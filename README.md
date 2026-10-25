@@ -168,7 +168,7 @@ Read [`FAILURE_MODES.md`](FAILURE_MODES.md). The short list:
 ### What we got wrong
 - We planned on Zetaris' MCP tools; the local platform has none, so we rebuilt the engine layer over JDBC on day 1.
 - We expected a 5–12 s hero; it runs about 35 s, so one live verification takes minutes, not seconds.
-- We first called the NVIDIA endpoint directly and added Meterless Nightshift as the provider later, so the recordings predate it.
+- We first called the NVIDIA endpoint directly and added Meterless Nightshift as the provider later, so the recorded packs (hero-r1/r2, traps, sample) predate it; the three filmed takes came after it but ran on direct NIM because no Nightshift runtime was reachable.
 - We specified Nemotron 3 Super and switched to Nemotron 3 Ultra mid-build.
 
 ## 🚀 Getting Started

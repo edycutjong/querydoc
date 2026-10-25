@@ -58,8 +58,8 @@ Known gaps in this family:
 
 ## 5. Timing is noisy
 
-Wall-clock on the local platform is noisy: the hero's original ran five times in one case (`recorded/live/hero-r1`) between 24460.9 ms and 37452.7 ms, and the `SELECT 1` floor
-(1.78 s) understates it. The rule needs a majority of alternating pairs to win, not a single run, and the saving must exceed the floor.
+Wall-clock on the local platform is noisy: the hero's original ran five times in one case (`recorded/live/hero-r1`) between 24460.9 ms and 37452.7 ms, and the noise floor
+(1.78 s = 3 × the 594 ms spread of `SELECT 1` runs) understates it. The rule needs a majority of alternating pairs to win, not a single run, and the saving must exceed the floor.
 The hero's 2.11× (median of 10 per-pair ratios; p50s 32,442.6 → 16,428 ms) is one laptop over local JDBC; it says nothing about a hosted deployment.
 NY_TAXI (CSV read in place) is far noisier than TPCDS (Parquet): a `COUNT` there took 200 s, so the live hero uses TPCDS (that 200 s figure is from an unlogged earlier probe).
 
