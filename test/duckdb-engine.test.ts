@@ -33,7 +33,7 @@ describe("DuckDB sample engine (committed NYC TLC subset)", () => {
     const small = await e.run("SELECT * FROM ops.zones", { rowCap: 1000 });
     expect(small.truncated).toBe(false);
     expect(small.rows.length).toBe(265);
-  });
+  }, 30_000); // draining ~496k rows takes >5 s on a 2-vCPU GitHub runner (passes in ~2 s locally)
 
   it("the row-hash fingerprint is order-independent, sees a changed value, and duplicate rows do not cancel", async () => {
     const fp = async (inner: string) => {
