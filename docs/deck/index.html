@@ -11,7 +11,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Query Doctor — pitch deck</title>
-<meta name="description" content="Query Doctor pitch deck: an agent that signs a SQL rewrite only after executing both versions on Zetaris returns identical rows and a measured speedup.">
+<meta name="description" content="Query Doctor pitch deck: an agent that signs a SQL rewrite only when both versions, executed on Zetaris, return identical rows and the rewrite is measurably faster.">
 <meta property="og:title" content="Query Doctor — pitch deck"><meta property="og:site_name" content="Query Doctor">
 <meta property="og:image" content="https://querydoc-flax.vercel.app/assets/og.png?v=56e6e5d968"><meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
@@ -275,13 +275,13 @@ FROM   TPCDS_DB.store_sales ss
 <s>LEFT JOIN TPCDS_DB.promotion p ON ss.ss_promo_sk = p.p_promo_sk</s>
 WHERE  ss.ss_customer_sk IS NULL</pre>
     <p class="l">Results vs reference · per-side medians of 3 alternating pairs</p>
-    <div class="res"><span>original</span><div class="bar" style="width:100%"><i>H</i></div><span class="t">29.3 s</span><span>rewrite</span><div class="bar rw" style="width:45.1%"></div><span class="t">13.2 s</span></div>
+    <div class="res"><span>original</span><div class="bar" style="width:100%"><i title="H: flagged high, as on a lab report">H</i></div><span class="t">29.3 s</span><span>rewrite</span><div class="bar rw" style="width:45.1%"></div><span class="t">13.2 s</span></div>
     <div class="verdict"><div class="fp"><span>original</span><span>87cd00c5</span><span>rewrite</span><b class="green">87cd00c5</b></div>
     <div class="stamp">ROW-IDENTICAL · 87CD00C5</div></div>
     <p class="sig">Verified by <b>Verifier</b> — code, no model · 2.1× = median pair ratio, 3/3 pairs faster</p>
   </div>
   <div class="qr art"><svg viewBox="0 0 33 33" width="108" height="108" role="img" aria-label="QR code for https://querydoc-flax.vercel.app/" shape-rendering="crispEdges"><rect width="33" height="33" fill="#FBFAF6"/><path fill="#1A1C1E" d="M2,2h1v1h-1zM3,2h1v1h-1zM4,2h1v1h-1zM5,2h1v1h-1zM6,2h1v1h-1zM7,2h1v1h-1zM8,2h1v1h-1zM11,2h1v1h-1zM13,2h1v1h-1zM14,2h1v1h-1zM15,2h1v1h-1zM18,2h1v1h-1zM21,2h1v1h-1zM24,2h1v1h-1zM25,2h1v1h-1zM26,2h1v1h-1zM27,2h1v1h-1zM28,2h1v1h-1zM29,2h1v1h-1zM30,2h1v1h-1zM2,3h1v1h-1zM8,3h1v1h-1zM10,3h1v1h-1zM12,3h1v1h-1zM16,3h1v1h-1zM17,3h1v1h-1zM18,3h1v1h-1zM20,3h1v1h-1zM21,3h1v1h-1zM24,3h1v1h-1zM30,3h1v1h-1zM2,4h1v1h-1zM4,4h1v1h-1zM5,4h1v1h-1zM6,4h1v1h-1zM8,4h1v1h-1zM14,4h1v1h-1zM15,4h1v1h-1zM16,4h1v1h-1zM18,4h1v1h-1zM20,4h1v1h-1zM21,4h1v1h-1zM24,4h1v1h-1zM26,4h1v1h-1zM27,4h1v1h-1zM28,4h1v1h-1zM30,4h1v1h-1zM2,5h1v1h-1zM4,5h1v1h-1zM5,5h1v1h-1zM6,5h1v1h-1zM8,5h1v1h-1zM12,5h1v1h-1zM13,5h1v1h-1zM14,5h1v1h-1zM15,5h1v1h-1zM16,5h1v1h-1zM17,5h1v1h-1zM20,5h1v1h-1zM24,5h1v1h-1zM26,5h1v1h-1zM27,5h1v1h-1zM28,5h1v1h-1zM30,5h1v1h-1zM2,6h1v1h-1zM4,6h1v1h-1zM5,6h1v1h-1zM6,6h1v1h-1zM8,6h1v1h-1zM10,6h1v1h-1zM11,6h1v1h-1zM16,6h1v1h-1zM20,6h1v1h-1zM21,6h1v1h-1zM22,6h1v1h-1zM24,6h1v1h-1zM26,6h1v1h-1zM27,6h1v1h-1zM28,6h1v1h-1zM30,6h1v1h-1zM2,7h1v1h-1zM8,7h1v1h-1zM11,7h1v1h-1zM13,7h1v1h-1zM14,7h1v1h-1zM15,7h1v1h-1zM19,7h1v1h-1zM20,7h1v1h-1zM21,7h1v1h-1zM24,7h1v1h-1zM30,7h1v1h-1zM2,8h1v1h-1zM3,8h1v1h-1zM4,8h1v1h-1zM5,8h1v1h-1zM6,8h1v1h-1zM7,8h1v1h-1zM8,8h1v1h-1zM10,8h1v1h-1zM12,8h1v1h-1zM14,8h1v1h-1zM16,8h1v1h-1zM18,8h1v1h-1zM20,8h1v1h-1zM22,8h1v1h-1zM24,8h1v1h-1zM25,8h1v1h-1zM26,8h1v1h-1zM27,8h1v1h-1zM28,8h1v1h-1zM29,8h1v1h-1zM30,8h1v1h-1zM12,9h1v1h-1zM13,9h1v1h-1zM14,9h1v1h-1zM15,9h1v1h-1zM16,9h1v1h-1zM18,9h1v1h-1zM19,9h1v1h-1zM20,9h1v1h-1zM21,9h1v1h-1zM2,10h1v1h-1zM4,10h1v1h-1zM6,10h1v1h-1zM8,10h1v1h-1zM14,10h1v1h-1zM16,10h1v1h-1zM17,10h1v1h-1zM18,10h1v1h-1zM19,10h1v1h-1zM21,10h1v1h-1zM26,10h1v1h-1zM29,10h1v1h-1zM2,11h1v1h-1zM4,11h1v1h-1zM5,11h1v1h-1zM14,11h1v1h-1zM16,11h1v1h-1zM17,11h1v1h-1zM19,11h1v1h-1zM20,11h1v1h-1zM22,11h1v1h-1zM24,11h1v1h-1zM27,11h1v1h-1zM30,11h1v1h-1zM3,12h1v1h-1zM5,12h1v1h-1zM6,12h1v1h-1zM7,12h1v1h-1zM8,12h1v1h-1zM9,12h1v1h-1zM11,12h1v1h-1zM13,12h1v1h-1zM14,12h1v1h-1zM15,12h1v1h-1zM18,12h1v1h-1zM19,12h1v1h-1zM20,12h1v1h-1zM28,12h1v1h-1zM29,12h1v1h-1zM30,12h1v1h-1zM2,13h1v1h-1zM3,13h1v1h-1zM4,13h1v1h-1zM6,13h1v1h-1zM7,13h1v1h-1zM9,13h1v1h-1zM11,13h1v1h-1zM13,13h1v1h-1zM17,13h1v1h-1zM19,13h1v1h-1zM21,13h1v1h-1zM25,13h1v1h-1zM29,13h1v1h-1zM2,14h1v1h-1zM4,14h1v1h-1zM7,14h1v1h-1zM8,14h1v1h-1zM9,14h1v1h-1zM10,14h1v1h-1zM11,14h1v1h-1zM12,14h1v1h-1zM13,14h1v1h-1zM18,14h1v1h-1zM19,14h1v1h-1zM22,14h1v1h-1zM23,14h1v1h-1zM24,14h1v1h-1zM25,14h1v1h-1zM27,14h1v1h-1zM29,14h1v1h-1zM30,14h1v1h-1zM2,15h1v1h-1zM3,15h1v1h-1zM4,15h1v1h-1zM5,15h1v1h-1zM11,15h1v1h-1zM12,15h1v1h-1zM14,15h1v1h-1zM15,15h1v1h-1zM17,15h1v1h-1zM19,15h1v1h-1zM22,15h1v1h-1zM23,15h1v1h-1zM24,15h1v1h-1zM27,15h1v1h-1zM30,15h1v1h-1zM2,16h1v1h-1zM3,16h1v1h-1zM5,16h1v1h-1zM6,16h1v1h-1zM8,16h1v1h-1zM9,16h1v1h-1zM11,16h1v1h-1zM12,16h1v1h-1zM16,16h1v1h-1zM19,16h1v1h-1zM20,16h1v1h-1zM22,16h1v1h-1zM23,16h1v1h-1zM24,16h1v1h-1zM25,16h1v1h-1zM26,16h1v1h-1zM27,16h1v1h-1zM29,16h1v1h-1zM30,16h1v1h-1zM2,17h1v1h-1zM7,17h1v1h-1zM10,17h1v1h-1zM12,17h1v1h-1zM15,17h1v1h-1zM16,17h1v1h-1zM18,17h1v1h-1zM19,17h1v1h-1zM20,17h1v1h-1zM21,17h1v1h-1zM22,17h1v1h-1zM23,17h1v1h-1zM27,17h1v1h-1zM29,17h1v1h-1zM2,18h1v1h-1zM5,18h1v1h-1zM7,18h1v1h-1zM8,18h1v1h-1zM10,18h1v1h-1zM11,18h1v1h-1zM16,18h1v1h-1zM17,18h1v1h-1zM18,18h1v1h-1zM19,18h1v1h-1zM21,18h1v1h-1zM22,18h1v1h-1zM23,18h1v1h-1zM24,18h1v1h-1zM27,18h1v1h-1zM29,18h1v1h-1zM30,18h1v1h-1zM3,19h1v1h-1zM4,19h1v1h-1zM6,19h1v1h-1zM10,19h1v1h-1zM14,19h1v1h-1zM16,19h1v1h-1zM19,19h1v1h-1zM22,19h1v1h-1zM23,19h1v1h-1zM24,19h1v1h-1zM27,19h1v1h-1zM28,19h1v1h-1zM30,19h1v1h-1zM2,20h1v1h-1zM6,20h1v1h-1zM8,20h1v1h-1zM13,20h1v1h-1zM15,20h1v1h-1zM18,20h1v1h-1zM22,20h1v1h-1zM23,20h1v1h-1zM25,20h1v1h-1zM26,20h1v1h-1zM29,20h1v1h-1zM30,20h1v1h-1zM3,21h1v1h-1zM7,21h1v1h-1zM14,21h1v1h-1zM17,21h1v1h-1zM19,21h1v1h-1zM20,21h1v1h-1zM22,21h1v1h-1zM24,21h1v1h-1zM27,21h1v1h-1zM29,21h1v1h-1zM2,22h1v1h-1zM7,22h1v1h-1zM8,22h1v1h-1zM9,22h1v1h-1zM11,22h1v1h-1zM13,22h1v1h-1zM19,22h1v1h-1zM22,22h1v1h-1zM23,22h1v1h-1zM24,22h1v1h-1zM25,22h1v1h-1zM26,22h1v1h-1zM10,23h1v1h-1zM11,23h1v1h-1zM15,23h1v1h-1zM18,23h1v1h-1zM21,23h1v1h-1zM22,23h1v1h-1zM26,23h1v1h-1zM28,23h1v1h-1zM29,23h1v1h-1zM30,23h1v1h-1zM2,24h1v1h-1zM3,24h1v1h-1zM4,24h1v1h-1zM5,24h1v1h-1zM6,24h1v1h-1zM7,24h1v1h-1zM8,24h1v1h-1zM13,24h1v1h-1zM14,24h1v1h-1zM16,24h1v1h-1zM18,24h1v1h-1zM21,24h1v1h-1zM22,24h1v1h-1zM24,24h1v1h-1zM26,24h1v1h-1zM27,24h1v1h-1zM29,24h1v1h-1zM30,24h1v1h-1zM2,25h1v1h-1zM8,25h1v1h-1zM12,25h1v1h-1zM13,25h1v1h-1zM15,25h1v1h-1zM16,25h1v1h-1zM17,25h1v1h-1zM19,25h1v1h-1zM22,25h1v1h-1zM26,25h1v1h-1zM27,25h1v1h-1zM2,26h1v1h-1zM4,26h1v1h-1zM5,26h1v1h-1zM6,26h1v1h-1zM8,26h1v1h-1zM10,26h1v1h-1zM13,26h1v1h-1zM14,26h1v1h-1zM16,26h1v1h-1zM19,26h1v1h-1zM20,26h1v1h-1zM22,26h1v1h-1zM23,26h1v1h-1zM24,26h1v1h-1zM25,26h1v1h-1zM26,26h1v1h-1zM30,26h1v1h-1zM2,27h1v1h-1zM4,27h1v1h-1zM5,27h1v1h-1zM6,27h1v1h-1zM8,27h1v1h-1zM11,27h1v1h-1zM13,27h1v1h-1zM14,27h1v1h-1zM15,27h1v1h-1zM16,27h1v1h-1zM18,27h1v1h-1zM26,27h1v1h-1zM28,27h1v1h-1zM29,27h1v1h-1zM30,27h1v1h-1zM2,28h1v1h-1zM4,28h1v1h-1zM5,28h1v1h-1zM6,28h1v1h-1zM8,28h1v1h-1zM10,28h1v1h-1zM12,28h1v1h-1zM15,28h1v1h-1zM19,28h1v1h-1zM21,28h1v1h-1zM25,28h1v1h-1zM26,28h1v1h-1zM27,28h1v1h-1zM30,28h1v1h-1zM2,29h1v1h-1zM8,29h1v1h-1zM11,29h1v1h-1zM12,29h1v1h-1zM13,29h1v1h-1zM14,29h1v1h-1zM15,29h1v1h-1zM17,29h1v1h-1zM19,29h1v1h-1zM21,29h1v1h-1zM22,29h1v1h-1zM23,29h1v1h-1zM29,29h1v1h-1zM2,30h1v1h-1zM3,30h1v1h-1zM4,30h1v1h-1zM5,30h1v1h-1zM6,30h1v1h-1zM7,30h1v1h-1zM8,30h1v1h-1zM10,30h1v1h-1zM13,30h1v1h-1zM16,30h1v1h-1zM18,30h1v1h-1zM19,30h1v1h-1zM22,30h1v1h-1zM23,30h1v1h-1zM26,30h1v1h-1zM27,30h1v1h-1zM29,30h1v1h-1zM30,30h1v1h-1z"/></svg><span>landing + this deck<br>querydoc-flax.vercel.app</span></div>
-  <div class="ft"><span>Query Doctor · Open Agent Hackathon 2026</span><span>v0.1.0 · code b05f6f7 · 01 / 11</span></div>
+  <div class="ft"><span>Query Doctor · Open Agent Hackathon 2026</span><span>v0.1.0 · code 09a0bb0 · 01 / 11</span></div>
   <aside class="speaker-notes">A rewrite that makes a query faster can also make it wrong, and the diff looks the same either way. Query Doctor executes both on Zetaris and only signs when the rows match. Here it signed: 2.1× on this run, 2.11× over ten paired runs.</aside>
 </section>
 
@@ -303,13 +303,13 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
       <p class="who">Reviewers see one deleted join. Users: whoever reviews a rewrite before it merges — the diff is all they see.</p>
     </div>
   </div>
-  <div class="ft"><span>evidence/verify/2026-10-25T08-42-12Z · Verifier REJECT ROW_DIFF</span><span>v0.1.0 · code b05f6f7 · 02 / 11</span></div>
+  <div class="ft"><span>evidence/verify/2026-10-25T08-42-12Z · Verifier REJECT ROW_DIFF</span><span>v0.1.0 · code 09a0bb0 · 02 / 11</span></div>
   <aside class="speaker-notes">This is the trino#2939 shape: drop a LEFT JOIN whose columns are never read. Safe when the joined key is unique. Here the key repeats, so the count drops by 24 rows. Nothing in the diff tells the reviewer which case they are in.</aside>
 </section>
 
 <!-- 3 SOLUTION -->
 <section class="slide s3" data-n="3" aria-label="Solution">
-  <div class="lh"><span><b>Method</b> · four agents, one rule</span><span>names as they appear in the traces</span></div>
+  <div class="lh"><span><b>Method</b> · three agents and an orchestrator, one rule</span><span>names as they appear in the traces</span></div>
   <p class="eb">Solution</p>
   <h2>A model proposes. <em>Code decides.</em></h2>
   <div class="agents">
@@ -319,7 +319,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
     <div class="rise r"><span class="k">model</span><h3>Rewriter</h3><p>One rewrite per hypothesis.</p><p class="ex">drops the unused join</p></div>
     <div class="rise r"><span class="k code">code</span><h3>Orchestrator</h3><p>Sequences, retries, remembers refusals.</p><p class="ex">1 attempt → ACCEPTED</p></div>
   </div>
-  <div class="ft"><span>Diagnoser + Rewriter: Nemotron 3 Ultra · Verifier + Orchestrator: TypeScript</span><span>v0.1.0 · code b05f6f7 · 03 / 11</span></div>
+  <div class="ft"><span>Diagnoser + Rewriter: Nemotron 3 Ultra · Verifier + Orchestrator: TypeScript</span><span>v0.1.0 · code 09a0bb0 · 03 / 11</span></div>
   <aside class="speaker-notes">Two agents use the model, two are plain code. The Verifier has no model at all: it runs the queries on the engine. A refusal goes back to the Rewriter as a reason code; the latest one also carries the Verifier's detail and the differing row.</aside>
 </section>
 
@@ -351,7 +351,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
     <span class="lab red" style="left:1474px;top:126px;line-height:1.35">NOT_FASTER<br>(no_gain) →<br>Diagnoser.revise</span>
     <div class="nd" style="left:0;top:628px;width:1680px;display:flex;gap:40px;align-items:baseline;font-size:18px"><b style="display:inline;font-size:26px">Engines</b>Zetaris · local platform over a Java JDBC sidecar (live) <span class="mut">|</span> DuckDB · committed NYC TLC subset (sample, keyless) <span class="mut">|</span> model: Nightshift default · NIM fallback (recorded)</div>
   </div>
-  <div class="ft"><span>src/orchestrator.ts · src/agents/verifier.ts · src/reasoning/chain.ts · src/memory/playbook.ts</span><span>v0.1.0 · code b05f6f7 · 04 / 11</span></div>
+  <div class="ft"><span>src/orchestrator.ts · src/agents/verifier.ts · src/reasoning/chain.ts · src/memory/playbook.ts</span><span>v0.1.0 · code 09a0bb0 · 04 / 11</span></div>
   <aside class="speaker-notes">The pre-check runs the original twice, so a query whose results change between runs is marked NOT_VERIFIABLE instead of compared. The Diagnoser and Rewriter are the only model calls. Every candidate goes through the same Verifier; a changed-rows refusal is written to the playbook and the next attempt sees it.</aside>
 </section>
 
@@ -370,7 +370,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
       <li class="rise">Labelled: evidence from a recorded run.</li>
     </ol>
   </div>
-  <div class="ft"><span>real screen of the app · evidence from the recorded run, not a new execution</span><span>v0.1.0 · code b05f6f7 · 05 / 11</span></div>
+  <div class="ft"><span>real screen of the app · evidence from the recorded run, not a new execution</span><span>v0.1.0 · code 09a0bb0 · 05 / 11</span></div>
   <aside class="speaker-notes">This is the product's Report screen replaying the recorded live run. The verdict and the stamp come first, then the measured runtime bars. The page says plainly that this is evidence from a recorded run, not a new execution; the agent trace sits beside it in the app.</aside>
 </section>
 
@@ -397,7 +397,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
       <div class="stamp no">REFUSED · ROW_DIFF</div>
     </div>
   </div>
-  <div class="ft"><span>recorded/live/hero-r1/case.json · recorded/live/hero-trap-r1/case.json + trace.jsonl (profile_keys)</span><span>v0.1.0 · code b05f6f7 · 06 / 11</span></div>
+  <div class="ft"><span>recorded/live/hero-r1/case.json · recorded/live/hero-trap-r1/case.json + trace.jsonl (profile_keys)</span><span>v0.1.0 · code 09a0bb0 · 06 / 11</span></div>
   <aside class="speaker-notes">Same query, same edit: drop the join. On the left the key is unique, the fingerprints match and it is 2.1× faster. On the right the key has duplicates, the rewrite returns 129,752 instead of the original's count, and the Verifier refuses it. Reading the SQL cannot tell these apart; executing it can.</aside>
 </section>
 
@@ -414,7 +414,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
     <div class="rise"><div class="n red">6 / 15</div><p class="what">baseline changed rows</p><p class="src">one model call, same Verifier, DuckDB<br>Query Doctor shipped: 0</p>
       <div class="dots art"><i class="c">Δ</i><i class="c">Δ</i><i class="c">Δ</i><i class="c">Δ</i><i class="c">Δ</i><i class="c">Δ</i><i>=</i><i>=</i><i>=</i><i>=</i><i>=</i><i class="e">·</i><i class="e">·</i><i class="e">·</i><i class="e">·</i></div></div>
   </div>
-  <div class="ft"><span>designed queries, small N — not a rate on real workloads · one laptop, local JDBC</span><span>v0.1.0 · code b05f6f7 · 07 / 11</span></div>
+  <div class="ft"><span>designed queries, small N — not a rate on real workloads · one laptop, local JDBC</span><span>v0.1.0 · code 09a0bb0 · 07 / 11</span></div>
   <aside class="speaker-notes">The live verdict and the benchmark are separate runs: 2.1× and 2.15× on the two recorded hero runs, 2.11× median over ten alternating pairs in the bench. A one-shot baseline scored by the same Verifier changed rows in 6 of 15 runs; Query Doctor shipped none.</aside>
 </section>
 
@@ -434,7 +434,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
       <p class="nsx rise">Nightshift: 0 live runs, mock-tested</p></div>
   </div>
   <p class="also"><span><b>NVIDIA</b> Nemotron · 2 calls</span></p>
-  <div class="ft"><span>counts from the recorded trace of hero-r1 · Nightshift: 16 mock-runtime tests</span><span>v0.1.0 · code b05f6f7 · 08 / 11</span></div>
+  <div class="ft"><span>counts from the recorded trace of hero-r1 · Nightshift: 16 mock-runtime tests</span><span>v0.1.0 · code 09a0bb0 · 08 / 11</span></div>
   <aside class="speaker-notes">Counted from one live case. Ten queries on Zetaris — nine Verifier runs and one key profile — and one EXPLAIN. H-MEM is opened and queried before the rewrite, and the Markovian chain hands the attempt to the Verifier. Nightshift is the default provider in code but has only run against a mock; the recorded runs used NIM directly.</aside>
 </section>
 
@@ -460,7 +460,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
       <p class="rise">Cursor wrote scaffold <span class="mono">d3e823c</span>; Claude Code the rest.</p>
     </div>
   </div>
-  <div class="ft"><span>docker build -t querydoc . &amp;&amp; docker run --rm -p 8000:8000 -e SAMPLE_MODE=true querydoc</span><span>v0.1.0 · code b05f6f7 · 09 / 11</span></div>
+  <div class="ft"><span>docker build -t querydoc . &amp;&amp; docker run --rm -p 8000:8000 -e SAMPLE_MODE=true querydoc</span><span>v0.1.0 · code 09a0bb0 · 09 / 11</span></div>
   <aside class="speaker-notes">A judge can run it with one Docker command and no keys: DuckDB on a committed NYC taxi subset with recorded model answers. Cursor's agent wrote the scaffold commit; Claude Code wrote the rest, and every commit carries a Tool trailer saying which.</aside>
 </section>
 
@@ -477,8 +477,8 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
     </ul>
     <img class="shot art" loading="lazy" decoding="async" src="../assets/ui-trap-attempts.webp" width="1568" height="1164" alt="Query Doctor — three refused attempts on the duplicated-key trap, each struck through with the Verifier's reason">
   </div>
-  <div class="ft"><span>real screen · README Limitations: the retry loop does not reliably learn from a refusal</span><span>v0.1.0 · code b05f6f7 · 10 / 11</span></div>
-  <aside class="speaker-notes">We keep the losing rewrites on the report too, with the row that proves them wrong. Honestly: the retry loop did not learn here; all three attempts changed the rows. What saved it was the gate, not the model.</aside>
+  <div class="ft"><span>real screen · README Limitations: the retry loop does not reliably learn from a refusal</span><span>v0.1.0 · code 09a0bb0 · 10 / 11</span></div>
+  <aside class="speaker-notes">We keep the losing rewrites on the report too, with the row that proves them wrong. Honestly: the retry loop did not learn here; both executed attempts changed the rows, and the third repeated the first. What saved it was the gate, not the model.</aside>
 </section>
 
 <!-- 11 FUTURE -->
@@ -494,7 +494,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
   </ul>
   <div class="end art"><svg viewBox="0 0 33 33" width="300" height="300" role="img" aria-label="QR code for https://querydoc-flax.vercel.app/" shape-rendering="crispEdges"><rect width="33" height="33" fill="#FBFAF6"/><path fill="#1A1C1E" d="M2,2h1v1h-1zM3,2h1v1h-1zM4,2h1v1h-1zM5,2h1v1h-1zM6,2h1v1h-1zM7,2h1v1h-1zM8,2h1v1h-1zM11,2h1v1h-1zM13,2h1v1h-1zM14,2h1v1h-1zM15,2h1v1h-1zM18,2h1v1h-1zM21,2h1v1h-1zM24,2h1v1h-1zM25,2h1v1h-1zM26,2h1v1h-1zM27,2h1v1h-1zM28,2h1v1h-1zM29,2h1v1h-1zM30,2h1v1h-1zM2,3h1v1h-1zM8,3h1v1h-1zM10,3h1v1h-1zM12,3h1v1h-1zM16,3h1v1h-1zM17,3h1v1h-1zM18,3h1v1h-1zM20,3h1v1h-1zM21,3h1v1h-1zM24,3h1v1h-1zM30,3h1v1h-1zM2,4h1v1h-1zM4,4h1v1h-1zM5,4h1v1h-1zM6,4h1v1h-1zM8,4h1v1h-1zM14,4h1v1h-1zM15,4h1v1h-1zM16,4h1v1h-1zM18,4h1v1h-1zM20,4h1v1h-1zM21,4h1v1h-1zM24,4h1v1h-1zM26,4h1v1h-1zM27,4h1v1h-1zM28,4h1v1h-1zM30,4h1v1h-1zM2,5h1v1h-1zM4,5h1v1h-1zM5,5h1v1h-1zM6,5h1v1h-1zM8,5h1v1h-1zM12,5h1v1h-1zM13,5h1v1h-1zM14,5h1v1h-1zM15,5h1v1h-1zM16,5h1v1h-1zM17,5h1v1h-1zM20,5h1v1h-1zM24,5h1v1h-1zM26,5h1v1h-1zM27,5h1v1h-1zM28,5h1v1h-1zM30,5h1v1h-1zM2,6h1v1h-1zM4,6h1v1h-1zM5,6h1v1h-1zM6,6h1v1h-1zM8,6h1v1h-1zM10,6h1v1h-1zM11,6h1v1h-1zM16,6h1v1h-1zM20,6h1v1h-1zM21,6h1v1h-1zM22,6h1v1h-1zM24,6h1v1h-1zM26,6h1v1h-1zM27,6h1v1h-1zM28,6h1v1h-1zM30,6h1v1h-1zM2,7h1v1h-1zM8,7h1v1h-1zM11,7h1v1h-1zM13,7h1v1h-1zM14,7h1v1h-1zM15,7h1v1h-1zM19,7h1v1h-1zM20,7h1v1h-1zM21,7h1v1h-1zM24,7h1v1h-1zM30,7h1v1h-1zM2,8h1v1h-1zM3,8h1v1h-1zM4,8h1v1h-1zM5,8h1v1h-1zM6,8h1v1h-1zM7,8h1v1h-1zM8,8h1v1h-1zM10,8h1v1h-1zM12,8h1v1h-1zM14,8h1v1h-1zM16,8h1v1h-1zM18,8h1v1h-1zM20,8h1v1h-1zM22,8h1v1h-1zM24,8h1v1h-1zM25,8h1v1h-1zM26,8h1v1h-1zM27,8h1v1h-1zM28,8h1v1h-1zM29,8h1v1h-1zM30,8h1v1h-1zM12,9h1v1h-1zM13,9h1v1h-1zM14,9h1v1h-1zM15,9h1v1h-1zM16,9h1v1h-1zM18,9h1v1h-1zM19,9h1v1h-1zM20,9h1v1h-1zM21,9h1v1h-1zM2,10h1v1h-1zM4,10h1v1h-1zM6,10h1v1h-1zM8,10h1v1h-1zM14,10h1v1h-1zM16,10h1v1h-1zM17,10h1v1h-1zM18,10h1v1h-1zM19,10h1v1h-1zM21,10h1v1h-1zM26,10h1v1h-1zM29,10h1v1h-1zM2,11h1v1h-1zM4,11h1v1h-1zM5,11h1v1h-1zM14,11h1v1h-1zM16,11h1v1h-1zM17,11h1v1h-1zM19,11h1v1h-1zM20,11h1v1h-1zM22,11h1v1h-1zM24,11h1v1h-1zM27,11h1v1h-1zM30,11h1v1h-1zM3,12h1v1h-1zM5,12h1v1h-1zM6,12h1v1h-1zM7,12h1v1h-1zM8,12h1v1h-1zM9,12h1v1h-1zM11,12h1v1h-1zM13,12h1v1h-1zM14,12h1v1h-1zM15,12h1v1h-1zM18,12h1v1h-1zM19,12h1v1h-1zM20,12h1v1h-1zM28,12h1v1h-1zM29,12h1v1h-1zM30,12h1v1h-1zM2,13h1v1h-1zM3,13h1v1h-1zM4,13h1v1h-1zM6,13h1v1h-1zM7,13h1v1h-1zM9,13h1v1h-1zM11,13h1v1h-1zM13,13h1v1h-1zM17,13h1v1h-1zM19,13h1v1h-1zM21,13h1v1h-1zM25,13h1v1h-1zM29,13h1v1h-1zM2,14h1v1h-1zM4,14h1v1h-1zM7,14h1v1h-1zM8,14h1v1h-1zM9,14h1v1h-1zM10,14h1v1h-1zM11,14h1v1h-1zM12,14h1v1h-1zM13,14h1v1h-1zM18,14h1v1h-1zM19,14h1v1h-1zM22,14h1v1h-1zM23,14h1v1h-1zM24,14h1v1h-1zM25,14h1v1h-1zM27,14h1v1h-1zM29,14h1v1h-1zM30,14h1v1h-1zM2,15h1v1h-1zM3,15h1v1h-1zM4,15h1v1h-1zM5,15h1v1h-1zM11,15h1v1h-1zM12,15h1v1h-1zM14,15h1v1h-1zM15,15h1v1h-1zM17,15h1v1h-1zM19,15h1v1h-1zM22,15h1v1h-1zM23,15h1v1h-1zM24,15h1v1h-1zM27,15h1v1h-1zM30,15h1v1h-1zM2,16h1v1h-1zM3,16h1v1h-1zM5,16h1v1h-1zM6,16h1v1h-1zM8,16h1v1h-1zM9,16h1v1h-1zM11,16h1v1h-1zM12,16h1v1h-1zM16,16h1v1h-1zM19,16h1v1h-1zM20,16h1v1h-1zM22,16h1v1h-1zM23,16h1v1h-1zM24,16h1v1h-1zM25,16h1v1h-1zM26,16h1v1h-1zM27,16h1v1h-1zM29,16h1v1h-1zM30,16h1v1h-1zM2,17h1v1h-1zM7,17h1v1h-1zM10,17h1v1h-1zM12,17h1v1h-1zM15,17h1v1h-1zM16,17h1v1h-1zM18,17h1v1h-1zM19,17h1v1h-1zM20,17h1v1h-1zM21,17h1v1h-1zM22,17h1v1h-1zM23,17h1v1h-1zM27,17h1v1h-1zM29,17h1v1h-1zM2,18h1v1h-1zM5,18h1v1h-1zM7,18h1v1h-1zM8,18h1v1h-1zM10,18h1v1h-1zM11,18h1v1h-1zM16,18h1v1h-1zM17,18h1v1h-1zM18,18h1v1h-1zM19,18h1v1h-1zM21,18h1v1h-1zM22,18h1v1h-1zM23,18h1v1h-1zM24,18h1v1h-1zM27,18h1v1h-1zM29,18h1v1h-1zM30,18h1v1h-1zM3,19h1v1h-1zM4,19h1v1h-1zM6,19h1v1h-1zM10,19h1v1h-1zM14,19h1v1h-1zM16,19h1v1h-1zM19,19h1v1h-1zM22,19h1v1h-1zM23,19h1v1h-1zM24,19h1v1h-1zM27,19h1v1h-1zM28,19h1v1h-1zM30,19h1v1h-1zM2,20h1v1h-1zM6,20h1v1h-1zM8,20h1v1h-1zM13,20h1v1h-1zM15,20h1v1h-1zM18,20h1v1h-1zM22,20h1v1h-1zM23,20h1v1h-1zM25,20h1v1h-1zM26,20h1v1h-1zM29,20h1v1h-1zM30,20h1v1h-1zM3,21h1v1h-1zM7,21h1v1h-1zM14,21h1v1h-1zM17,21h1v1h-1zM19,21h1v1h-1zM20,21h1v1h-1zM22,21h1v1h-1zM24,21h1v1h-1zM27,21h1v1h-1zM29,21h1v1h-1zM2,22h1v1h-1zM7,22h1v1h-1zM8,22h1v1h-1zM9,22h1v1h-1zM11,22h1v1h-1zM13,22h1v1h-1zM19,22h1v1h-1zM22,22h1v1h-1zM23,22h1v1h-1zM24,22h1v1h-1zM25,22h1v1h-1zM26,22h1v1h-1zM10,23h1v1h-1zM11,23h1v1h-1zM15,23h1v1h-1zM18,23h1v1h-1zM21,23h1v1h-1zM22,23h1v1h-1zM26,23h1v1h-1zM28,23h1v1h-1zM29,23h1v1h-1zM30,23h1v1h-1zM2,24h1v1h-1zM3,24h1v1h-1zM4,24h1v1h-1zM5,24h1v1h-1zM6,24h1v1h-1zM7,24h1v1h-1zM8,24h1v1h-1zM13,24h1v1h-1zM14,24h1v1h-1zM16,24h1v1h-1zM18,24h1v1h-1zM21,24h1v1h-1zM22,24h1v1h-1zM24,24h1v1h-1zM26,24h1v1h-1zM27,24h1v1h-1zM29,24h1v1h-1zM30,24h1v1h-1zM2,25h1v1h-1zM8,25h1v1h-1zM12,25h1v1h-1zM13,25h1v1h-1zM15,25h1v1h-1zM16,25h1v1h-1zM17,25h1v1h-1zM19,25h1v1h-1zM22,25h1v1h-1zM26,25h1v1h-1zM27,25h1v1h-1zM2,26h1v1h-1zM4,26h1v1h-1zM5,26h1v1h-1zM6,26h1v1h-1zM8,26h1v1h-1zM10,26h1v1h-1zM13,26h1v1h-1zM14,26h1v1h-1zM16,26h1v1h-1zM19,26h1v1h-1zM20,26h1v1h-1zM22,26h1v1h-1zM23,26h1v1h-1zM24,26h1v1h-1zM25,26h1v1h-1zM26,26h1v1h-1zM30,26h1v1h-1zM2,27h1v1h-1zM4,27h1v1h-1zM5,27h1v1h-1zM6,27h1v1h-1zM8,27h1v1h-1zM11,27h1v1h-1zM13,27h1v1h-1zM14,27h1v1h-1zM15,27h1v1h-1zM16,27h1v1h-1zM18,27h1v1h-1zM26,27h1v1h-1zM28,27h1v1h-1zM29,27h1v1h-1zM30,27h1v1h-1zM2,28h1v1h-1zM4,28h1v1h-1zM5,28h1v1h-1zM6,28h1v1h-1zM8,28h1v1h-1zM10,28h1v1h-1zM12,28h1v1h-1zM15,28h1v1h-1zM19,28h1v1h-1zM21,28h1v1h-1zM25,28h1v1h-1zM26,28h1v1h-1zM27,28h1v1h-1zM30,28h1v1h-1zM2,29h1v1h-1zM8,29h1v1h-1zM11,29h1v1h-1zM12,29h1v1h-1zM13,29h1v1h-1zM14,29h1v1h-1zM15,29h1v1h-1zM17,29h1v1h-1zM19,29h1v1h-1zM21,29h1v1h-1zM22,29h1v1h-1zM23,29h1v1h-1zM29,29h1v1h-1zM2,30h1v1h-1zM3,30h1v1h-1zM4,30h1v1h-1zM5,30h1v1h-1zM6,30h1v1h-1zM7,30h1v1h-1zM8,30h1v1h-1zM10,30h1v1h-1zM13,30h1v1h-1zM16,30h1v1h-1zM18,30h1v1h-1zM19,30h1v1h-1zM22,30h1v1h-1zM23,30h1v1h-1zM26,30h1v1h-1zM27,30h1v1h-1zM29,30h1v1h-1zM30,30h1v1h-1z"/></svg><p>querydoc-flax.vercel.app<br>landing · deck · recorded runs</p></div>
   <p class="sig2">Verified by the Verifier.</p>
-  <div class="ft"><span>Query Doctor · Apache-2.0 · github.com/edycutjong/querydoc</span><span>v0.1.0 · code b05f6f7 · 11 / 11</span></div>
+  <div class="ft"><span>Query Doctor · Apache-2.0 · github.com/edycutjong/querydoc</span><span>v0.1.0 · code 09a0bb0 · 11 / 11</span></div>
   <aside class="speaker-notes">Everything you saw ran on queries we designed. The next step is a workload we did not write, plus the baseline on Zetaris. Then the live Nightshift recording, MCP intake when Zetaris exposes it, and write-back once a human approves.</aside>
 </section>
 

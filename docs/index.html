@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Query Doctor — same rows, faster, or it won't sign</title>
-<meta name="description" content="Query Doctor keeps a SQL rewrite only after executing both versions on Zetaris returns identical rows and a measured speedup.">
+<meta name="description" content="Query Doctor keeps a SQL rewrite only when both versions, executed on Zetaris, return identical rows and the rewrite is measurably faster.">
 <meta name="author" content="Edy Cu">
 <meta name="twitter:creator" content="@edycutjong">
 <meta name="theme-color" content="#F3F0E8">
@@ -390,7 +390,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
     <p class="lbl" id="reslbl">Results vs reference · per-side medians of 3 alternating pairs</p>
     <p class="xbig" id="xbig"><span id="xnum">2.1×</span><small id="xcap">live verdict · median pair ratio · 3/3 pairs faster · saves 16.9 s (median pair saving)</small></p>
     <div class="res" id="res">
-      <span>original</span><div class="bar" style="width:100%"><i>H</i></div><span class="t">29.3 s</span>
+      <span>original</span><div class="bar" style="width:100%"><i title="H: flagged high, as on a lab report">H</i></div><span class="t">29.3 s</span>
       <span>rewrite</span><div class="bar rw" id="rwbar" style="width:45.1%"></div><span class="t" id="rwt">13.2 s</span>
     </div>
     <div class="verdict"><div class="fp"><span>original</span><span class="hex" id="fpo">87cd00c5</span><span id="fprl">rewrite</span><span class="hex" id="fpr">87cd00c5</span></div>
@@ -427,7 +427,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
 </div></section>
 
 <section class="sec" id="how" style="padding-top:0"><div class="wrap">
-  <p class="lbl">Method · four agents, one rule</p>
+  <p class="lbl">Method · three agents, one rule</p>
   <h2 class="t">A model proposes. <em>Code decides.</em></h2>
   <p class="lede">Nemotron writes the diagnosis and the rewrite. The verdict, every number and every timing come from code that executes both queries on Zetaris.</p>
   <article class="ver">
@@ -457,7 +457,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
 <section class="sec band2" id="trap"><div class="wrap">
   <p class="lbl">Comments · the same edit on two keys</p>
   <h2 class="t">Three wrong rewrites, <em>kept on the page.</em></h2>
-  <p class="lede">Same query, a different join key: <code>p_item_sk</code>, which repeats. Dropping the join now changes the count. The Rewriter tried three times; the Verifier refused all three and wrote why in the margin.</p>
+  <p class="lede">Same query, a different join key: <code>p_item_sk</code>, which repeats. Dropping the join now changes the count. The Rewriter tried three times; the Verifier refused two by execution and the third from its ledger, and wrote why in the margin.</p>
   <div class="twin">
     <div class="fig"><p class="lbl">hero-r1 · ON p_promo_sk</p><p class="big">300 <span>distinct</span></p><p class="of">of 300 non-null values · fingerprints 87cd00c5 = 87cd00c5</p><div class="stamp static" id="stamp3">ROW-IDENTICAL · 87CD00C5</div></div>
     <div class="fig"><p class="lbl">hero-trap-r1 · ON p_item_sk</p><p class="big"><span class="red">291</span> <span>distinct</span></p><p class="of">of 293 non-null values · attempt 1 fingerprints e51f9da7 ≠ 87cd00c5</p><div class="stamp no static" id="stamp2">REFUSED · ROW_DIFF</div></div>
@@ -506,7 +506,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
   <p class="lbl">Honest by design · from the README</p>
   <h2 class="t">What it <em>can't</em> do yet.</h2>
   <div class="comments">
-    <blockquote><span class="n">COMMENT 1</span><p>“The retry loop does not reliably learn from a refusal: on the duplicated-key hero trap all 3 attempts changed the rows (two dropped the join, one swapped it for a LEFT SEMI JOIN) although the prompt carried the measured fact that the key is not unique.”</p><cite>— README · Limitations</cite></blockquote>
+    <blockquote><span class="n">COMMENT 1</span><p>“The retry loop does not reliably learn from a refusal: on the duplicated-key hero trap the first two attempts changed the rows when executed (one dropped the join, one swapped it for a LEFT SEMI JOIN) and the third repeated the first and was refused from the ledger without running, although the prompt carried the measured fact that the key is not unique.”</p><cite>— README · Limitations</cite></blockquote>
     <blockquote><span class="n">COMMENT 2</span><p>“Nightshift was never run live; there is no hosted CI run to cite (GitHub Actions did not start on the private repo).”</p><cite>— README · Limitations</cite></blockquote>
     <blockquote><span class="n">COMMENT 3</span><p>“We expected a 5–12 s hero; it runs about 35 s, so one live verification takes minutes, not seconds.”</p><cite>— README · What we got wrong</cite></blockquote>
   </div>
@@ -536,7 +536,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
     <li><a href="https://github.com/edycutjong/querydoc/tree/main/recorded/live">Recorded live runs</a></li>
     <li><a href="https://github.com/trinodb/trino/issues/2939">trino#2939, the hero's shape</a></li>
   </ul>
-  <p class="vstamp">v0.1.0 · code b05f6f7 · page built 2026-10-25 18:07 UTC · numbers from DEMO.md, evals/results.md and recorded/live/</p>
+  <p class="vstamp">v0.1.0 · code 09a0bb0 · page built 2026-10-25 20:30 UTC · numbers from DEMO.md, evals/results.md and recorded/live/</p>
 </div></footer>
 
 <script>
