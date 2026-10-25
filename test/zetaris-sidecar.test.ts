@@ -35,6 +35,11 @@ describe("ZetarisEngine ↔ sidecar", () => {
     await expect(e.run("SELECT 1", { rowCap: 1, timeoutSec: 5 })).rejects.toThrow(/no ready line within 0.3 s/);
   });
 
+  it("EXPLAIN wraps the statement without a pasted trailing semicolon", async () => {
+    const plan = await open().explain("SELECT 1 ;  ");
+    expect(plan.text).toBe("EXPLAIN FORMATTED SELECT 1");
+  });
+
   it("close() fails a statement still waiting instead of leaving it pending", async () => {
     const e = open(60);
     const pending = e.run("SELECT 'hang'", { rowCap: 1, timeoutSec: 60 });

@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { sqlGuard } from "../guard/sqlGuard.js";
+import { trimStatement } from "../sql/text.js";
 import { engineFingerprintSql } from "../verify/fingerprint.js";
 import { parseSparkPlan } from "./sparkPlan.js";
 import { EngineError, type Cell, type Column, type Plan, type QueryEngine, type RunOptions, type RunResult, type TableRef } from "./types.js";
@@ -221,7 +222,7 @@ export class ZetarisEngine implements QueryEngine {
   async explain(sql: string): Promise<Plan> {
     const g = sqlGuard(sql);
     if (!g.ok) throw new EngineError(`guard refused the statement to explain: ${g.reason}`);
-    const r = await this.run(`EXPLAIN FORMATTED ${sql}`, { rowCap: 1, timeoutSec: 60 });
+    const r = await this.run(`EXPLAIN FORMATTED ${trimStatement(sql)}`, { rowCap: 1, timeoutSec: 60 }); // a pasted trailing ";" would break the wrapper
     const text = String(r.rows[0]?.[0] ?? "");
     return { format: "spark-physical-text", text, nodes: parseSparkPlan(text), wallMs: r.wallMs };
   }
