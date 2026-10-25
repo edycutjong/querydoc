@@ -1,6 +1,6 @@
 // Eval: Query Doctor vs a plain one-shot model baseline, scored by the same Verifier. Writes evals/results.md (+ raw JSONL).
 //   npm run eval                                  regenerate results.md from the recorded runs (no network, no key)
-//   npm run eval -- --arm baseline                baseline arm on the sample pack, DuckDB, N = 3 per query (needs NVIDIA_API_KEY)
+//   npm run eval -- --arm baseline                baseline arm on the sample pack, DuckDB, N = 3 per query (needs Meterless Nightshift: METERLESS_RUNTIME_TOKEN)
 //   npm run eval -- --arm baseline --engine zetaris   baseline arm on the live hero + traps (needs ZETARIS_JDBC_* too; slow)
 // Baseline = ONE call, prompt below, no diagnosis, no memory, no feedback, one attempt, through the same guard + Verifier. Prompt
 // hashes of every arm are written into results.md. The queries are ones WE designed (a non-designed set was cut, see results.md).
@@ -8,7 +8,8 @@
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { NimClient, nimClientFromEnv } from "../src/adapters/nim.js";
+import { llmClientFromEnv } from "../src/adapters/llm.js";
+import type { LlmClient } from "../src/adapters/nim.js";
 import { Verifier } from "../src/agents/verifier.js";
 import { ROOT, loadConfig } from "../src/config.js";
 import { DuckDbEngine } from "../src/engine/duckdb.js";
@@ -51,14 +52,14 @@ function extractSql(content: string): string {
 }
 
 interface BaselineRow {
-  engine: string; query: string; run: number; at: string; model: string; outcome: string; reason?: string; sql: string; speedup?: number; first_diff?: unknown;
+  engine: string; query: string; run: number; at: string; model: string; provider?: string; outcome: string; reason?: string; sql: string; speedup?: number; first_diff?: unknown;
 }
 
 async function baseline() {
   loadQuerydocEnv();
-  const client = nimClientFromEnv();
+  const client = llmClientFromEnv();
   if (!client) {
-    console.error("eval --arm baseline needs NVIDIA_API_KEY (~/.config/querydoc/nvidia.env)");
+    console.error("eval --arm baseline needs a live model: METERLESS_RUNTIME_TOKEN (~/.config/querydoc/nightshift.env) with Meterless Nightshift running");
     process.exit(2);
   }
   let engine: QueryEngine;
@@ -74,17 +75,28 @@ async function baseline() {
   const dialect = engineName === "zetaris" ? "Spark SQL" : "DuckDB SQL";
   mkdirSync(RAW, { recursive: true });
   const file = join(RAW, `baseline-${engineName}-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}Z.jsonl`);
-  console.log(`baseline arm · ${engineName} · N=${N} · model ${(client as NimClient).model} · prompt ${sha(BASELINE_SYSTEM + BASELINE_USER("<sql>", dialect))} → ${file}`);
+  console.log(`baseline arm · ${engineName} · N=${N} · provider ${(client as LlmClient).provider} · route ${(client as LlmClient).model} · prompt ${sha(BASELINE_SYSTEM + BASELINE_USER("<sql>", dialect))} → ${file}`);
   try {
     for (const q of SETS[engineName]) {
       const sql = stripComments(read(q.file));
       for (let i = 1; i <= N; i++) {
         const trace = new Trace(`baseline-${q.id}-${i}`);
         const v = new Verifier(engine, cfg, trace);
-        const row: BaselineRow = { engine: engineName, query: q.id, run: i, at: new Date().toISOString(), model: (client as NimClient).model, outcome: "", sql: "" };
+        const row: BaselineRow = { engine: engineName, query: q.id, run: i, at: new Date().toISOString(), model: (client as LlmClient).model, outcome: "", sql: "" };
         try {
-          const r = await (client as NimClient).chat({ system: BASELINE_SYSTEM, user: BASELINE_USER(sql, dialect), reasoning: "off", maxTokens: 4000, temperature: 1.0 });
+          // A rate-limited provider answers HTTP 429: wait and ask again, up to 6 tries, before the run counts as an error.
+          let r: Awaited<ReturnType<LlmClient["chat"]>> | undefined;
+          for (let t = 1; !r; t++) {
+            try {
+              r = await (client as LlmClient).chat({ system: BASELINE_SYSTEM, user: BASELINE_USER(sql, dialect), reasoning: "off", maxTokens: 4000, temperature: 1.0 });
+            } catch (e) {
+              if (!/429/.test(String(e)) || t >= 6) throw e;
+              await new Promise((res) => setTimeout(res, 20_000 * t));
+            }
+          }
           row.sql = extractSql(r.content);
+          row.provider = r.provider;
+          row.model = r.handledModel ?? r.requestedModel; // the model that handled the request, as the response reports it
           const pre = await v.precheck(sql);
           const a = await v.verify({ n: 1, origin: "rewriter", hypothesis_id: null, sql: row.sql, change_summary: "baseline one-shot" }, pre, { lastAttempt: true });
           row.outcome = a.verdict === "ACCEPT" ? "identical_and_faster" : a.reason === "ROW_DIFF" ? "rows_changed" : a.reason === "NOT_FASTER" ? "identical_not_faster" : a.reason === "GUARD" ? "refused_by_guard" : "error";
@@ -112,6 +124,9 @@ const latest = (prefix: string): { file: string; rows: BaselineRow[] } | null =>
   return f ? { file: `evals/raw/${f}`, rows: read(`evals/raw/${f}`).split("\n").filter(Boolean).map((l) => JSON.parse(l) as BaselineRow) } : null;
 };
 
+// Evidence recorded before the Nightshift adapter existed carries no provider field: it went to direct NVIDIA NIM (the declared fallback).
+const providerLabel = (p?: string) => (p === "nightshift" ? "Meterless Nightshift → NVIDIA Nemotron" : p === "nim" || !p ? "direct NVIDIA NIM (declared fallback; recorded before the Nightshift adapter, a Nightshift re-recording is pending)" : p);
+
 const pctOf = (k: number, n: number) => (n ? `${k}/${n} (${Math.round((100 * k) / n)}%)` : "—");
 type Run = { verdict: string; no_rewrite_reason?: string | null; attempts: number; first_attempt: string; route: string };
 
@@ -121,7 +136,7 @@ function qdSample() {
 }
 
 function write() {
-  const live = JSON.parse(read("recorded/live/MANIFEST.json")) as { recorded_at: string; model: string; runs: Record<string, Run[]> };
+  const live = JSON.parse(read("recorded/live/MANIFEST.json")) as { recorded_at: string; model: string; requested_model?: string; provider?: string; runs: Record<string, Run[]> };
   const sample = qdSample();
   const L: string[] = [
     "# Eval results",
@@ -136,7 +151,7 @@ function write() {
   ];
 
   // Query Doctor arm (recorded)
-  L.push("## Arm A — Query Doctor (full pipeline)", "", `Live pack recorded ${live.recorded_at}, sample pack recorded ${sample.recorded_at}, model ${live.model}.`, "");
+  L.push("## Arm A — Query Doctor (full pipeline)", "", `Live pack recorded ${live.recorded_at}, sample pack recorded ${sample.recorded_at}, model ${live.requested_model ?? live.model}, provider ${providerLabel(live.provider)}.`, "");
   L.push("### Live runs on Zetaris (`recorded/live/`)", "", "| Query | Runs | Verdicts | Routing path (attempt verdicts in order) |", "|---|---:|---|---|");
   let liveAcc = 0, liveN = 0, liveWrongShipped = 0;
   for (const [name, rs] of Object.entries(live.runs)) {
@@ -161,7 +176,7 @@ function write() {
       continue;
     }
     combined[eng] = { b: b.rows };
-    L.push(`### ${eng === "duckdb" ? "Sample pack (DuckDB)" : "Live (Zetaris)"} — raw: \`${b.file}\` · model ${b.rows[0]?.model}`, "");
+    L.push(`### ${eng === "duckdb" ? "Sample pack (DuckDB)" : "Live (Zetaris)"} — raw: \`${b.file}\` · model ${b.rows[0]?.model} · provider ${providerLabel(b.rows[0]?.provider)}`, "");
     L.push("| Query | Runs | Changed rows | Identical and faster | Identical, not faster | Other (guard/error) |", "|---|---:|---|---|---|---|");
     const byQ = new Map<string, BaselineRow[]>();
     for (const r of b.rows) byQ.set(r.query, [...(byQ.get(r.query) ?? []), r]);
