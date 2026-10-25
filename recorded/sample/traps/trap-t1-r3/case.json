@@ -1,0 +1,206 @@
+{
+  "run_id": "trap-t1-r3",
+  "sql": "SELECT z.LocationID, z.Borough, z.Zone, COUNT(t.PULocationID) AS cash_trips\nFROM ops.zones z\nLEFT JOIN lake.trips t ON t.PULocationID = z.LocationID AND t.payment_type = 2\nGROUP BY z.LocationID, z.Borough, z.Zone\nORDER BY z.LocationID",
+  "source": "paste",
+  "engine": "duckdb",
+  "llm": "nim",
+  "started_at": "2026-10-25T11:12:38.912Z",
+  "attempts": [
+    {
+      "n": 1,
+      "origin": "rewriter",
+      "hypothesis_id": "h1",
+      "sql": "SELECT z.LocationID, z.Borough, z.Zone, COALESCE(agg.cash_trips, 0) AS cash_trips\nFROM ops.zones z\nLEFT JOIN (\n    SELECT PULocationID, COUNT(*) AS cash_trips\n    FROM lake.trips\n    WHERE payment_type = 2\n    GROUP BY PULocationID\n) agg ON agg.PULocationID = z.LocationID\nORDER BY z.LocationID",
+      "change_summary": "Pre-aggregated the filtered trips table before joining to eliminate the large RIGHT join and reduce row expansion prior to the final GROUP BY.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 265,
+        "rewrite": 265
+      },
+      "fingerprint": {
+        "orig": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df",
+        "rewrite": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          6.1,
+          3.7,
+          3.3
+        ],
+        "rewrite": [
+          1.8,
+          1.5,
+          1.3
+        ],
+        "median_speedup": 2.54,
+        "median_saving_ms": 2.2,
+        "faster_pairs": 3,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "floor"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "under_gate",
+      "detail": "median 2.54×, saving 2.2 ms, 3/3 pairs faster — missed: floor"
+    },
+    {
+      "n": 2,
+      "origin": "rewriter",
+      "hypothesis_id": "h2",
+      "sql": "SELECT z.LocationID, z.Borough, z.Zone, COALESCE(t.cnt, 0) AS cash_trips FROM ops.zones z LEFT JOIN (SELECT PULocationID, COUNT(*) AS cnt FROM lake.trips WHERE payment_type = 2 GROUP BY PULocationID) t ON t.PULocationID = z.LocationID ORDER BY z.LocationID",
+      "change_summary": "Pre-aggregate trips with payment_type=2 by PULocationID before left joining to zones, eliminating the 99k-row expansion from the right hash join.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 265,
+        "rewrite": 265
+      },
+      "fingerprint": {
+        "orig": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df",
+        "rewrite": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          6,
+          4.2,
+          4.1
+        ],
+        "rewrite": [
+          1.9,
+          1.6,
+          1.6
+        ],
+        "median_speedup": 2.63,
+        "median_saving_ms": 2.6,
+        "faster_pairs": 3,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "floor"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "under_gate",
+      "detail": "median 2.63×, saving 2.6 ms, 3/3 pairs faster — missed: floor"
+    },
+    {
+      "n": 3,
+      "origin": "rewriter",
+      "hypothesis_id": "h3",
+      "sql": "SELECT z.LocationID, z.Borough, z.Zone, COALESCE(agg.cnt, 0) AS cash_trips FROM ops.zones z LEFT JOIN (SELECT PULocationID, COUNT(*) AS cnt FROM lake.trips WHERE payment_type = 2 GROUP BY PULocationID) agg ON agg.PULocationID = z.LocationID ORDER BY z.LocationID",
+      "change_summary": "Pre-aggregate cash trips by PULocationID before joining to zones, reducing rows fed into the join from ~99k to ~243 distinct locations.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 265,
+        "rewrite": 265
+      },
+      "fingerprint": {
+        "orig": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df",
+        "rewrite": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          4.8,
+          5.3,
+          5.8
+        ],
+        "rewrite": [
+          2.1,
+          1.6,
+          1.6
+        ],
+        "median_speedup": 3.31,
+        "median_saving_ms": 3.7,
+        "faster_pairs": 3,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "floor"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "under_gate",
+      "detail": "median 3.31×, saving 3.7 ms, 3/3 pairs faster — missed: floor"
+    }
+  ],
+  "verdict": "NO_SAFE_REWRITE",
+  "playbook_hits": [],
+  "precheck": {
+    "deterministic": true,
+    "rows": 265,
+    "fingerprint": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df",
+    "fingerprint_kind": "rows",
+    "vacuous": false,
+    "columns": [
+      {
+        "name": "LocationID",
+        "type": "bigint"
+      },
+      {
+        "name": "Borough",
+        "type": "varchar"
+      },
+      {
+        "name": "Zone",
+        "type": "varchar"
+      },
+      {
+        "name": "cash_trips",
+        "type": "bigint"
+      }
+    ]
+  },
+  "diagnosis": {
+    "bottleneck": "The HASH_JOIN (node 8) performs a RIGHT join with filter pushdown on payment_type=2; DuckDB builds the hash table from the filtered trips (est. 99k rows) and probes the 265-row zones table, but the RIGHT join forces retention of all zone rows plus 99k matching trips, causing unnecessary row expansion before GROUP BY. The subsequent HASH_GROUP_BY then re-aggregates those 99k rows down to ~243 distinct PULocationIDs.",
+    "pattern_label": "outer_join_predicate",
+    "plan_nodes": [
+      {
+        "id": "8",
+        "op": "HASH_JOIN",
+        "note": "Join Type: RIGHT | Conditions: CAST(PULocationID AS BIGINT) = LocationID | Estimated Cardinality: 99167"
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "h1",
+        "source": "detector",
+        "plan_node_id": "8",
+        "claim": "A filter on the joined side sits in the ON clause of a LEFT JOIN; the join dominates the cost. (matched: left join lake.trips t on … and t.payment_type = 2)",
+        "status": "unproven"
+      },
+      {
+        "id": "h2",
+        "source": "llm",
+        "plan_node_id": "8",
+        "claim": "Using a RIGHT hash join prevents filter pushdown into the build side and materializes 99k trip rows that immediately collapse to ~243 groups; switching to a LEFT join (zones LEFT JOIN filtered trips) or pre-aggregating trips by PULocationID before joining would eliminate the row expansion.",
+        "status": "unproven"
+      },
+      {
+        "id": "h3",
+        "source": "llm",
+        "plan_node_id": "9",
+        "claim": "The SEQ_SCAN on trips reads all columns needed for the filter but projects only PULocationID; if payment_type is not in the same row group / segment, the scan still decodes full rows. A projection pushdown or columnar skip could reduce I/O.",
+        "status": "unproven"
+      }
+    ],
+    "raw_refs": [
+      "dropped hypothesis citing unknown plan node 11"
+    ],
+    "narrative": "llm"
+  },
+  "schema_fqn": "lake+ops",
+  "finished_at": "2026-10-25T11:14:24.547Z",
+  "no_rewrite_reason": "attempts_exhausted",
+  "detail": "#1 REJECT NOT_FASTER, #2 REJECT NOT_FASTER, #3 REJECT NOT_FASTER",
+  "playbook_state": "empty"
+}

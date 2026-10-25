@@ -1,0 +1,142 @@
+{
+  "run_id": "trap-t3-r1",
+  "sql": "SELECT z.LocationID, z.Zone\nFROM ops.zones z\nWHERE z.LocationID NOT IN (SELECT t.RatecodeID FROM lake.trips t WHERE t.PULocationID = z.LocationID)\nORDER BY z.LocationID",
+  "source": "paste",
+  "engine": "duckdb",
+  "llm": "nim",
+  "started_at": "2026-10-25T11:23:00.550Z",
+  "attempts": [
+    {
+      "n": 1,
+      "origin": "rewriter",
+      "hypothesis_id": "h1",
+      "sql": "SELECT z.LocationID, z.Zone FROM ops.zones z WHERE NOT EXISTS (SELECT 1 FROM lake.trips t WHERE t.PULocationID = z.LocationID AND t.RatecodeID IS NOT NULL AND t.RatecodeID = z.LocationID) ORDER BY z.LocationID",
+      "change_summary": "Replaced NOT IN with NOT EXISTS and added explicit IS NOT NULL check on RatecodeID to eliminate null-aware anti-join overhead.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 43,
+        "rewrite": 264
+      },
+      "fingerprint": {
+        "orig": "95c658947951847aa21ddb45463aa5c63c05561714b1cbdd88dadb6f2ff101fb",
+        "rewrite": "6031a4c9ea531e83d94421992af0e7edb81c2acf061b33cc9bb87b47fcde5363"
+      },
+      "fingerprint_kind": "rows",
+      "reason": "ROW_DIFF",
+      "first_diff": {
+        "side": "orig",
+        "row": [
+          "5",
+          "Arden Heights"
+        ]
+      },
+      "detail": "rows differ (43 vs 264 rows); first differing row [\"5\",\"Arden Heights\"] returned by the original, missing from the candidate"
+    },
+    {
+      "n": 2,
+      "origin": "rewriter",
+      "hypothesis_id": "h1",
+      "sql": "SELECT z.LocationID, z.Zone FROM ops.zones z WHERE NOT EXISTS (SELECT 1 FROM lake.trips t WHERE t.PULocationID = z.LocationID AND t.RatecodeID = z.LocationID)",
+      "change_summary": "Replaced NOT IN with NOT EXISTS preserving exact NULL semantics without adding extra IS NOT NULL filter",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 43,
+        "rewrite": 264
+      },
+      "fingerprint": {
+        "orig": "95c658947951847aa21ddb45463aa5c63c05561714b1cbdd88dadb6f2ff101fb",
+        "rewrite": "5fe5a4f718663971b5ab1bfde6da7aaa186c33b00ee53163d743ed3d1d7c2c49"
+      },
+      "fingerprint_kind": "rows",
+      "reason": "ROW_DIFF",
+      "first_diff": {
+        "side": "orig",
+        "row": [
+          "2",
+          "Jamaica Bay"
+        ]
+      },
+      "detail": "rows differ (43 vs 264 rows); first differing row [\"2\",\"Jamaica Bay\"] returned by the original, missing from the candidate"
+    }
+  ],
+  "verdict": "NO_SAFE_REWRITE",
+  "playbook_hits": [
+    "mem-1",
+    "mem-2"
+  ],
+  "precheck": {
+    "deterministic": true,
+    "rows": 43,
+    "fingerprint": "95c658947951847aa21ddb45463aa5c63c05561714b1cbdd88dadb6f2ff101fb",
+    "fingerprint_kind": "rows",
+    "vacuous": false,
+    "columns": [
+      {
+        "name": "LocationID",
+        "type": "bigint"
+      },
+      {
+        "name": "Zone",
+        "type": "varchar"
+      }
+    ]
+  },
+  "diagnosis": {
+    "bottleneck": "The NOT IN subquery with a nullable column (RatecodeID) forces a large hash join between the trips table (495k rows) and a delim scan of zones to materialize the subquery result, followed by a left anti-join (LEFT_DELIM_JOIN) that must handle NULL semantics, resulting in high CPU and memory usage.",
+    "pattern_label": "not_in_nullable",
+    "plan_nodes": [
+      {
+        "id": "5",
+        "op": "FILTER",
+        "note": "Expression: (NOT SUBQUERY) | Estimated Cardinality: 265"
+      },
+      {
+        "id": "6",
+        "op": "LEFT_DELIM_JOIN",
+        "note": "Join Type: MARK | Conditions: LocationID IS NOT DISTINCT FROM LocationID; LocationID = #0 | Estimated Cardinality: 0 | D"
+      },
+      {
+        "id": "8",
+        "op": "HASH_JOIN",
+        "note": "Join Type: MARK | Conditions: LocationID IS NOT DISTINCT FROM LocationID; LocationID = #0 | Estimated Cardinality: 0"
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "h1",
+        "source": "detector",
+        "plan_node_id": "5",
+        "claim": "NOT IN over a subquery forces a null-aware anti join, which is expensive. (matched: not in (select t.ratecodeid from lake.trips t where t.pulocationid = z.locationid) order b)",
+        "status": "unproven"
+      },
+      {
+        "id": "h2",
+        "source": "llm",
+        "plan_node_id": "5",
+        "claim": "The LEFT_DELIM_JOIN (node 5) implements the NOT IN anti-join; because RatecodeID is nullable, the engine cannot use a simple hash anti-join and must perform per-row null checks, adding significant overhead.",
+        "status": "untested"
+      },
+      {
+        "id": "h3",
+        "source": "llm",
+        "plan_node_id": "8",
+        "claim": "The COLUMN_DATA_SCAN (node 8) shows an estimated cardinality of 0, indicating a severe statistics misestimate for the correlated parameter that likely leads to a suboptimal join order or join type for the subquery.",
+        "status": "untested"
+      },
+      {
+        "id": "h4",
+        "source": "llm",
+        "plan_node_id": "6",
+        "claim": "The SEQ_SCAN on zones (node 6) is small (265 rows), but if the LEFT_DELIM_JOIN is executed as a correlated nested loop rather than a hash anti-join, it could cause repeated execution of the subquery; however, the plan suggests a hash join is used, so this is less likely.",
+        "status": "untested"
+      }
+    ],
+    "raw_refs": [],
+    "narrative": "llm"
+  },
+  "schema_fqn": "lake+ops",
+  "finished_at": "2026-10-25T11:25:39.463Z",
+  "no_rewrite_reason": "upstream",
+  "detail": "NIM timed out after 60000 ms (reasoning off)",
+  "playbook_state": "empty"
+}

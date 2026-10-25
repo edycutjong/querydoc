@@ -1,47 +1,41 @@
-// CLI: npx tsx run.ts <input.json> [--max-attempts N] [--out <dir>]
-// input.json = {"sql": "...", "candidate_sql"?: "...", "source"?: "paste"}. Live mode: Zetaris over the JDBC sidecar
-// (ZETARIS_* from ~/.config/querydoc/zetaris.env) and NVIDIA_API_KEY from nvidia.env. Writes logs/trace-<run_id>.jsonl and
-// prints the markdown dossier. The keyless DuckDB sample path arrives with the sample engine.
+// CLI: npx tsx run.ts <input.json> [--sample] [--max-attempts N] [--out <dir>]
+// input.json = a POST /run body ({input:{sql, candidate_sql?, source?}, options?}) or the flat {sql, candidate_sql?, source?}. Without
+// --sample the engine follows the same rules as the server: input.options.sample_mode, SAMPLE_MODE, else Zetaris when ZETARIS_* settings
+// exist (~/.config/querydoc/zetaris.env), else the DuckDB sample engine. Prints the markdown dossier; writes the case, dossier and the
+// Hub-schema JSONL trace into --out. Credentials are read from ~/.config/querydoc/*.env, never from the tree.
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { LlmGateway, nimClientFromEnv } from "./src/adapters/nim.js";
-import { loadConfig } from "./src/config.js";
-import { ZetarisEngine, zetarisConfigFromEnv } from "./src/engine/zetaris.js";
 import { loadQuerydocEnv } from "./src/env.js";
-import { runCase } from "./src/orchestrator.js";
-import { caseMarkdown } from "./src/report/markdown.js";
-import type { RunInput } from "./src/types.js";
+import { QueryDocService } from "./src/service.js";
 
 const args = process.argv.slice(2);
-const outIdx = args.indexOf("--out");
-const outDir = outIdx >= 0 ? args[outIdx + 1] : undefined;
-const file = args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--max-attempts" && args[i - 1] !== "--out");
+const val = (n: string) => (args.includes(n) ? args[args.indexOf(n) + 1] : undefined);
+const file = args.find((a, i) => !a.startsWith("--") && !["--max-attempts", "--out"].includes(args[i - 1] ?? ""));
 if (!file) {
-  console.error("usage: npx tsx run.ts <input.json> [--max-attempts N] [--out <dir>]");
+  console.error("usage: npx tsx run.ts <input.json> [--sample] [--max-attempts N] [--out <dir>]");
   process.exit(2);
 }
-const maxIdx = args.indexOf("--max-attempts");
-const maxAttempts = maxIdx >= 0 ? Number(args[maxIdx + 1]) : undefined;
-
 loadQuerydocEnv();
-const zcfg = zetarisConfigFromEnv();
-if (!zcfg) {
-  console.error("Zetaris JDBC settings missing (ZETARIS_JDBC_URL / _JAR / _USER / _PASSWORD) — see .env.example");
-  process.exit(2);
-}
-const input = JSON.parse(readFileSync(file, "utf8")) as RunInput;
-const engine = new ZetarisEngine(zcfg);
+const body = JSON.parse(readFileSync(file, "utf8")) as Record<string, any>;
+body.options = { ...(body.options ?? {}), ...(args.includes("--sample") ? { sample_mode: true } : {}), ...(val("--max-attempts") ? { max_attempts: Number(val("--max-attempts")) } : {}) };
+const svc = new QueryDocService();
 try {
-  const { case: c } = await runCase(input, { engine, cfg: loadConfig(), llm: new LlmGateway({ client: nimClientFromEnv() }), attemptCap: 3 }, maxAttempts ? { maxAttempts } : {});
-  const md = caseMarkdown(c);
+  const r = (await svc.run(body)) as { status: number; json: any };
+  if (r.status !== 200) {
+    console.error(JSON.stringify(r.json, null, 2));
+    process.exit(1);
+  }
+  const outDir = val("--out");
   if (outDir) {
     mkdirSync(outDir, { recursive: true });
-    writeFileSync(join(outDir, "case.json"), JSON.stringify(c, null, 2) + "\n");
-    writeFileSync(join(outDir, "dossier.md"), md);
-    copyFileSync(join("logs", `trace-${c.run_id}.jsonl`), join(outDir, "trace.jsonl"));
+    writeFileSync(join(outDir, "case.json"), JSON.stringify(r.json.output.case, null, 2) + "\n");
+    writeFileSync(join(outDir, "dossier.md"), r.json.output.dossier);
+    copyFileSync(join("data", "runs", r.json.run_id, `trace-${r.json.run_id}.jsonl`), join(outDir, "trace.jsonl"));
   }
-  console.log(md);
-  console.log(`trace: logs/trace-${c.run_id}.jsonl`);
+  if (r.json.banner) console.log(`> ${r.json.banner}\n`);
+  console.log(r.json.output.dossier);
+  if (r.json.error) console.log(`status ${r.json.status}: ${r.json.error.type} — ${r.json.error.message}`);
+  console.log(`trace: ${r.json.log_file}`);
 } finally {
-  await engine.close();
+  await svc.close();
 }

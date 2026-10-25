@@ -1,0 +1,14 @@
+{
+  "run_id": "canon-example_5",
+  "sql": "SELECT VendorID, tpep_pickup_datetime, fare_amount FROM lake.trips LIMIT 20",
+  "source": "paste",
+  "engine": "duckdb",
+  "llm": "none",
+  "started_at": "2026-10-25T11:10:09.370Z",
+  "attempts": [],
+  "verdict": "NOT_VERIFIABLE",
+  "playbook_hits": [],
+  "finished_at": "2026-10-25T11:10:09.371Z",
+  "detail": "LIMIT without a top-level ORDER BY",
+  "playbook_state": "empty"
+}

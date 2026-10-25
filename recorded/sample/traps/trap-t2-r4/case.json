@@ -1,0 +1,193 @@
+{
+  "run_id": "trap-t2-r4",
+  "sql": "SELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30\nUNION\nSELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE fare_amount > 100",
+  "source": "paste",
+  "engine": "duckdb",
+  "llm": "nim",
+  "started_at": "2026-10-25T11:21:27.126Z",
+  "attempts": [
+    {
+      "n": 1,
+      "origin": "rewriter",
+      "hypothesis_id": "h1",
+      "sql": "SELECT DISTINCT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 OR fare_amount > 100",
+      "change_summary": "Replace UNION with a single scan and OR predicate, then deduplicate once using DISTINCT.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 277,
+        "rewrite": 277
+      },
+      "fingerprint": {
+        "orig": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441",
+        "rewrite": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          4.5,
+          2.8,
+          3.8
+        ],
+        "rewrite": [
+          4.2,
+          4.2,
+          3.2
+        ],
+        "median_speedup": 1.07,
+        "median_saving_ms": 0.3,
+        "faster_pairs": 2,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "ratio",
+          "floor"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "no_gain",
+      "detail": "median 1.07×, saving 0.3 ms, 2/3 pairs faster — missed: ratio, floor"
+    },
+    {
+      "n": 2,
+      "origin": "rewriter",
+      "hypothesis_id": "h2",
+      "sql": "SELECT DISTINCT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 OR fare_amount > 100",
+      "change_summary": "Combined two sequential scans into a single scan with OR predicate and single DISTINCT deduplication",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 277,
+        "rewrite": 277
+      },
+      "fingerprint": {
+        "orig": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441",
+        "rewrite": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          4.2,
+          4.1,
+          2.2
+        ],
+        "rewrite": [
+          5.8,
+          3.8,
+          2.4
+        ],
+        "median_speedup": 0.92,
+        "median_saving_ms": -0.2,
+        "faster_pairs": 1,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "ratio",
+          "floor",
+          "majority"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "no_gain",
+      "detail": "median 0.92×, saving -0.2 ms, 1/3 pairs faster — missed: ratio, floor, majority"
+    },
+    {
+      "n": 3,
+      "origin": "rewriter",
+      "hypothesis_id": "h3",
+      "sql": "SELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 UNION ALL SELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE fare_amount > 100 AND trip_distance <= 30",
+      "change_summary": "Replaced UNION with UNION ALL and added a filter to the second scan to exclude rows already captured by the first scan, eliminating the need for deduplication.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 277,
+        "rewrite": 1437
+      },
+      "fingerprint": {
+        "orig": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441",
+        "rewrite": "fa82127317edb66eacfd49896fbe960f3bb150e4dbab6ae3da35bb4b583a4f65"
+      },
+      "fingerprint_kind": "rows",
+      "reason": "ROW_DIFF",
+      "first_diff": {
+        "side": "rewrite",
+        "row": [
+          "132",
+          "1",
+          "1"
+        ]
+      },
+      "detail": "rows differ (277 vs 1437 rows); first differing row [\"132\",\"1\",\"1\"] returned by the candidate, not by the original"
+    }
+  ],
+  "verdict": "NO_SAFE_REWRITE",
+  "playbook_hits": [
+    "mem-1",
+    "mem-2"
+  ],
+  "precheck": {
+    "deterministic": true,
+    "rows": 277,
+    "fingerprint": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441",
+    "fingerprint_kind": "rows",
+    "vacuous": false,
+    "columns": [
+      {
+        "name": "PULocationID",
+        "type": "integer"
+      },
+      {
+        "name": "payment_type",
+        "type": "bigint"
+      },
+      {
+        "name": "passenger_count",
+        "type": "bigint"
+      }
+    ]
+  },
+  "diagnosis": {
+    "bottleneck": "The query scans the same table twice with sequential scans (nodes 0 and 1), each reading all rows and applying filters afterward, then deduplicates ~198K combined rows via HASH_GROUP_BY (node 2).",
+    "pattern_label": "union_dedupe",
+    "plan_nodes": [
+      {
+        "id": "2",
+        "op": "UNION",
+        "note": ""
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "h1",
+        "source": "detector",
+        "plan_node_id": "2",
+        "claim": "UNION forces a deduplicating aggregate over both inputs. (matched: rips where trip_distance > 30 union select pulocationid, payment_type,)",
+        "status": "falsified"
+      },
+      {
+        "id": "h2",
+        "source": "llm",
+        "plan_node_id": "2",
+        "claim": "HASH_GROUP_BY performs duplicate elimination for UNION DISTINCT; if the two result sets have high overlap, the hash table build/probe is wasteful and could be avoided with UNION ALL plus a downstream distinct or by rewriting to a single scan.",
+        "status": "falsified"
+      },
+      {
+        "id": "h3",
+        "source": "llm",
+        "plan_node_id": "1",
+        "claim": "No indexes exist on trip_distance or fare_amount; adding a composite or single-column index on the filtered columns could turn the sequential scans into index scans if selectivity is high enough.",
+        "status": "unproven"
+      }
+    ],
+    "raw_refs": [
+      "dropped hypothesis citing unknown plan node 0"
+    ],
+    "narrative": "llm"
+  },
+  "schema_fqn": "lake",
+  "finished_at": "2026-10-25T11:22:02.293Z",
+  "no_rewrite_reason": "attempts_exhausted",
+  "detail": "#1 REJECT NOT_FASTER, #2 REJECT NOT_FASTER, #3 REJECT ROW_DIFF",
+  "playbook_state": "empty"
+}

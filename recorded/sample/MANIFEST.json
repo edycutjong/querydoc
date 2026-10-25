@@ -1,0 +1,192 @@
+{
+  "recorded_at": "2026-10-25T11:05:07.000Z",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b",
+  "prompt_hashes": {
+    "rewriter": "75b886bb8fc848d2",
+    "diagnoser": "0bf2aec20a7ed9c2",
+    "revise": "42d31eb5edcf26d7"
+  },
+  "sample_data_sha": {
+    "trips": "77f4b61a62f6b166",
+    "zones": "76a66e2aa0459157"
+  },
+  "traps": {
+    "T1": [
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/NOT_FASTER/under_gate",
+        "route": "REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/under_gate",
+        "llm": "nim"
+      },
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/NOT_FASTER/under_gate",
+        "route": "REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/under_gate",
+        "llm": "nim"
+      },
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/NOT_FASTER/under_gate",
+        "route": "REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/under_gate",
+        "llm": "nim"
+      },
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/NOT_FASTER/no_gain",
+        "route": "REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/under_gate",
+        "llm": "nim"
+      },
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/NOT_FASTER/under_gate",
+        "route": "REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/under_gate",
+        "llm": "nim"
+      }
+    ],
+    "T2": [
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/NOT_FASTER/no_gain",
+        "route": "REJECT/NOT_FASTER/no_gain → REJECT/ROW_DIFF → REJECT/NOT_FASTER/no_gain",
+        "llm": "nim"
+      },
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/ROW_DIFF",
+        "route": "REJECT/ROW_DIFF → REJECT/ROW_DIFF → REJECT/NOT_FASTER/no_gain",
+        "llm": "nim"
+      },
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/ROW_DIFF",
+        "route": "REJECT/ROW_DIFF → REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/no_gain",
+        "llm": "nim"
+      },
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/NOT_FASTER/no_gain",
+        "route": "REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/no_gain → REJECT/ROW_DIFF",
+        "llm": "nim"
+      },
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/NOT_FASTER/no_gain",
+        "route": "REJECT/NOT_FASTER/no_gain → REJECT/ROW_DIFF → REJECT/NOT_FASTER/no_gain",
+        "llm": "nim"
+      }
+    ],
+    "T3": [
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "upstream",
+        "attempts": 2,
+        "first_attempt": "REJECT/ROW_DIFF",
+        "route": "REJECT/ROW_DIFF → REJECT/ROW_DIFF",
+        "llm": "nim"
+      },
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/ROW_DIFF",
+        "route": "REJECT/ROW_DIFF → REJECT/ROW_DIFF → REJECT/ROW_DIFF",
+        "llm": "nim"
+      },
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/ROW_DIFF",
+        "route": "REJECT/ROW_DIFF → REJECT/ROW_DIFF → REJECT/ROW_DIFF",
+        "llm": "nim"
+      },
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/ROW_DIFF",
+        "route": "REJECT/ROW_DIFF → REJECT/ROW_DIFF → REJECT/ROW_DIFF",
+        "llm": "nim"
+      },
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/ROW_DIFF",
+        "route": "REJECT/ROW_DIFF → REJECT/ROW_DIFF → REJECT/ROW_DIFF",
+        "llm": "nim"
+      }
+    ]
+  },
+  "runs": {
+    "example_1": {
+      "verdict": "NO_SAFE_REWRITE",
+      "no_rewrite_reason": "attempts_exhausted",
+      "attempts": 3,
+      "first_attempt": "REJECT/NOT_FASTER/under_gate",
+      "route": "REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/under_gate",
+      "llm": "nim"
+    },
+    "example_4": {
+      "verdict": "NO_SAFE_REWRITE",
+      "no_rewrite_reason": "attempts_exhausted",
+      "attempts": 3,
+      "first_attempt": "REJECT/ROW_DIFF",
+      "route": "REJECT/ROW_DIFF → REJECT/ROW_DIFF → REJECT/ROW_DIFF",
+      "llm": "nim"
+    },
+    "example_6": {
+      "verdict": "NO_SAFE_REWRITE",
+      "no_rewrite_reason": "attempts_exhausted",
+      "attempts": 3,
+      "first_attempt": "REJECT/NOT_FASTER/no_gain",
+      "route": "REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/no_gain",
+      "llm": "nim"
+    },
+    "example_2": {
+      "verdict": "NO_SAFE_REWRITE",
+      "no_rewrite_reason": "attempts_exhausted",
+      "attempts": 3,
+      "first_attempt": "REJECT/ROW_DIFF",
+      "route": "REJECT/ROW_DIFF → REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/under_gate",
+      "llm": "nim"
+    },
+    "example_3": {
+      "verdict": "NO_SAFE_REWRITE",
+      "no_rewrite_reason": "attempts_exhausted",
+      "attempts": 3,
+      "first_attempt": "REJECT/ROW_DIFF",
+      "route": "REJECT/ROW_DIFF → REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/no_gain",
+      "llm": "nim"
+    },
+    "example_5": {
+      "verdict": "NOT_VERIFIABLE",
+      "no_rewrite_reason": null,
+      "attempts": 0,
+      "first_attempt": "none",
+      "route": "none",
+      "llm": "none"
+    }
+  },
+  "llm_cache_entries": 15
+}

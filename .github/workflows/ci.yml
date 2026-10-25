@@ -17,9 +17,33 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-  docker:
+  keyless:
+    # The Hub self-test, with no keys anywhere: build the image, start it in SAMPLE_MODE, POST the shipped examples, assert the verdict.
     runs-on: ubuntu-latest
     needs: test
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t querydoc:ci .
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: docker build -t querydoc .
+      - run: docker run -d --name querydoc -p 8000:8000 -e SAMPLE_MODE=true querydoc
+      - name: wait for /health
+        run: |
+          for i in $(seq 1 40); do curl -sf localhost:8000/health && exit 0; sleep 1; done
+          docker logs querydoc; exit 1
+      - name: example_1 (the Hub step 9 request) — plain SQL, recorded model responses
+        run: |
+          curl -sf -X POST localhost:8000/run -H 'Content-Type: application/json' -d @input_examples/example_1.json -o out1.json
+          node scripts/assert-verdict.mjs out1.json example_1
+      - name: example_2 (a supplied rewrite is refused by the Verifier, no model needed)
+        run: |
+          curl -sf -X POST localhost:8000/run -H 'Content-Type: application/json' -d @input_examples/example_2.json -o out2.json
+          node scripts/assert-verdict.mjs out2.json example_2
+      - name: example_3 (the refusal is reused from the playbook ledger)
+        run: |
+          curl -sf -X POST localhost:8000/run -H 'Content-Type: application/json' -d @input_examples/example_3.json -o out3.json
+          node scripts/assert-verdict.mjs out3.json example_3
+          node -e "const r=require('./out3.json'); const a=r.output.case.attempts[0]; if(!a.reused_from||a.fingerprint.rewrite!==null){console.error('ledger reuse missing');process.exit(1)}"
+      - if: failure()
+        run: docker logs querydoc | tail -50

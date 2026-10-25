@@ -1,0 +1,215 @@
+{
+  "run_id": "canon-example_6",
+  "sql": "SELECT payment_type, COUNT(*) AS trips\nFROM lake.trips\nGROUP BY payment_type\nORDER BY payment_type",
+  "source": "paste",
+  "engine": "duckdb",
+  "llm": "nim",
+  "started_at": "2026-10-25T11:06:51.755Z",
+  "attempts": [
+    {
+      "n": 1,
+      "origin": "rewriter",
+      "hypothesis_id": "h1",
+      "sql": "SELECT payment_type, COUNT(*) AS trips FROM (SELECT payment_type FROM lake.trips) t GROUP BY payment_type ORDER BY payment_type",
+      "change_summary": "Wrapped the column projection in a derived table to potentially enable more efficient columnar scanning and aggregation pushdown",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 5,
+        "rewrite": 5
+      },
+      "fingerprint": {
+        "orig": "d8710a873f8bd21d1e939a7f0705f3b559c909ca7e7dfeb188b48fda3dcde231",
+        "rewrite": "d8710a873f8bd21d1e939a7f0705f3b559c909ca7e7dfeb188b48fda3dcde231"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          2.2,
+          1.7,
+          1.8
+        ],
+        "rewrite": [
+          1.8,
+          1.8,
+          1.8
+        ],
+        "median_speedup": 1,
+        "median_saving_ms": 0,
+        "faster_pairs": 1,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "ratio",
+          "floor",
+          "majority"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "no_gain",
+      "detail": "median 1×, saving 0 ms, 1/3 pairs faster — missed: ratio, floor, majority"
+    },
+    {
+      "n": 2,
+      "origin": "rewriter",
+      "hypothesis_id": "h3",
+      "sql": "SELECT payment_type, COUNT(*) AS trips FROM lake.trips GROUP BY payment_type ORDER BY payment_type",
+      "change_summary": "Original query retained as no pre-aggregated metadata cache or materialized view exists for payment_type counts; hypothesis h3 cannot be implemented without additional database objects.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 5,
+        "rewrite": 5
+      },
+      "fingerprint": {
+        "orig": "d8710a873f8bd21d1e939a7f0705f3b559c909ca7e7dfeb188b48fda3dcde231",
+        "rewrite": "d8710a873f8bd21d1e939a7f0705f3b559c909ca7e7dfeb188b48fda3dcde231"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          2.4,
+          1.9,
+          1.5
+        ],
+        "rewrite": [
+          1.9,
+          1.8,
+          1.6
+        ],
+        "median_speedup": 1.06,
+        "median_saving_ms": 0.1,
+        "faster_pairs": 2,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "ratio",
+          "floor"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "no_gain",
+      "detail": "median 1.06×, saving 0.1 ms, 2/3 pairs faster — missed: ratio, floor"
+    },
+    {
+      "n": 3,
+      "origin": "rewriter",
+      "hypothesis_id": "h5",
+      "sql": "SELECT payment_type, COUNT(*) AS trips FROM lake.trips GROUP BY payment_type ORDER BY payment_type",
+      "change_summary": "No rewrite possible: DuckDB does not expose dictionary-encoding internals to SQL, so the original query is already optimal for the logical plan.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 5,
+        "rewrite": 5
+      },
+      "fingerprint": {
+        "orig": "d8710a873f8bd21d1e939a7f0705f3b559c909ca7e7dfeb188b48fda3dcde231",
+        "rewrite": "d8710a873f8bd21d1e939a7f0705f3b559c909ca7e7dfeb188b48fda3dcde231"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          2.2,
+          1.7,
+          1.7
+        ],
+        "rewrite": [
+          2.1,
+          1.8,
+          1.7
+        ],
+        "median_speedup": 1,
+        "median_saving_ms": 0,
+        "faster_pairs": 1,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "ratio",
+          "floor",
+          "majority"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "no_gain",
+      "detail": "median 1×, saving 0 ms, 1/3 pairs faster — missed: ratio, floor, majority"
+    }
+  ],
+  "verdict": "NO_SAFE_REWRITE",
+  "playbook_hits": [],
+  "precheck": {
+    "deterministic": true,
+    "rows": 5,
+    "fingerprint": "d8710a873f8bd21d1e939a7f0705f3b559c909ca7e7dfeb188b48fda3dcde231",
+    "fingerprint_kind": "rows",
+    "vacuous": false,
+    "columns": [
+      {
+        "name": "payment_type",
+        "type": "bigint"
+      },
+      {
+        "name": "trips",
+        "type": "bigint"
+      }
+    ]
+  },
+  "diagnosis": {
+    "bottleneck": "The query scans the entire payment_type column (≈495K rows) via a sequential scan and then performs a perfect hash aggregation. With only ~5 distinct payment_type values, the aggregation itself is cheap, so the dominant cost is reading and decompressing the payment_type column for every row.",
+    "pattern_label": "other",
+    "plan_nodes": [
+      {
+        "id": "8",
+        "op": "SEQ_SCAN",
+        "note": "Table: trips | Type: Sequential Scan | Projections: payment_type | Estimated Cardinality: 495833"
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "h1",
+        "source": "detector",
+        "plan_node_id": "8",
+        "claim": "No known pattern matched; the plan's most expensive operator is the candidate.",
+        "status": "falsified"
+      },
+      {
+        "id": "h2",
+        "source": "llm",
+        "plan_node_id": "8",
+        "claim": "The SEQ_SCAN reads all 495,833 payment_type values from disk; if the table is partitioned or sorted by payment_type, partition pruning or a zone-map skip could avoid reading entire row groups.",
+        "status": "untested"
+      },
+      {
+        "id": "h3",
+        "source": "llm",
+        "plan_node_id": "5",
+        "claim": "The PERFECT_HASH_GROUP_BY processes every row despite extremely low cardinality (5 groups); a pre-aggregated metadata cache or materialized view could answer this query without scanning the fact table.",
+        "status": "falsified"
+      },
+      {
+        "id": "h4",
+        "source": "llm",
+        "plan_node_id": "6",
+        "claim": "The compression/decompression projections (nodes 6/7) add CPU overhead per row; using a dictionary-encoded column with direct aggregation on dictionary codes could eliminate the decompress step.",
+        "status": "untested"
+      },
+      {
+        "id": "h5",
+        "source": "llm",
+        "plan_node_id": "6",
+        "claim": "Bypassing the decompression at plan node 6 by aggregating directly on dictionary-encoded payment_type codes will reduce total CPU cycles consumed by the query.",
+        "status": "falsified"
+      }
+    ],
+    "raw_refs": [],
+    "narrative": "llm"
+  },
+  "schema_fqn": "lake",
+  "finished_at": "2026-10-25T11:08:51.512Z",
+  "no_rewrite_reason": "attempts_exhausted",
+  "detail": "#1 REJECT NOT_FASTER, #2 REJECT NOT_FASTER, #3 REJECT NOT_FASTER",
+  "playbook_state": "empty"
+}

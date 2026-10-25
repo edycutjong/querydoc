@@ -1,0 +1,200 @@
+{
+  "example": "example_4",
+  "request": {
+    "input": {
+      "sql": "SELECT z.Borough, COUNT(*) AS touches\nFROM lake.trips t\nJOIN ops.zones z ON z.LocationID = t.PULocationID OR z.LocationID = t.DOLocationID\nGROUP BY z.Borough\nORDER BY z.Borough",
+      "source": "paste"
+    },
+    "options": {
+      "sample_mode": true,
+      "playbook": "empty"
+    }
+  },
+  "response": {
+    "status": "ok",
+    "engine": "duckdb",
+    "llm": "cache",
+    "verdict": "NO_SAFE_REWRITE",
+    "no_rewrite_reason": "attempts_exhausted",
+    "llm_unavailable": false,
+    "output": {
+      "dossier": "# Query Doctor — NO_SAFE_REWRITE\n\nrun `replay-example_4` · engine duckdb · llm cache · 2026-10-25T11:29:13.384Z\n\n## Original\n```sql\nSELECT z.Borough, COUNT(*) AS touches\nFROM lake.trips t\nJOIN ops.zones z ON z.LocationID = t.PULocationID OR z.LocationID = t.DOLocationID\nGROUP BY z.Borough\nORDER BY z.Borough\n```\n\nPre-check: deterministic true, 8 row(s), fingerprint `d4ab3ed2a53751bb` (rows).\n\n> Sample mode: DuckDB on the committed NYC TLC subset. A different optimiser from Zetaris — speedups here say nothing about Zetaris.\n\n## Diagnosis\n- pattern: `or_join_condition` (deterministic detector)\n- Diagnoser's reading (model text, unverified): The BLOCKWISE_NL_JOIN (node 8) performs a nested-loop join over 495,833 trips rows and 265 zones rows with an OR join condition (PULocationID OR DOLocationID), preventing hash-join optimization and likely executing ~130M comparisons.\n- narrative: llm-cache\n- **h1** [unproven] (detector, plan node 8) An OR inside the JOIN condition cannot use a hash join; the engine falls back to a nested-loop style join, which is far more expensive than two equi-joins. (matched: inner join ops.zones z on z.locationid = t.pulocationid or z.locationid = t.dolocationid)\n- **h2** [unproven] (model claim, unverified, plan node 8) The OR join condition forces a nested-loop join instead of a hash join; rewriting as a UNION ALL of two separate equi-joins (one on PULocationID, one on DOLocationID) followed by aggregation would enable hash joins and reduce comparisons to ~1M.\n- **h3** [untested] (model claim, unverified, plan node 8) Neither trips.PULocationID nor trips.DOLocationID has an index; creating a hash index or sorting trips on both columns would allow a merge join or hash join on each key individually.\n- **h4** [untested] (model claim, unverified, plan node 8) The blockwise nested-loop join materializes the full cross-product for the OR condition; pushing a bloom filter or pre-filtering zones into the scan could reduce the inner-loop iterations.\n\n## Attempts\n### Attempt 1 — REJECT (ROW_DIFF)\norigin rewriter · hypothesis h1 · Rewriter's note (model text): Replaced the OR join with UNION ALL of PULocationID and DOLocationID followed by a single equi-join to zones, enabling hash join optimization.\n```sql\nSELECT z.Borough, COUNT(*) AS touches FROM (SELECT PULocationID AS LocationID FROM lake.trips UNION ALL SELECT DOLocationID FROM lake.trips) locs JOIN ops.zones z ON z.LocationID = locs.LocationID GROUP BY z.Borough ORDER BY z.Borough\n```\nrows 8 vs 8 · rows differ (8 vs 8 rows); first differing row [\"Bronx\",\"4073\"] returned by the original, missing from the candidate\nfirst difference (orig only): `[\"Bronx\",\"4073\"]`\n\n### Attempt 2 — REJECT (ROW_DIFF)\norigin rewriter · hypothesis h1 · Rewriter's note (model text): Split the OR join into two separate equi-joins with UNION ALL to enable hash join optimization, then aggregate by Borough.\n```sql\nSELECT z.Borough, COUNT(*) AS touches FROM lake.trips t JOIN ops.zones z ON z.LocationID = t.PULocationID GROUP BY z.Borough UNION ALL SELECT z.Borough, COUNT(*) AS touches FROM lake.trips t JOIN ops.zones z ON z.LocationID = t.DOLocationID GROUP BY z.Borough ORDER BY z.Borough\n```\nrows 8 vs 16 · rows differ (8 vs 16 rows); first differing row [\"Bronx\",\"4073\"] returned by the original, missing from the candidate\nfirst difference (orig only): `[\"Bronx\",\"4073\"]`\n\n### Attempt 3 — REJECT (ROW_DIFF)\norigin rewriter · hypothesis h2 · Rewriter's note (model text): Rewritten OR join as double equi-join to zones for PULocationID and DOLocationID, then unnest boroughs to preserve per-trip contribution to both boroughs, enabling hash joins.\n```sql\nSELECT z.Borough, COUNT(*) AS touches FROM lake.trips t JOIN ops.zones z_pu ON z_pu.LocationID = t.PULocationID JOIN ops.zones z_do ON z_do.LocationID = t.DOLocationID CROSS JOIN UNNEST([z_pu.Borough, z_do.Borough]) AS z(Borough) GROUP BY z.Borough ORDER BY z.Borough\n```\nrows 8 vs 8 · rows differ (8 vs 8 rows); first differing row [\"Bronx\",\"4073\"] returned by the original, missing from the candidate\nfirst difference (orig only): `[\"Bronx\",\"4073\"]`\n\nPlaybook entries used: `mem-1`, `mem-2`\n\n## Verdict: NO_SAFE_REWRITE — attempts_exhausted\n(attempt summary / upstream message) #1 REJECT ROW_DIFF, #2 REJECT ROW_DIFF, #3 REJECT ROW_DIFF\n",
+      "case": {
+        "run_id": "replay-example_4",
+        "sql": "SELECT z.Borough, COUNT(*) AS touches\nFROM lake.trips t\nJOIN ops.zones z ON z.LocationID = t.PULocationID OR z.LocationID = t.DOLocationID\nGROUP BY z.Borough\nORDER BY z.Borough",
+        "source": "paste",
+        "engine": "duckdb",
+        "llm": "cache",
+        "started_at": "2026-10-25T11:29:13.384Z",
+        "attempts": [
+          {
+            "n": 1,
+            "origin": "rewriter",
+            "hypothesis_id": "h1",
+            "sql": "SELECT z.Borough, COUNT(*) AS touches FROM (SELECT PULocationID AS LocationID FROM lake.trips UNION ALL SELECT DOLocationID FROM lake.trips) locs JOIN ops.zones z ON z.LocationID = locs.LocationID GROUP BY z.Borough ORDER BY z.Borough",
+            "change_summary": "Replaced the OR join with UNION ALL of PULocationID and DOLocationID followed by a single equi-join to zones, enabling hash join optimization.",
+            "verdict": "REJECT",
+            "rows": {
+              "orig": 8,
+              "rewrite": 8
+            },
+            "fingerprint": {
+              "orig": "d4ab3ed2a53751bb94d91a20590358ea45f2c56af65cb86e99d7a17951972250",
+              "rewrite": "d31048165065c1f4fa7ec00f5808d5ed7be9ad9ad0ab23e8bd4dc3aba47609a7"
+            },
+            "fingerprint_kind": "rows",
+            "reason": "ROW_DIFF",
+            "first_diff": {
+              "side": "orig",
+              "row": [
+                "Bronx",
+                "4073"
+              ]
+            },
+            "detail": "rows differ (8 vs 8 rows); first differing row [\"Bronx\",\"4073\"] returned by the original, missing from the candidate"
+          },
+          {
+            "n": 2,
+            "origin": "rewriter",
+            "hypothesis_id": "h1",
+            "sql": "SELECT z.Borough, COUNT(*) AS touches FROM lake.trips t JOIN ops.zones z ON z.LocationID = t.PULocationID GROUP BY z.Borough UNION ALL SELECT z.Borough, COUNT(*) AS touches FROM lake.trips t JOIN ops.zones z ON z.LocationID = t.DOLocationID GROUP BY z.Borough ORDER BY z.Borough",
+            "change_summary": "Split the OR join into two separate equi-joins with UNION ALL to enable hash join optimization, then aggregate by Borough.",
+            "verdict": "REJECT",
+            "rows": {
+              "orig": 8,
+              "rewrite": 16
+            },
+            "fingerprint": {
+              "orig": "d4ab3ed2a53751bb94d91a20590358ea45f2c56af65cb86e99d7a17951972250",
+              "rewrite": "7b006ee17810ea5c3153d76ba1c961676f27fb3747e422c7f390e910fc5778e6"
+            },
+            "fingerprint_kind": "rows",
+            "reason": "ROW_DIFF",
+            "first_diff": {
+              "side": "orig",
+              "row": [
+                "Bronx",
+                "4073"
+              ]
+            },
+            "detail": "rows differ (8 vs 16 rows); first differing row [\"Bronx\",\"4073\"] returned by the original, missing from the candidate"
+          },
+          {
+            "n": 3,
+            "origin": "rewriter",
+            "hypothesis_id": "h2",
+            "sql": "SELECT z.Borough, COUNT(*) AS touches FROM lake.trips t JOIN ops.zones z_pu ON z_pu.LocationID = t.PULocationID JOIN ops.zones z_do ON z_do.LocationID = t.DOLocationID CROSS JOIN UNNEST([z_pu.Borough, z_do.Borough]) AS z(Borough) GROUP BY z.Borough ORDER BY z.Borough",
+            "change_summary": "Rewritten OR join as double equi-join to zones for PULocationID and DOLocationID, then unnest boroughs to preserve per-trip contribution to both boroughs, enabling hash joins.",
+            "verdict": "REJECT",
+            "rows": {
+              "orig": 8,
+              "rewrite": 8
+            },
+            "fingerprint": {
+              "orig": "d4ab3ed2a53751bb94d91a20590358ea45f2c56af65cb86e99d7a17951972250",
+              "rewrite": "d31048165065c1f4fa7ec00f5808d5ed7be9ad9ad0ab23e8bd4dc3aba47609a7"
+            },
+            "fingerprint_kind": "rows",
+            "reason": "ROW_DIFF",
+            "first_diff": {
+              "side": "orig",
+              "row": [
+                "Bronx",
+                "4073"
+              ]
+            },
+            "detail": "rows differ (8 vs 8 rows); first differing row [\"Bronx\",\"4073\"] returned by the original, missing from the candidate"
+          }
+        ],
+        "verdict": "NO_SAFE_REWRITE",
+        "playbook_hits": [
+          "mem-1",
+          "mem-2"
+        ],
+        "precheck": {
+          "deterministic": true,
+          "rows": 8,
+          "fingerprint": "d4ab3ed2a53751bb94d91a20590358ea45f2c56af65cb86e99d7a17951972250",
+          "fingerprint_kind": "rows",
+          "vacuous": false,
+          "columns": [
+            {
+              "name": "Borough",
+              "type": "varchar"
+            },
+            {
+              "name": "touches",
+              "type": "bigint"
+            }
+          ]
+        },
+        "diagnosis": {
+          "bottleneck": "The BLOCKWISE_NL_JOIN (node 8) performs a nested-loop join over 495,833 trips rows and 265 zones rows with an OR join condition (PULocationID OR DOLocationID), preventing hash-join optimization and likely executing ~130M comparisons.",
+          "pattern_label": "or_join_condition",
+          "plan_nodes": [
+            {
+              "id": "8",
+              "op": "BLOCKWISE_NL_JOIN",
+              "note": "Join Type: INNER | Condition: ((LocationID = CAST(PULocationID AS BIGINT)) OR (LocationID = CAST(DOLocationID AS BIGINT)"
+            }
+          ],
+          "hypotheses": [
+            {
+              "id": "h1",
+              "source": "detector",
+              "plan_node_id": "8",
+              "claim": "An OR inside the JOIN condition cannot use a hash join; the engine falls back to a nested-loop style join, which is far more expensive than two equi-joins. (matched: inner join ops.zones z on z.locationid = t.pulocationid or z.locationid = t.dolocationid)",
+              "status": "unproven"
+            },
+            {
+              "id": "h2",
+              "source": "llm",
+              "plan_node_id": "8",
+              "claim": "The OR join condition forces a nested-loop join instead of a hash join; rewriting as a UNION ALL of two separate equi-joins (one on PULocationID, one on DOLocationID) followed by aggregation would enable hash joins and reduce comparisons to ~1M.",
+              "status": "unproven"
+            },
+            {
+              "id": "h3",
+              "source": "llm",
+              "plan_node_id": "8",
+              "claim": "Neither trips.PULocationID nor trips.DOLocationID has an index; creating a hash index or sorting trips on both columns would allow a merge join or hash join on each key individually.",
+              "status": "untested"
+            },
+            {
+              "id": "h4",
+              "source": "llm",
+              "plan_node_id": "8",
+              "claim": "The blockwise nested-loop join materializes the full cross-product for the OR condition; pushing a bloom filter or pre-filtering zones into the scan could reduce the inner-loop iterations.",
+              "status": "untested"
+            }
+          ],
+          "raw_refs": [],
+          "narrative": "llm-cache"
+        },
+        "schema_fqn": "lake+ops",
+        "finished_at": "2026-10-25T11:29:13.569Z",
+        "no_rewrite_reason": "attempts_exhausted",
+        "detail": "#1 REJECT ROW_DIFF, #2 REJECT ROW_DIFF, #3 REJECT ROW_DIFF",
+        "playbook_state": "empty"
+      }
+    },
+    "agents": [
+      {
+        "name": "Orchestrator",
+        "events": 14
+      },
+      {
+        "name": "Verifier",
+        "events": 9
+      },
+      {
+        "name": "Diagnoser",
+        "events": 2
+      },
+      {
+        "name": "Rewriter",
+        "events": 3
+      }
+    ]
+  }
+}

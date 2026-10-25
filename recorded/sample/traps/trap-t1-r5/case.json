@@ -1,0 +1,206 @@
+{
+  "run_id": "trap-t1-r5",
+  "sql": "SELECT z.LocationID, z.Borough, z.Zone, COUNT(t.PULocationID) AS cash_trips\nFROM ops.zones z\nLEFT JOIN lake.trips t ON t.PULocationID = z.LocationID AND t.payment_type = 2\nGROUP BY z.LocationID, z.Borough, z.Zone\nORDER BY z.LocationID",
+  "source": "paste",
+  "engine": "duckdb",
+  "llm": "nim",
+  "started_at": "2026-10-25T11:16:15.440Z",
+  "attempts": [
+    {
+      "n": 1,
+      "origin": "rewriter",
+      "hypothesis_id": "h1",
+      "sql": "SELECT z.LocationID, z.Borough, z.Zone, COALESCE(t.cnt, 0) AS cash_trips\nFROM ops.zones z\nLEFT JOIN (\n    SELECT CAST(PULocationID AS BIGINT) AS loc_id, COUNT(*) AS cnt\n    FROM lake.trips\n    WHERE payment_type = 2\n    GROUP BY CAST(PULocationID AS BIGINT)\n) t ON t.loc_id = z.LocationID\nORDER BY z.LocationID",
+      "change_summary": "Pre-aggregate filtered trips by casted PULocationID before joining to zones to eliminate the expensive hash join on raw rows and avoid per-row CAST in the join condition.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 265,
+        "rewrite": 265
+      },
+      "fingerprint": {
+        "orig": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df",
+        "rewrite": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          7.3,
+          3.6,
+          4
+        ],
+        "rewrite": [
+          1.8,
+          2.4,
+          1.6
+        ],
+        "median_speedup": 2.5,
+        "median_saving_ms": 2.4,
+        "faster_pairs": 3,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "floor"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "under_gate",
+      "detail": "median 2.5×, saving 2.4 ms, 3/3 pairs faster — missed: floor"
+    },
+    {
+      "n": 2,
+      "origin": "rewriter",
+      "hypothesis_id": "h2",
+      "sql": "SELECT z.LocationID, z.Borough, z.Zone, COALESCE(t.cnt, 0) AS cash_trips FROM ops.zones z LEFT JOIN ( SELECT PULocationID, COUNT(*) AS cnt FROM lake.trips WHERE payment_type = 2 GROUP BY PULocationID ) t ON t.PULocationID = z.LocationID ORDER BY z.LocationID",
+      "change_summary": "Removed CAST on PULocationID in subquery and join condition, allowing direct integer comparison and potential predicate pushdown; moved aggregation before join to reduce rows processed in join.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 265,
+        "rewrite": 265
+      },
+      "fingerprint": {
+        "orig": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df",
+        "rewrite": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          5.3,
+          3.3,
+          4.3
+        ],
+        "rewrite": [
+          2.4,
+          2.3,
+          1.8
+        ],
+        "median_speedup": 2.21,
+        "median_saving_ms": 2.5,
+        "faster_pairs": 3,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "floor"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "under_gate",
+      "detail": "median 2.21×, saving 2.5 ms, 3/3 pairs faster — missed: floor"
+    },
+    {
+      "n": 3,
+      "origin": "rewriter",
+      "hypothesis_id": "h3",
+      "sql": "SELECT z.LocationID, z.Borough, z.Zone, COALESCE(t.cnt, 0) AS cash_trips FROM ops.zones z LEFT JOIN (SELECT CAST(PULocationID AS BIGINT) AS PULocationID, COUNT(*) AS cnt FROM lake.trips WHERE payment_type = 2 GROUP BY CAST(PULocationID AS BIGINT)) t ON t.PULocationID = z.LocationID ORDER BY z.LocationID",
+      "change_summary": "Pre-cast PULocationID to BIGINT inside the subquery aggregation to eliminate per-row CAST overhead during the join and enable hash-based join on matching BIGINT types",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 265,
+        "rewrite": 265
+      },
+      "fingerprint": {
+        "orig": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df",
+        "rewrite": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          5.2,
+          5,
+          4.8
+        ],
+        "rewrite": [
+          1.7,
+          1.6,
+          1.7
+        ],
+        "median_speedup": 3.06,
+        "median_saving_ms": 3.4,
+        "faster_pairs": 3,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "floor"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "under_gate",
+      "detail": "median 3.06×, saving 3.4 ms, 3/3 pairs faster — missed: floor"
+    }
+  ],
+  "verdict": "NO_SAFE_REWRITE",
+  "playbook_hits": [],
+  "precheck": {
+    "deterministic": true,
+    "rows": 265,
+    "fingerprint": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df",
+    "fingerprint_kind": "rows",
+    "vacuous": false,
+    "columns": [
+      {
+        "name": "LocationID",
+        "type": "bigint"
+      },
+      {
+        "name": "Borough",
+        "type": "varchar"
+      },
+      {
+        "name": "Zone",
+        "type": "varchar"
+      },
+      {
+        "name": "cash_trips",
+        "type": "bigint"
+      }
+    ]
+  },
+  "diagnosis": {
+    "bottleneck": "The query spends most time in the HASH_JOIN (node 8) and subsequent HASH_GROUP_BY because the join condition requires a runtime CAST from PULocationID (smallint) to BIGINT to match LocationID, preventing predicate pushdown and forcing a full scan of 99k filtered trips rows through the hash join before aggregation.",
+    "pattern_label": "outer_join_predicate",
+    "plan_nodes": [
+      {
+        "id": "8",
+        "op": "HASH_JOIN",
+        "note": "Join Type: RIGHT | Conditions: CAST(PULocationID AS BIGINT) = LocationID | Estimated Cardinality: 99167"
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "h1",
+        "source": "detector",
+        "plan_node_id": "8",
+        "claim": "A filter on the joined side sits in the ON clause of a LEFT JOIN; the join dominates the cost. (matched: left join lake.trips t on … and t.payment_type = 2)",
+        "status": "unproven"
+      },
+      {
+        "id": "h2",
+        "source": "llm",
+        "plan_node_id": "8",
+        "claim": "The CAST(PULocationID AS BIGINT) = LocationID condition in the HASH_JOIN prevents the payment_type=2 filter from being pushed into the trips scan as an index seek or partition prune, forcing a full sequential scan of the filtered 99k rows.",
+        "status": "unproven"
+      },
+      {
+        "id": "h3",
+        "source": "llm",
+        "plan_node_id": "8",
+        "claim": "Because PULocationID has only 243 distinct values across 495k rows, the hash join builds a large hash table with many collisions on the right (zones) side, and the type coercion adds per-row CPU overhead during probing.",
+        "status": "unproven"
+      }
+    ],
+    "raw_refs": [
+      "dropped hypothesis citing unknown plan node 11"
+    ],
+    "narrative": "llm"
+  },
+  "schema_fqn": "lake+ops",
+  "finished_at": "2026-10-25T11:18:01.850Z",
+  "no_rewrite_reason": "attempts_exhausted",
+  "detail": "#1 REJECT NOT_FASTER, #2 REJECT NOT_FASTER, #3 REJECT NOT_FASTER",
+  "playbook_state": "empty"
+}

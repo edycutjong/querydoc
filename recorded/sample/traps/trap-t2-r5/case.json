@@ -1,0 +1,194 @@
+{
+  "run_id": "trap-t2-r5",
+  "sql": "SELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30\nUNION\nSELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE fare_amount > 100",
+  "source": "paste",
+  "engine": "duckdb",
+  "llm": "nim",
+  "started_at": "2026-10-25T11:22:02.296Z",
+  "attempts": [
+    {
+      "n": 1,
+      "origin": "rewriter",
+      "hypothesis_id": "h1",
+      "sql": "SELECT DISTINCT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 OR fare_amount > 100",
+      "change_summary": "Combined two scans into one by using a single WHERE clause with OR and retained deduplication via SELECT DISTINCT.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 277,
+        "rewrite": 277
+      },
+      "fingerprint": {
+        "orig": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441",
+        "rewrite": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          3.7,
+          3.7,
+          3.1
+        ],
+        "rewrite": [
+          3.7,
+          4,
+          3.3
+        ],
+        "median_speedup": 0.94,
+        "median_saving_ms": -0.2,
+        "faster_pairs": 0,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "ratio",
+          "floor",
+          "majority"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "no_gain",
+      "detail": "median 0.94×, saving -0.2 ms, 0/3 pairs faster — missed: ratio, floor, majority"
+    },
+    {
+      "n": 2,
+      "origin": "rewriter",
+      "hypothesis_id": "h2",
+      "sql": "SELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 OR fare_amount > 100",
+      "change_summary": "Replaced UNION with a single scan using combined OR predicate and removed explicit deduplication since UNION's distinct behavior is implicitly maintained by the single scan",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 277,
+        "rewrite": 1437
+      },
+      "fingerprint": {
+        "orig": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441",
+        "rewrite": "fa82127317edb66eacfd49896fbe960f3bb150e4dbab6ae3da35bb4b583a4f65"
+      },
+      "fingerprint_kind": "rows",
+      "reason": "ROW_DIFF",
+      "first_diff": {
+        "side": "rewrite",
+        "row": [
+          "142",
+          "1",
+          "1"
+        ]
+      },
+      "detail": "rows differ (277 vs 1437 rows); first differing row [\"142\",\"1\",\"1\"] returned by the candidate, not by the original"
+    },
+    {
+      "n": 3,
+      "origin": "rewriter",
+      "hypothesis_id": "h2",
+      "sql": "SELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE (trip_distance > 30 OR fare_amount > 100) GROUP BY PULocationID, payment_type, passenger_count",
+      "change_summary": "Combined both UNION branches into a single table scan with OR predicate and used GROUP BY for deduplication to match UNION's distinct semantics.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 277,
+        "rewrite": 277
+      },
+      "fingerprint": {
+        "orig": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441",
+        "rewrite": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          4,
+          2.8,
+          2.6
+        ],
+        "rewrite": [
+          3.9,
+          3.6,
+          2.7
+        ],
+        "median_speedup": 0.96,
+        "median_saving_ms": -0.1,
+        "faster_pairs": 1,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "ratio",
+          "floor",
+          "majority"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "no_gain",
+      "detail": "median 0.96×, saving -0.1 ms, 1/3 pairs faster — missed: ratio, floor, majority"
+    }
+  ],
+  "verdict": "NO_SAFE_REWRITE",
+  "playbook_hits": [
+    "mem-1",
+    "mem-2"
+  ],
+  "precheck": {
+    "deterministic": true,
+    "rows": 277,
+    "fingerprint": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441",
+    "fingerprint_kind": "rows",
+    "vacuous": false,
+    "columns": [
+      {
+        "name": "PULocationID",
+        "type": "integer"
+      },
+      {
+        "name": "payment_type",
+        "type": "bigint"
+      },
+      {
+        "name": "passenger_count",
+        "type": "bigint"
+      }
+    ]
+  },
+  "diagnosis": {
+    "bottleneck": "The query executes two full table scans of the same table (one for each filter) and then performs a hash-based deduplication (HASH_GROUP_BY) on the combined results, causing redundant I/O and unnecessary aggregation overhead.",
+    "pattern_label": "union_dedupe",
+    "plan_nodes": [
+      {
+        "id": "2",
+        "op": "UNION",
+        "note": ""
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "h1",
+        "source": "detector",
+        "plan_node_id": "2",
+        "claim": "UNION forces a deduplicating aggregate over both inputs. (matched: rips where trip_distance > 30 union select pulocationid, payment_type,)",
+        "status": "falsified"
+      },
+      {
+        "id": "h2",
+        "source": "llm",
+        "plan_node_id": "2",
+        "claim": "The first sequential scan reads the entire table to evaluate trip_distance > 30; a single scan with a combined predicate (trip_distance > 30 OR fare_amount > 100) would eliminate the second full scan.",
+        "status": "falsified"
+      },
+      {
+        "id": "h3",
+        "source": "llm",
+        "plan_node_id": "3",
+        "claim": "The second sequential scan reads the entire table again for fare_amount > 100, doubling the I/O cost; this scan is redundant if the two filters are evaluated in one pass.",
+        "status": "untested"
+      }
+    ],
+    "raw_refs": [
+      "dropped hypothesis citing unknown plan node 0"
+    ],
+    "narrative": "llm"
+  },
+  "schema_fqn": "lake",
+  "finished_at": "2026-10-25T11:23:00.546Z",
+  "no_rewrite_reason": "attempts_exhausted",
+  "detail": "#1 REJECT NOT_FASTER, #2 REJECT ROW_DIFF, #3 REJECT NOT_FASTER",
+  "playbook_state": "empty"
+}

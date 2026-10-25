@@ -1,0 +1,18 @@
+{
+  "task": "diagnose_revise",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b",
+  "key_fields": {
+    "template": "diagnoser.revise@1",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "engine": "duckdb",
+    "sql": "select payment_type, count(*) as trips from lake.trips group by payment_type order by payment_type",
+    "pattern": "other",
+    "attempt": 2,
+    "carryover": "{\"ledger\":[[\"h1\",\"falsified\"],[\"h2\",\"untested\"],[\"h3\",\"falsified\"],[\"h4\",\"untested\"]],\"rejected\":[[1,\"rewriter\",\"h1\",\"NOT_FASTER\",\"no_gain\",\"069749d3e2bebbf4026f042d4aeca1cb2a06be2905deff6447b25619dc4ff86c\",null],[2,\"rewriter\",\"h3\",\"NOT_FASTER\",\"no_gain\",\"79ca8d26b15276a63281ff15173da97a018532c1eaa6c488c62e8ea83b52d0ed\",null]]}"
+  },
+  "value": {
+    "action": "new",
+    "plan_node_id": "6",
+    "claim": "Bypassing the decompression at plan node 6 by aggregating directly on dictionary-encoded payment_type codes will reduce total CPU cycles consumed by the query."
+  }
+}

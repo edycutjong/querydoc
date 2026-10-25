@@ -154,3 +154,25 @@ for the hero, pair and trap executions; the adapter's default is 120 s, so live 
   `npm ci && npm run typecheck && npm test && docker build .`.
 - `scripts/autopilot-preflight.sh` matched `progress` and flagged the vendored `progress.ts` as a kitchen file; it now matches
   `progress.md`.
+
+## Day 4 (25 Oct) — sample engine, playbook, API
+
+- **DuckDB is too fast to host a natural "slow query".** Probe on the committed subset (495,833 trips, 1-in-6 of January 2024, 7.6 MB):
+  an unused `LEFT JOIN` to the 265-row zones table costs 5 ms (a hand rewrite 1–3 ms), a correlated `AVG` 11 ms, `COUNT(DISTINCT)` 10 ms —
+  all far below the 50 ms noise floor, and replicating the table ×10 at load did not change that (saving < 2 ms). The one natural
+  shape that is slow enough is an `OR` inside a join condition (`ON z.LocationID = t.PULocationID OR z.LocationID = t.DOLocationID`):
+  71–79 ms against 3–5 ms for the two-equi-join `UNION ALL` rewrite, rows identical by an independent `EXCEPT ALL` oracle. It became the
+  sample pack's hero and the closed-enum pattern `or_join_condition`. The sample-mode ACCEPT depends on the machine (a faster CPU
+  shrinks the 70 ms saving toward the 50 ms floor), so the README claims the verdict class, not the number. No ×K scaling is used.
+- **The first recorded hero run did not reach ACCEPT.** The model's pre-aggregate-then-`UNION ALL` rewrite counts a trip twice when
+  pickup = dropoff; the Verifier refused it twice with the differing row (`["Bronx","4073"]`), then a third attempt hit a binder error.
+  That is the critique/retry beat on a product-shaped query; the recorded ACCEPT of the same hero comes from the supplied rewrite.
+- **`NOT IN` is only slow when the subquery column has NULLs.** On a non-nullable key DuckDB runs it as a hash mark join in 4–10 ms;
+  the NULL-aware path (T3) took 56 ms. T3's tempting `NOT EXISTS` rewrite changes the rows, so it stays a trap, not a hero.
+- **node-api returns BIGINT and DECIMAL as strings** under `getRowsJson()`; the canonicaliser already parses strings through `BigInt`,
+  so the Verifier path needed no change. `runAndReadUntil(sql, cap + 1)` stops reading at the cap, which is how truncation is detected.
+- **`SET enable_external_access = false` + `SET lock_configuration = true`** after loading the two Parquet files: with the guard
+  bypassed, `read_text('/etc/hosts')` fails inside the engine and `SET enable_external_access = true` is refused. The guard also
+  refuses `read_*`, `*_scan`, `glob`, `getenv`, `duckdb_*` and friends before the engine sees them.
+- **Hub flow note:** `cp .env.example .env` gives empty values; `docker run --env-file .env` sets them to the empty string, and both
+  `zetarisConfigFromEnv` and `nimClientFromEnv` treat empty as absent, so that path lands in sample mode with a labelled banner.

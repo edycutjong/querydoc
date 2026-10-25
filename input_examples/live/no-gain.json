@@ -1,4 +1,10 @@
 {
-  "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.promotion p\nWHERE  p.p_channel_tv = 'N'",
-  "source": "paste"
+  "input": {
+    "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.promotion p\nWHERE  p.p_channel_tv = 'N'",
+    "source": "paste"
+  },
+  "options": {
+    "sample_mode": false,
+    "playbook": "empty"
+  }
 }

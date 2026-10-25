@@ -1,0 +1,46 @@
+{
+  "example": "example_5",
+  "request": {
+    "input": {
+      "sql": "SELECT VendorID, tpep_pickup_datetime, fare_amount FROM lake.trips LIMIT 20",
+      "source": "paste"
+    },
+    "options": {
+      "sample_mode": true,
+      "playbook": "empty"
+    }
+  },
+  "response": {
+    "status": "ok",
+    "engine": "duckdb",
+    "llm": "none",
+    "verdict": "NOT_VERIFIABLE",
+    "output": {
+      "dossier": "# Query Doctor — NOT_VERIFIABLE\n\nrun `replay-example_5` · engine duckdb · llm none · 2026-10-25T11:29:13.571Z\n\n## Original\n```sql\nSELECT VendorID, tpep_pickup_datetime, fare_amount FROM lake.trips LIMIT 20\n```\n\n> Sample mode: DuckDB on the committed NYC TLC subset. A different optimiser from Zetaris — speedups here say nothing about Zetaris.\n\n## Verdict: NOT_VERIFIABLE\n(upstream message) LIMIT without a top-level ORDER BY\n",
+      "case": {
+        "run_id": "replay-example_5",
+        "sql": "SELECT VendorID, tpep_pickup_datetime, fare_amount FROM lake.trips LIMIT 20",
+        "source": "paste",
+        "engine": "duckdb",
+        "llm": "none",
+        "started_at": "2026-10-25T11:29:13.571Z",
+        "attempts": [],
+        "verdict": "NOT_VERIFIABLE",
+        "playbook_hits": [],
+        "finished_at": "2026-10-25T11:29:13.572Z",
+        "detail": "LIMIT without a top-level ORDER BY",
+        "playbook_state": "empty"
+      }
+    },
+    "agents": [
+      {
+        "name": "Orchestrator",
+        "events": 2
+      },
+      {
+        "name": "Verifier",
+        "events": 1
+      }
+    ]
+  }
+}

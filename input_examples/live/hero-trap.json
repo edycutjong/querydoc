@@ -1,4 +1,10 @@
 {
-  "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.store_sales ss\nLEFT JOIN TPCDS_DB.promotion p ON ss.ss_item_sk = p.p_item_sk\nWHERE  ss.ss_customer_sk IS NULL",
-  "source": "paste"
+  "input": {
+    "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.store_sales ss\nLEFT JOIN TPCDS_DB.promotion p ON ss.ss_item_sk = p.p_item_sk\nWHERE  ss.ss_customer_sk IS NULL",
+    "source": "paste"
+  },
+  "options": {
+    "sample_mode": false,
+    "playbook": "empty"
+  }
 }

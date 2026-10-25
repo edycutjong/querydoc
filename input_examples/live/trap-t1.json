@@ -1,4 +1,10 @@
 {
-  "sql": "SELECT COUNT(p.p_promo_sk) AS promo_rows, COUNT(1) AS n\nFROM   TPCDS_DB.store_sales ss\nLEFT JOIN TPCDS_DB.promotion p ON ss.ss_promo_sk = p.p_promo_sk AND p.p_channel_tv = 'N'\nWHERE  ss.ss_customer_sk IS NULL",
-  "source": "paste"
+  "input": {
+    "sql": "SELECT COUNT(p.p_promo_sk) AS promo_rows, COUNT(1) AS n\nFROM   TPCDS_DB.store_sales ss\nLEFT JOIN TPCDS_DB.promotion p ON ss.ss_promo_sk = p.p_promo_sk AND p.p_channel_tv = 'N'\nWHERE  ss.ss_customer_sk IS NULL",
+    "source": "paste"
+  },
+  "options": {
+    "sample_mode": false,
+    "playbook": "empty"
+  }
 }
