@@ -13,6 +13,9 @@ describe("sqlGuard (Zetaris side, hive dialect)", () => {
     "(SELECT 1)",
     "SELECT `parquet_files`.a FROM t `parquet_files`",
     "SELECT 'parquet.`x`' AS s",
+    "SELECT a.k FROM t a JOIN u b USING (k)",
+    "SELECT `TPCDS_DB`.`store_sales`.ss_store_sk FROM `TPCDS_DB`.`store_sales`",
+    "SELECT transform(arr, x -> x + 1) AS t2, 'USING \\'cmd\\'' AS s FROM t",
   ];
   for (const sql of passes) it(`passes: ${sql.slice(0, 60)}`, () => expect(sqlGuard(sql)).toMatchObject({ ok: true }));
 
@@ -30,6 +33,11 @@ describe("sqlGuard (Zetaris side, hive dialect)", () => {
     ["SELECT * FROM csv . `/etc/passwd`", /file/],
     ["SELECT `reflect`('java.lang.Runtime', 'getRuntime')", /JVM/],
     ["SELECT java_method ('java.lang.System', 'getenv')", /JVM/],
+    ["SELECT * FROM `org.apache.spark.sql.parquet`.`s3a://bucket/path`", /file/],
+    ["SELECT * FROM delta2.`/tmp/table`", /file/],
+    ["SELECT TRANSFORM(a, b) USING 'cat /etc/passwd' AS (x, y) FROM t", /script/],
+    ["SELECT TRANSFORM(a) USING \"sh -c id\" FROM t", /script/],
+    ["FROM t SELECT 1", /not a SELECT/],
     ["/* hi */ DELETE FROM t", /not a SELECT/],
     ["", /empty/],
   ];

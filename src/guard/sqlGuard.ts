@@ -8,7 +8,8 @@ const parser = new Parser();
 // ACTIVATE through the same SQL entry point), so this guard — not a tool allowlist — is what keeps a rewrite read-only.
 // Zetaris side: a literal-aware keyword scan (decisive) plus node-sql-parser in the Day-1 dialect (`hive`, querydoc.config.json).
 // A single statement the parser cannot read but the scan passes is a WARN, not a refusal; more than one statement, a DDL/DML
-// keyword outside literals, a direct file read (`parquet.\`s3a://…\``) or a JVM call (`reflect`, `java_method`) is REFUSED.
+// keyword outside literals, a direct file read (`parquet.\`s3a://…\``), a JVM call (`reflect`, `java_method`) or a script
+// transform (`TRANSFORM(…) USING 'cmd'`, also Hive's MAP/REDUCE form) is REFUSED.
 // The scan is deliberately blunt: an unquoted column named like a keyword (`comment`, `set`, `lock`) is refused too — a false
 // refusal, never a false pass; quote such a name with backticks.
 
@@ -27,6 +28,10 @@ const WRITE_KEYWORDS = [
 const WRITE_RE = new RegExp(`\\b(${WRITE_KEYWORDS.join("|")})\\b`, "i");
 // Both run on a mask that keeps backtick identifiers, so `parquet`.`s3a://…` and `reflect`(…) are seen too.
 const FILE_READ_RE = /`?\b(parquet|csv|json|orc|text|avro|binaryfile|delta|jdbc|hive)`?\s*\.\s*`/i;
+// Any qualifier (incl. a fully-qualified source like `org.apache.spark.sql.parquet`) applied to a back-quoted path or URI.
+const PATH_READ_RE = /`?[\w.]+`?\s*\.\s*`(?:[a-z][a-z0-9+.-]*:\/\/|\/)/i;
+// USING followed by a string literal = an external script (JOIN … USING (col) is followed by a parenthesis, not a literal).
+const SCRIPT_RE = /\bUSING\s*['"]/i;
 const JVM_CALL_RE = /\b(reflect|java_method|try_reflect)`?\s*\(/i;
 
 export function sqlGuard(sql: string, dialect = "hive"): GuardResult {
@@ -41,7 +46,8 @@ export function sqlGuard(sql: string, dialect = "hive"): GuardResult {
   const hit = WRITE_RE.exec(masked);
   if (hit) return { ok: false, reason: `keyword ${hit[1]!.toUpperCase()} outside literals`, warnings };
   const withIdents = maskSql(stmt, true);
-  if (FILE_READ_RE.test(withIdents)) return { ok: false, reason: "direct file/source read", warnings };
+  if (FILE_READ_RE.test(withIdents) || PATH_READ_RE.test(withIdents)) return { ok: false, reason: "direct file/source read", warnings };
+  if (SCRIPT_RE.test(masked)) return { ok: false, reason: "script transform (USING 'command')", warnings };
   if (JVM_CALL_RE.test(withIdents)) return { ok: false, reason: "JVM reflection call", warnings };
 
   try {
