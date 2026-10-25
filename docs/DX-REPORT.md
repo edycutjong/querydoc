@@ -122,3 +122,35 @@ for the hero, pair and trap executions; the adapter's default is 120 s, so live 
 - **Run-to-run spread.** In this run the original took 25.2–36.7 s over 5 runs, and `SELECT 1` had a median of 47.4 ms
   (spread 131.7 ms over runs 2–10). That spread is lower than Day 1's 594.3 ms; the noise floor in the config is still Day 1's
   1,782.9 ms, the more conservative of the two.
+
+## 2026-10-25 — Day 3: agents, the NVIDIA endpoint, vendored Meterless
+
+- **Nemotron 3 Ultra latency, measured** (`scripts/nim_probe.ts`, run `2026-10-25T09-09-01Z`; the hero, real agent prompts, one call each).
+  Diagnoser 13.7 s with reasoning on, 13.4 s off; Rewriter 9.9 s on, 7.7 s off. Both modes proposed the correct rewrite (drop the
+  unused LEFT JOIN). The switch is `chat_template_kwargs: {enable_thinking: false|true}`; `low_effort` changed nothing and
+  `reasoning_budget` is refused ("thinking_token_budget is not yet supported by the V2 model runner", HTTP 400).
+- **The probe understated the tail.** In the live chain the Rewriter's reasoning-on calls took 48.8 s and 52.3 s (about 2,200
+  completion tokens, 8.8–8.9k reasoning characters), and one retry attempt ran past its 90 s budget and timed out; the same prompt
+  with reasoning off answered in 2.0 s (166 tokens). The first live trap run, with a 4,000-token ceiling and 120 s timeout × 3
+  retries, lost an attempt to an empty reply (reasoning tokens count against `max_tokens`, so the JSON was cut off) and then to
+  three timeouts. So: **Diagnoser reasoning on** (once per case), **Rewriter reasoning off**; the gateway retries a timeout or a
+  truncation (`finish_reason: length`) once with reasoning off instead of resending the same request; ceilings are 6,000 / 8,000
+  tokens, timeouts 90 s (reasoning) / 60 s. `QUERYDOC_DUMP_DIR=<dir>` writes each model call (prompt, latency, finish reason, token
+  counts) — that is how the table above was obtained.
+- **Meterless vendoring.** `vendor/meterless/{hmem,markovian}/src` are the upstream reference sources at commit `0aa7417`
+  (LICENSE + NOTICE, no upstream AGENTS.md/CLAUDE.md), unmodified; the two upstream smoke tests run in our suite (20 tests, import
+  paths only changed). Cost: the sources do not compile under our `noUncheckedIndexedAccess`, so `npm run typecheck`
+  (`scripts/typecheck.mjs`) fails on any error outside `vendor/` and reports how many it ignored inside it. The Markovian engine
+  swallows an exception thrown inside a step into `run.error` and returns normally; `reasoning/chain.ts` reads `run.status` and
+  re-raises it, otherwise a Zetaris failure mid-chain would have looked like a clean finish. The engine also treats marker
+  tokens (`[FINAL]`, `<DONE/>`, …) anywhere in a chunk as control, so rejected SQL and engine errors are neutralised before they enter
+  the carryover block.
+- **The "no-gain control" was not one.** `evals/queries/zetaris/04-correlated-avg.sql` (a correlated `AVG` on the 18k-row `item`
+  dimension) was picked as a query where nothing could be won. The Rewriter's window-function rewrite was proven same-rows and
+  1.69× faster (3/3 pairs, saving 7.6 s; `recorded/live/correlated-avg/`). It is kept as a second real ACCEPT; the control is now a
+  one-column filter on the 300-row `promotion` table (`03-no-gain-control.sql`).
+- **GitHub Actions does not start on the private repo** — "recent account payments have failed or your spending limit needs to be
+  increased" (run 40179255951). That is an account billing state, not a workflow error (HUMAN-TODO #17). The same steps run locally:
+  `npm ci && npm run typecheck && npm test && docker build .`.
+- `scripts/autopilot-preflight.sh` matched `progress` and flagged the vendored `progress.ts` as a kitchen file; it now matches
+  `progress.md`.

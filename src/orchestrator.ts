@@ -24,6 +24,7 @@ export interface Deps {
   llm: LlmGateway;
   attemptCap: number; // querydoc.config.json policy.attemptCap
   logDir?: string; // JSONL traces go to <logDir>/trace-<run_id>.jsonl
+  // Chosen from the Day-3 latency probe (docs/DX-REPORT.md): the Diagnoser reasons once per case; the Rewriter answers directly.
   reasoning?: { diagnoser: "on" | "off"; rewriter: "on" | "off" };
 }
 
@@ -88,7 +89,7 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
       return finalise(att.verdict === "ACCEPT" ? att : null, c.attempts, null, finish);
     }
 
-    const rewriter = new Rewriter(deps.llm, trace, deps.reasoning?.rewriter ?? "on");
+    const rewriter = new Rewriter(deps.llm, trace, deps.reasoning?.rewriter ?? "off");
     const chain = await runChain({ sql: input.sql, plan, diagnosis: c.diagnosis, facts, pre, rewriter, verifier, trace, maxAttempts });
     c.attempts.push(...chain.attempts);
     if (c.llm === "none" && chain.attempts.length) c.llm = deps.llm.live ? "nim" : "cache"; // a Rewriter attempt ran, so a model (or its cache) was used
