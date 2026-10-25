@@ -78,7 +78,7 @@ async function intake(preset = {}) {
       <label class="choice"><input type="radio" name="mode" value="candidate" ${preset.mode === "agents" ? "" : "checked"}><span class="t">Check a rewrite you were sent</span>
         <div class="d">Paste the original and the rewrite. The Verifier gives its verdict on exactly that rewrite — nothing else is tried.</div></label>
       <label class="choice"><input type="radio" name="mode" value="agents" ${preset.mode === "agents" ? "checked" : ""}><span class="t">Or let the agents find one</span>
-        <div class="d">Paste the SQL (or pick one below). The Diagnoser reads the plan, the Rewriter proposes, the Verifier decides.${sample ? " In sample mode this needs NVIDIA_API_KEY or a recorded model response." : ""}</div></label>
+        <div class="d">Paste the SQL (or pick one below). The Diagnoser reads the plan, the Rewriter proposes, the Verifier decides.${sample ? " In sample mode this needs a Meterless Nightshift runtime token or a recorded model response." : ""}</div></label>
       <div class="fields">
         <label>Original SQL<textarea id="sql" spellcheck="false" placeholder="SELECT …" required>${esc(preset.sql ?? "")}</textarea></label>
         <label id="cand-wrap">Rewrite to check (candidate_sql)<textarea id="cand" spellcheck="false" placeholder="SELECT …">${esc(preset.cand ?? "")}</textarea></label>
@@ -286,9 +286,9 @@ const statusGlyph = (s) => ({ untested: "○", unproven: "◐", falsified: "✕"
 function noRewriteText(c, o) {
   if (o.partial || c.no_rewrite_reason === "llm_unavailable") {
     const a = c.attempts.find((x) => x.origin === "candidate_sql");
-    if (a?.reason === "ROW_DIFF") return `Your rewrite changes the result (${reasonText(a).replace(/^rows differ: /, "")}). Automatic retries need NVIDIA_API_KEY.`;
-    if (a?.reason === "NOT_FASTER") return `Your rewrite returns identical rows but is not faster by the gate (${a.timing_ms?.gates_missed.join(", ") || "see timing"}). Automatic retries need NVIDIA_API_KEY.`;
-    return "Diagnosis is below; rewrites need NVIDIA_API_KEY, or pass your own rewrite to check.";
+    if (a?.reason === "ROW_DIFF") return `Your rewrite changes the result (${reasonText(a).replace(/^rows differ: /, "")}). Automatic retries need a live model through Meterless Nightshift.`;
+    if (a?.reason === "NOT_FASTER") return `Your rewrite returns identical rows but is not faster by the gate (${a.timing_ms?.gates_missed.join(", ") || "see timing"}). Automatic retries need a live model through Meterless Nightshift.`;
+    return "Diagnosis is below; rewrites need a live model through Meterless Nightshift, or pass your own rewrite to check.";
   }
   switch (c.no_rewrite_reason) {
     case "attempts_exhausted": return `Every attempt was refused or not faster (${c.attempts.length} tried). The original stays as it is — no kept rewrite.`;

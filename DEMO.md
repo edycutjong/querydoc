@@ -1,5 +1,7 @@
 # DEMO — measured proof
 
+**Provenance:** the accepted Zetaris rewrite and the recorded runs behind these numbers were produced through direct NVIDIA NIM (the declared fallback) before the Meterless Nightshift adapter existed; a Nightshift re-recording is pending. The timings themselves are measured by `scripts/bench.ts` on the engine, independent of which provider wrote the rewrite.
+
 Every number below is copied from the run file named under it (`npm run bench`, `npm run eval`); nothing is typed by hand.
 
 <!-- BEGIN bench-duckdb -->

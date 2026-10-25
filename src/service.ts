@@ -296,7 +296,7 @@ export class QueryDocService {
     } catch (e) {
       engine = { name: mode.engine, ok: false, error: (e as Error).message.slice(0, 200) };
     }
-    return { status: 200, json: { status: engine.ok ? "ok" : "degraded", engine, ...(mode.banner ? { banner: mode.banner } : {}), llm: { provider: this.llm.provider ?? "none", configured: this.llm.live, route: "app → Meterless Nightshift → NVIDIA Nemotron" }, llm_cache: existsSync(this.p("llm-cache")), calibration: this.calibration(), playbook_seed: existsSync(this.p("fixtures", "hmem-seed", "sample", "state.json")) } };
+    return { status: 200, json: { status: engine.ok ? "ok" : "degraded", engine, ...(mode.banner ? { banner: mode.banner } : {}), llm: { provider: this.llm.provider ?? "none", configured: this.llm.live }, llm_cache: existsSync(this.p("llm-cache")), calibration: this.calibration(), playbook_seed: existsSync(this.p("fixtures", "hmem-seed", "sample", "state.json")) } };
   }
 }
 

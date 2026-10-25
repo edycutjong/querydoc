@@ -100,7 +100,7 @@ export function pickModel(models: string[], pinned?: string): string {
   const nemo = models.find((m) => /nemotron/i.test(m) && /ultra/i.test(m)) ?? models.find((m) => /nemotron/i.test(m));
   if (nemo) return nemo;
   if (models.includes("meterless/deep")) return "meterless/deep";
-  return models.find((m) => m.startsWith("meterless/") && m !== "meterless/auto") ?? models[0] ?? "meterless/deep";
+  return models.find((m) => m.startsWith("meterless/") && m !== "meterless/auto") ?? models.find((m) => m !== "meterless/auto") ?? models[0] ?? "meterless/deep";
 }
 
 export interface NightshiftOptions {

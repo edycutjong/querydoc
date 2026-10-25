@@ -74,6 +74,7 @@ describe("pickModel", () => {
     expect(pickModel(["meterless/auto", "meterless/fast", "meterless/deep"])).toBe("meterless/deep");
     expect(pickModel(["meterless/auto", "meterless/fast"])).toBe("meterless/fast");
     expect(pickModel(["meterless/auto"])).toBe("meterless/auto");
+    expect(pickModel(["meterless/auto", "llama-x"])).toBe("llama-x");
   });
 });
 
@@ -180,6 +181,7 @@ describe("gateway degrades to the cache when Nightshift is down or rejects the t
     for (const fetchFn of [dead, runtime({ token: "other" }).fetchFn]) {
       const gw = new LlmGateway({ client: new NightshiftClient("tok", { fetchFn, model: "meterless/deep", retries: 0 }), cacheDir: dir });
       expect(await gw.call("t", { k: 1 }, REQ, (raw) => raw as { a: number })).toMatchObject({ out: { a: 1 }, source: "llm-cache", provider: null });
+      expect(gw.lastServed).toBe("cache"); // the case label comes from here: a cache answer is never reported as nightshift
       await expect(gw.call("t", { k: 2 }, REQ, (raw) => raw)).rejects.toThrow(/needs a live model/);
     }
   });

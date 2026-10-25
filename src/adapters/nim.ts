@@ -226,9 +226,19 @@ export class LlmGateway {
     return this.o.client?.provider ?? null;
   }
 
+  // What served the most recent call: the live provider, or "cache" (keyless, or a provider that was down). The case-level label
+  // comes from here, so a cache answer is never reported as live.
+  lastServed: LlmProvider | "cache" | null = null;
+
   // Run one structured call. `parse` validates (zod); a validation failure is retried once with the error appended (the model
   // sees what was wrong), then rethrown. Keyless: cache lookup, else SampleModeNoLLM.
   async call<T>(task: string, keyFields: Record<string, unknown>, req: ChatRequest, parse: (raw: unknown) => T): Promise<{ out: T } & Omit<LlmOutcome, "value">> {
+    const out = await this.callInner(task, keyFields, req, parse);
+    this.lastServed = out.source === "live" ? (out.provider ?? "cache") : "cache";
+    return out;
+  }
+
+  private async callInner<T>(task: string, keyFields: Record<string, unknown>, req: ChatRequest, parse: (raw: unknown) => T): Promise<{ out: T } & Omit<LlmOutcome, "value">> {
     const key = normalisedKey(task, keyFields);
     const file = join(this.dir, `${key}.json`);
     const client = this.o.client;
@@ -265,7 +275,7 @@ export class LlmGateway {
         const out = parse(raw);
         if (this.o.cacheWrite && !hasCandidateOrigin(keyFields)) {
           mkdirSync(this.dir, { recursive: true });
-          writeFileSync(file, JSON.stringify({ task, provider: r.provider, model: r.handledModel ?? r.requestedModel, key_fields: keyFields, value: raw }, null, 2) + "\n");
+          writeFileSync(file, JSON.stringify({ task, provider: r.provider, model: r.handledModel, requested_model: r.requestedModel, key_fields: keyFields, value: raw }, null, 2) + "\n");
         }
         return { out, source: "live", latencyMs: r.latencyMs, reasoningChars: r.reasoning.length, provider: r.provider, requestedModel: r.requestedModel, handledModel: r.handledModel };
       } catch (e) {
