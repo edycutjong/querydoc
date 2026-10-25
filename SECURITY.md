@@ -12,7 +12,7 @@ GitHub profile. Please do not file a public issue for an exploitable bug. Expect
 - **Read-only SQL.** `src/guard/sqlGuard.ts` accepts one statement and refuses writes, DDL, multiple statements and external paths,
   for the original and every candidate. The DuckDB sample engine also locks external access.
 - **Credentials** are read from the environment or `~/.config/querydoc/*.env`, never from the tree. `.env.example` has empty values.
-  CI runs gitleaks on every push.
+  A gitleaks workflow is defined (`.github/workflows/gitleaks.yml`) but has not run on GitHub; a local full-history scan found no leaks.
 - **Live-mode API.** Binds `127.0.0.1` by default; answers only on `localhost`, an IP literal or `QUERYDOC_ALLOWED_HOSTS` names
   (DNS-rebinding guard); cross-origin writes are refused. The Docker image sets `HOST=0.0.0.0` and runs sample mode.
 - **Dependencies.** `npm audit --omit=dev` reports 0 vulnerabilities at the last release commit.

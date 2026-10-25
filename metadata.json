@@ -33,12 +33,12 @@
     },
     "cursor": {
       "used": true,
-      "how": "cursor-agent wrote the scaffold commit only (d3e823c, trailers Tool: cursor and Co-authored-by: Cursor). Cursor was optional for this event (organiser, 2026-10-22); every other commit was written with Claude Code (Tool: claude-code)."
+      "how": "cursor-agent wrote the scaffold commit only (d3e823c, trailers Tool: cursor and Co-authored-by: Cursor). Every other commit was written with Claude Code (Tool: claude-code)."
     }
   },
   "ai_usage": {
-    "development": "Claude Code (Claude Opus 5.5 and Sonnet 5.5) wrote 100 of 101 commits; Cursor's agent wrote 1 (the scaffold). Commit trailers record the tool.",
-    "review": "Code and architecture were reviewed by an outside panel of four models (Qwen, Grok, Codex, Claude Opus); each finding was checked against the code before any change.",
+    "development": "Claude Code wrote every commit except the scaffold; Cursor's agent wrote the scaffold. Commit trailers record the tool.",
+    "review": "Code and architecture were reviewed by an outside panel of four models (Qwen, Grok, Codex, Claude Opus); each finding was checked against the code before any change (transcripts not published).",
     "runtime": "Nemotron 3 Ultra for diagnosis and rewrite proposals. The verdict never comes from a model."
   },
   "tests": { "runner": "vitest", "files": 26, "tests": 286, "command": "npm test" },

@@ -23,7 +23,7 @@
 
 **Track: Reasoning Architecture.** Query Doctor takes one slow SQL query, reads its Zetaris plan, proposes a rewrite, and then lets
 deterministic code, not the model, decide whether the rewrite may ship. On the live hero query the accepted rewrite ran
-**2.11× faster** (p50 32,442.6 → 16,428 ms, 10 alternating pairs) with the same row ([`DEMO.md`](DEMO.md)); on the trap queries every
+**2.11× faster** (median of 10 per-pair ratios; the p50s are 32,442.6 → 16,428 ms) with the same row ([`DEMO.md`](DEMO.md)); on the trap queries every
 rewrite that changed rows was refused and none shipped ([`evals/results.md`](evals/results.md)).
 
 ## 📸 See it in Action
@@ -58,7 +58,7 @@ Four agents, one rule: **a model never decides.**
 Nothing is applied to your database. An accepted case is a candidate with a patch file for a human to review.
 
 ### Related work
-Engine optimizers (for example Trino's join elimination) apply fixed rules, safely, but only the rules they have. LLM rewriters
+Engine optimizers apply fixed rules, safely, but only the rules they have (join elimination for the hero's shape is an open request in Trino, #2939). LLM rewriters
 propose anything, with no check. Our baseline arm is that second kind: one plain model call, scored by the same Verifier; it changed rows
 in 6 of 15 sample runs and was faster-and-identical in 0 of 15 (`evals/results.md`). The hero is the shape from
 [trinodb/trino#2939](https://github.com/trinodb/trino/issues/2939), re-expressed on `TPCDS_DB`.
@@ -101,18 +101,18 @@ our own wall clock. Details and the other things we hit: [`docs/DX-REPORT.md`](d
   rejected attempts) is what the next attempt sees.
 - **Nightshift** is the default model provider (`src/adapters/nightshift.ts`, contract-following, 16 mock-runtime tests in test/nightshift.test.ts).
   **It was not run against a live Nightshift runtime.** All recorded runs used direct NVIDIA NIM, the declared fallback
-  (`LLM_PROVIDER=nim`), and every trace says `provider: nim`. We do not claim a Nemotron-through-Nightshift run.
+  (`LLM_PROVIDER=nim`), and every recorded trace names `nim` (`sponsor_call.service`). We do not claim a Nemotron-through-Nightshift run.
 
 ### NVIDIA
 Nemotron 3 Ultra serves the Diagnoser and Rewriter. The model that answered is recorded in each trace line and case.
 
 ### Cursor
-Cursor's agent wrote the scaffold commit only (`d3e823c`). Cursor was optional for this event (organiser, 22 Oct), so everything else was built with Claude Code.
+Cursor's agent wrote the scaffold commit only (`d3e823c`). Everything else was built with Claude Code.
 
 ### AI usage disclosure
-- **Code:** 100 of the commits carry `Tool: claude-code` (Claude Opus 5.5 / Sonnet 5.5 in Claude Code); 1 carries `Tool: cursor` and
+- **Code:** every commit except the scaffold carries `Tool: claude-code` (Claude Code); the scaffold carries `Tool: cursor` and
   `Co-authored-by: Cursor`. `git log --format='%h %(trailers:key=Tool,valueonly)'` lists them.
-- **Review:** an outside panel of four models (Qwen, Grok, Codex, Claude Opus) reviewed the code and architecture in two rounds; each
+- **Review:** an outside panel of four models (Qwen, Grok, Codex, Claude Opus) reviewed the code and architecture in two rounds (transcripts not published); each
   finding was checked against the code before a change, and the fixes are commits prefixed `a2a r03` / `a2a r04`.
 - **Runtime:** a model proposes diagnoses and rewrites. The verdict, every number and every timing come from code.
 - **Pre-existing:** `vendor/meterless/` (upstream engines, unmodified) and the public NYC TLC data in `data/sample/`.
@@ -121,7 +121,7 @@ Cursor's agent wrote the scaffold commit only (`d3e823c`). Cursor was optional f
 
 | Metric | Value | Source |
 |---|---|---|
-| Tests | **286 passing, 26 files** (vitest) | `npm test` |
+| Tests | **286 tests, 26 files** (vitest) | `npm test` |
 | Hero on Zetaris (TPCDS_DB, local JDBC) | 2.11× median, 10/10 pairs faster | [`DEMO.md`](DEMO.md) |
 | Live accepted runs | hero 2.1× and 2.15×; correlated-avg 1.44× (rows identical) | [`recorded/live/README.md`](recorded/live/README.md) |
 | Rewrites shipped with changed rows | 0 | an ACCEPT requires an identical row fingerprint |
@@ -140,16 +140,16 @@ Cursor's agent wrote the scaffold commit only (`d3e823c`). Cursor was optional f
 ### Limitations
 Read [`FAILURE_MODES.md`](FAILURE_MODES.md). The short list:
 - The queries in the evals are ones we designed (hero, traps, controls); N is small (live hero N=2) and the shares are not a rate on real workloads.
-- The sample (DuckDB) pack has **no ACCEPT**; the accepted speedup is live Zetaris only. A hand-written sample rewrite does ACCEPT (16.24×), but that benchmarks a supplied rewrite, not the agent.
-- The retry loop does not reliably learn from a refusal: on the duplicated-key hero trap the Rewriter made the same mistake 3 of 3 times.
+- The sample (DuckDB) pack has **no ACCEPT**; the accepted speedup is live Zetaris only. A hand-written sample rewrite benchmarks 16.24× faster with identical rows (`DEMO.md`); the Verifier's verdict on it is machine-dependent and not recorded, and some examples' verdicts vary by machine (`output_examples/expected.json`).
+- The retry loop does not reliably learn from a refusal: on the duplicated-key hero trap all 3 attempts changed the rows (two dropped the join, one swapped it for a LEFT SEMI JOIN) although the prompt carried the measured fact that the key is not unique.
 - Nightshift was never run live; there is no hosted CI run to cite (GitHub Actions did not start on the private repo).
 - Floats compare to 9 significant digits; the speedup is one laptop over local JDBC and says nothing about a hosted deployment.
 
 ### What we got wrong
 - We planned on Zetaris' MCP tools; the local platform has none, so we rebuilt the engine layer over JDBC on day 1.
 - We expected a 5–12 s hero; it runs about 35 s, so one live verification takes minutes, not seconds.
-- We first called the NVIDIA endpoint directly and added Meterless Nightshift as the provider only after the rules required it, so the recordings predate it.
-- We specified Nemotron 3 Super; every call to it returned 404 for our account, so we switched to Nemotron 3 Ultra mid-build.
+- We first called the NVIDIA endpoint directly and added Meterless Nightshift as the provider later, so the recordings predate it.
+- We specified Nemotron 3 Super; calls to it returned 404 for our account, so we switched to Nemotron 3 Ultra mid-build.
 
 ## 🚀 Getting Started
 
@@ -184,7 +184,7 @@ docker run --rm querydoc npm test    # the same suite in the image
 
 CI (`.github/workflows/`): typecheck, tests, `npm audit --omit=dev`, a keyless Docker job (builds the image, starts it in
 `SAMPLE_MODE`, POSTs all six `input_examples/`), and gitleaks over the full history. No hosted run is cited because Actions
-did not start on the private repo (account billing); the same steps were replayed locally in a clean clone (`scripts/clean_clone.sh`).
+did not start on the private repo (account billing); the same steps were replayed locally in a clean clone (`scripts/clean_clone.sh`, examples 1–3).
 
 ### Hub validation flow (this repo's names)
 ```bash
@@ -193,7 +193,7 @@ ls run.ts README.md .env.example input_examples/ output_examples/
 docker build -t querydoc .
 docker run --rm -p 8000:8000 --env-file .env querydoc          # or -e SAMPLE_MODE=true with no .env
 curl -X POST localhost:8000/run -H 'Content-Type: application/json' -d @input_examples/example_1.json   # also example_2 … example_6
-ls logs/ && cat logs/* | head -50                                # traces: ≥ 2 named agents, critique/retry events
+ls logs/ && cat logs/*.jsonl | head -50                          # committed traces; live runs write data/runs/<id>/trace-<id>.jsonl
 grep -RIn --exclude-dir=.git --exclude-dir=node_modules -E "(sk-|nvapi-|api[_-]?key|secret|token|password)" .
 rm .env && docker run --rm -p 8000:8000 -e SAMPLE_MODE=true querydoc   # no credentials at all
 ```
@@ -202,10 +202,10 @@ playbook ledger without executing it; `example_5` ends `NOT_VERIFIABLE` (non-det
 from the committed `llm-cache/`; a cache miss gives a partial dossier, never an invented rewrite.
 
 ### Hub readiness checklist
-- [x] `run.ts`, `README.md`, `.env.example` (empty values), `input_examples/` and `output_examples/` (6 each; ≥ 3 required)
-- [x] Runs from a clean clone, keyless (`scripts/clean_clone.sh`); no local GPU
+- [x] `run.ts`, `README.md`, `.env.example` (empty values), `input_examples/` and `output_examples/` (6 each)
+- [x] Runs from a clean clone, keyless (`scripts/clean_clone.sh`, examples 1–3); no local GPU
 - [x] `POST /run` on port 8000; `SAMPLE_MODE=true` works with no Zetaris, Nightshift or key
-- [x] `logs/` traces name ≥ 2 agents (Diagnoser, Rewriter, Verifier, Orchestrator) and show critique, retry and revise events
+- [x] `logs/` traces (copies of recorded runs) name ≥ 2 agents (Diagnoser, Rewriter, Verifier, Orchestrator) and show critique, retry and revise events
 - [x] No secrets in the tree (gitleaks clean); credentials live outside it
 - [x] Limitations stated ([`FAILURE_MODES.md`](FAILURE_MODES.md)); pre-existing components declared above
 - [ ] Hosted green CI run, live Nightshift recording: **not done**, see Limitations
@@ -217,7 +217,7 @@ src/agents/     diagnoser · rewriter · verifier · patterns · profile      sr
 src/engine/     zetaris (JDBC) · duckdb · sparkPlan                       src/adapters/  nightshift · nim · llm
 src/memory/     H-MEM playbook        src/reasoning/  Markovian chain     src/guard/     read-only SQL guard
 engine/zetaris-jdbc/  Java sidecar    vendor/meterless/  upstream engines  web/           Intake + Report
-recorded/ evals/ evidence/ logs/      input_examples/ output_examples/      data/          sample + playbook store
+recorded/ evals/ evidence/ logs/      input_examples/ output_examples/      data/          sample data
 ```
 
 ## 🗺️ Roadmap
