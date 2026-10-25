@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Query Doctor — keeps a SQL rewrite only if executing it returns identical rows and runs faster. The original query's red runtime bar shrinks, and a green ROW-IDENTICAL stamp lands over the matching fingerprint. In this mark the stamp's equals sign stands for the matching fingerprint.">
+<!-- STORYBOARD (dur 6s — must equal this file's single master dur)
+  0-10%    steady state: the paper tile with the Verifier's stamp and its "=" — identical to the static icon (poster rule).
+  10-25%   trigger: the old impression lifts away; a long red runtime bar draws across the tile — a new slow query.
+                                                                                                   data-story="beat-2"
+  25-45%   mechanism: The original query's red runtime bar shrinks, and a green ROW-IDENTICAL stamp lands over the matching fingerprint.
+           (the bar collapses 25-37% leaving a dashed red ghost; the stamp slams at 40% — SMIL appearance, CSS
+           zoom with overshoot — + ink bleed.)
+                                                                                                   data-story="beat-3"
+  45-80%   resolution: the stamped state persists (the ghost left under the slam); one slow ink-bleed breath along
+           the impression's edge.
+  80-100%  breathe + seam: from 78% the tile is exactly the static icon, so the loop restarts on an identical frame.
+-->
+<title>Query Doctor — keeps a SQL rewrite only if executing it returns identical rows and runs faster. The original query's red runtime bar shrinks, and a green ROW-IDENTICAL stamp lands over the matching fingerprint. In this mark the stamp's equals sign stands for the matching fingerprint.</title>
+<style>
+  /* the lift and the slam are CSS on the master 6s (percent = SMIL keyTimes x 100): SMIL owns appearance, CSS owns
+     the zoom, so reduced-motion users see the stamp fade out and back in without any scaling */
+  .stampmotion { transform-box: fill-box; transform-origin: center; animation: stampmotion 6s linear infinite; }
+  @keyframes stampmotion {
+    0%, 10%    { transform: scale(1); }
+    17%, 40%   { transform: scale(1.06); }
+    40.1%      { transform: scale(1.1); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }   /* a conservative cap: the tile holds to about x1.18 */
+    42.2%      { transform: scale(0.96); animation-timing-function: ease-out; }
+    43.6%      { transform: scale(1.02); }
+    45%, 100%  { transform: scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+<defs>
+  <filter id="ink" x="-8%" y="-12%" width="116%" height="124%" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="3" seed="11" result="grain"/><feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -26 21" result="specks"/><feComposite in="SourceGraphic" in2="specks" operator="in" result="inked"/><feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="4" result="wobble"/><feDisplacementMap in="inked" in2="wobble" scale="3" xChannelSelector="R" yChannelSelector="G"/></filter>
+  <filter id="bleed" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="7"/></filter>
+</defs>
+<rect x="16" y="16" width="480" height="480" rx="104" fill="#F3F0E8" stroke="#CFC8B8" stroke-width="3"/>
+<!-- story: the slow query's runtime bar, then its ghost -->
+<g transform="translate(256 256)">
+  <rect x="-184" y="-22" width="368" height="44" rx="3" fill="#B03A2E" opacity="0" data-story="beat-2">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.14;0.16;0.395;0.41;1" dur="6s" repeatCount="indefinite"/>
+    <animate attributeName="width" values="368;368;172;172" keyTimes="0;0.25;0.37;1" dur="6s" repeatCount="indefinite" calcMode="spline" keySplines="0 0 1 1;0.6 0 0.25 1;0 0 1 1"/>
+    <animate attributeName="x" values="-184;-184;-86;-86" keyTimes="0;0.25;0.37;1" dur="6s" repeatCount="indefinite" calcMode="spline" keySplines="0 0 1 1;0.6 0 0.25 1;0 0 1 1"/>
+    <animate attributeName="y" values="-22;-22;-22;-22" keyTimes="0;0.14;0.37;1" dur="6s" repeatCount="indefinite"/>
+  </rect>
+  <rect x="-183" y="-21" width="366" height="42" rx="3" fill="none" stroke="#B03A2E" stroke-width="5" stroke-dasharray="15 10" opacity="0" data-story="beat-3">
+    <animate attributeName="opacity" values="0;0;0.85;0.85;0;0" keyTimes="0;0.27;0.3;0.4;0.412;1" dur="6s" repeatCount="indefinite"/>
+  </rect>
+</g>
+<!-- the stamp: visible at t=0 (brand), lifts at 10-17%, slams back at 40% -->
+<g transform="translate(256 256)">
+  <g data-story="beat-3" opacity="0">
+    <animate attributeName="opacity" values="0;0;0.5;0.08;0.2;0;0" keyTimes="0;0.4;0.41;0.48;0.64;0.78;1" dur="6s" repeatCount="indefinite"/>
+    <rect x="-170" y="-130" width="340" height="260" rx="34" fill="none" stroke="#1E6B52" stroke-width="44" transform="rotate(-8)" filter="url(#bleed)"/>
+  </g>
+  <g>
+    <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.1;0.17;0.4;0.406;1" dur="6s" repeatCount="indefinite"/>
+    <g class="stampmotion">
+      <g transform="rotate(-8)" filter="url(#ink)"><rect x="-170.00" y="-130.00" width="340.00" height="260.00" rx="34.00" fill="none" stroke="#1E6B52" stroke-width="36.00"/><rect x="-132.00" y="-92.00" width="264.00" height="184.00" rx="12.00" fill="none" stroke="#1E6B52" stroke-width="8.00"/><rect x="-86.00" y="-60.00" width="172.00" height="44.00" rx="3.00" fill="#1E6B52"/><rect x="-86.00" y="16.00" width="172.00" height="44.00" rx="3.00" fill="#1E6B52"/></g>
+    </g>
+  </g>
+</g>
+</svg>

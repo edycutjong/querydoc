@@ -1,4 +1,8 @@
 <div align="center">
+  <img src="docs/assets/readme-hero-animated.svg" alt="Query Doctor — keeps a SQL rewrite only if executing it returns identical rows and runs faster. The original query's red runtime bar shrinks, and a green ROW-IDENTICAL stamp lands over the matching fingerprint." width="100%">
+</div>
+
+<div align="center">
   <h1>Query Doctor 🩺</h1>
   <p><em>Same rows. Faster. Or refused. A SQL rewrite is kept only when both queries, executed on Zetaris, return identical rows and the rewrite is measurably faster.</em></p>
 

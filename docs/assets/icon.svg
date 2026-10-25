@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Query Doctor — the Verifier's stamp bearing an equals sign: a rewrite proven row-identical">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Query Doctor — the Verifier's stamp bearing an equals sign: a rewrite verified row-identical by execution">
   <!-- Query Doctor mark. A report-paper tile with the Verifier's rubber stamp pressed on it at an angle.
        The stamp's glyph is "=": two equal ruled rows - the rewrite's result rows equal the original's.
-       Green = state: proven row-identical (the "after" / "accent" token). It is the ONLY colour on the mark;
+       Green = state: verified row-identical by execution (the "after" / "accent" token). It is the ONLY colour on the mark;
        red (the "before" token) belongs to the slow state and never appears on the static mark.
        Two geometries, one file. FULL (default, 65 px and up): double-ruled frame at -8 deg, ring 36 units,
        hairline 8 units, bars 44 units with a 32-unit gap. SMALL (favicon grade, switched on by the media
@@ -12,9 +12,9 @@
        Colours use CSS custom properties with a hex fallback, plus plain presentation attributes. -->
   <defs>
     <style>
-      .plate { fill: #F3F0E8; stroke: #CFC8B8; }
-      .ink-frame { stroke: #1E6B52; }
-      .ink-fill { fill: #1E6B52; }
+      .plate { fill: var(--bg, #F3F0E8); stroke: var(--rule, #CFC8B8); }
+      .ink-frame { stroke: var(--accent, #1E6B52); }
+      .ink-fill { fill: var(--accent, #1E6B52); }
       @media (max-width: 64px) {
         .mark-full { display: none; }
         .mark-small { display: inline; }
