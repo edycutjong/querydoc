@@ -37,7 +37,7 @@ const queries: Record<string, StubQuery> = {
   [RIGHT]: { columns: N, rows: [[10]], wallMs: 400 },
   [MARKED]: { columns: N, rows: [[9]], wallMs: 300 },
   [SLOW]: { columns: N, rows: [[10]], wallMs: 990 },
-  "SELECT COUNT(*) AS n, COUNT(k) AS nn, COUNT(DISTINCT k) AS d FROM d": { columns: [{ name: "n", type: "bigint" }, { name: "nn", type: "bigint" }, { name: "d", type: "bigint" }], rows: [[5, 5, 5]], wallMs: 3 },
+  "SELECT COUNT(*) AS n, COUNT(\"k\") AS nn, COUNT(DISTINCT \"k\") AS d FROM \"d\"": { columns: [{ name: "n", type: "bigint" }, { name: "nn", type: "bigint" }, { name: "d", type: "bigint" }], rows: [[5, 5, 5]], wallMs: 3 },
 };
 
 // A scripted "model": the n-th Rewriter call returns the n-th SQL; Diagnoser returns two hypotheses, one citing a node that does not exist.

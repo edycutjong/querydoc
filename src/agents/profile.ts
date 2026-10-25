@@ -28,7 +28,11 @@ export async function profileJoinKeys(engine: QueryEngine, sql: string, dialect:
   }
   const facts: KeyFact[] = [];
   for (const { table, column } of [...wanted.values()].slice(0, MAX_KEYS)) {
-    const q = `SELECT COUNT(*) AS n, COUNT(${column}) AS nn, COUNT(DISTINCT ${column}) AS d FROM ${table}`;
+    // Quoted names: a key or table named like a guarded keyword (`comment`, `set`, `lock`) would otherwise be refused by the guard
+    // and its fact silently dropped. Names come from findJoins ([\w.] only), so a quote character never appears inside one.
+    const qi = (s: string) => (engine.name === "zetaris" ? `\`${s}\`` : `"${s}"`);
+    const qt = table.split(".").map(qi).join(".");
+    const q = `SELECT COUNT(*) AS n, COUNT(${qi(column)}) AS nn, COUNT(DISTINCT ${qi(column)}) AS d FROM ${qt}`;
     if (!sqlGuard(q, dialect).ok) continue;
     try {
       const r = await engine.run(q, { rowCap: 1, timeoutSec: 120 });
