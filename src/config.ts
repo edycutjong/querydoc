@@ -18,18 +18,19 @@ export interface VerifierConfig {
   dialect: string;
 }
 
-export function loadConfig(path = resolve(ROOT, "querydoc.config.json")): VerifierConfig {
+// The sample engine uses the policy floor (50 ms) and the PostgreSQL parser dialect; the Zetaris values were measured on the instance.
+export function loadConfig(path = resolve(ROOT, "querydoc.config.json"), engine: "zetaris" | "duckdb" = "zetaris"): VerifierConfig {
   const c = JSON.parse(readFileSync(path, "utf8"));
   const p = c.policy;
   return {
     speedupMin: p.speedupMin,
     noGainSpeedup: p.noGainSpeedup,
-    noiseFloorMs: c.noise?.noiseFloorMs ?? p.noiseFloorMinMs,
+    noiseFloorMs: engine === "duckdb" ? p.noiseFloorMinMs : c.noise?.noiseFloorMs ?? p.noiseFloorMinMs,
     minPairs: Math.max(3, p.timedPairs), // never fewer than 3 valid pairs before an ACCEPT (architecture §Verifier order step 4)
     maxPairs: p.maxTimedPairs,
     rowCap: p.rowCap,
     floatSigDigits: p.floatSigDigits,
     timingCapMinMs: p.timingCapMinMs,
-    dialect: c.sqlParserDialect?.value ?? "hive",
+    dialect: engine === "duckdb" ? "postgresql" : c.sqlParserDialect?.value ?? "hive",
   };
 }

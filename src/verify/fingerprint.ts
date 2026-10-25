@@ -37,3 +37,20 @@ export function engineFingerprintSql(
 
 export const countStarSql = (innerSql: string): string =>
   `SELECT COUNT(*) AS qd_count FROM (${innerSql.trim().replace(/;\s*$/, "")}) q`;
+
+// DuckDB variant (sample engine). Same construction: each column canonicalised to text with a sentinel for NULL, rows hashed,
+// hashes summed as HUGEINT (cannot overflow, order-independent, duplicates do not cancel). Floats are rounded to N significant
+// digits with printf('%.<N-1>e'). The unit separator keeps ('ab','c') apart from ('a','bc').
+export function duckdbFingerprintSql(innerSql: string, columns: Column[], floatSigDigits = 9): string {
+  if (columns.length === 0) throw new Error("fingerprint needs at least one column");
+  if (new Set(columns.map((c) => c.name)).size !== columns.length) throw new Error("fingerprint needs distinct column names");
+  const parts = columns.map((c) => {
+    const ref = `q."${c.name.replace(/"/g, '""')}"`;
+    const asText = typeClass(c.type) === "float" ? `printf('%.${floatSigDigits - 1}e', CAST(${ref} AS DOUBLE))` : `CAST(${ref} AS VARCHAR)`;
+    return `COALESCE(${asText}, '${NULL_SENTINEL}')`;
+  });
+  return (
+    `SELECT COUNT(*) AS qd_rows, CAST(SUM(CAST(hash(${parts.join(" || chr(31) || ")}) AS HUGEINT)) AS VARCHAR) AS qd_hash_sum ` +
+    `FROM (${innerSql.trim().replace(/;\s*$/, "")}) q`
+  );
+}

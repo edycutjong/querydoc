@@ -34,6 +34,9 @@ const PATH_READ_RE = /`?[\w.]+`?\s*\.\s*`(?:[a-z][a-z0-9+.-]*:\/\/|\/)/i;
 // transform names its command (`USING 'cmd'`, raw `USING r'cmd'`), and every other form (CREATE … USING, MERGE … USING) is a write.
 const SCRIPT_RE = /\bUSING\b(?!\s*\()/i;
 // call_function('reflect', …) names the function in a literal the mask hides, so call_function itself is refused.
+// DuckDB table/scalar functions that read files, URLs, the environment or the catalog (sample engine). The engine also runs with
+// external access disabled; this is the guard-level refusal, so the same text is refused on any engine.
+const DUCKDB_IO_RE = /\b(read_[a-z0-9_]+|[a-z_]*_scan|glob|sniff_csv|getenv|current_setting|duckdb_[a-z_]+|pragma_[a-z_]+|query_table|query|load_extension)\s*\(/i;
 const JVM_CALL_RE = /\b(reflect|java_method|try_reflect|call_function)`?\s*\(/i;
 
 export function sqlGuard(sql: string, dialect = "hive"): GuardResult {
@@ -50,6 +53,7 @@ export function sqlGuard(sql: string, dialect = "hive"): GuardResult {
   const withIdents = maskSql(stmt, true);
   if (FILE_READ_RE.test(withIdents) || PATH_READ_RE.test(withIdents)) return { ok: false, reason: "direct file/source read", warnings };
   if (SCRIPT_RE.test(masked)) return { ok: false, reason: "USING outside a JOIN column list (script transform)", warnings };
+  if (DUCKDB_IO_RE.test(masked)) return { ok: false, reason: "file/URL/environment reader function", warnings };
   if (JVM_CALL_RE.test(withIdents)) return { ok: false, reason: "JVM reflection call", warnings };
 
   try {
