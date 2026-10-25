@@ -37,8 +37,11 @@ const SCRIPT_RE = /\bUSING\b(?!\s*\()/i;
 // DuckDB table/scalar functions that read files, URLs, the environment or the catalog (sample engine). The engine also runs with
 // external access disabled; these are the guard-level refusals (functions and quoted-path scans), and the engine setting is the backstop.
 const DUCKDB_IO_RE = /\b(read_[a-z0-9_]+|[a-z_]*_scan|glob|sniff_csv|getenv|current_setting|duckdb_[a-z_]+|pragma_[a-z_]+|query_table|query|load_extension)\s*\(/i;
-// DuckDB replacement scans: FROM '/path/file.parquet' / JOIN 'https://…' (a single-quoted string where a table is expected).
-const QUOTED_PATH_RE = /\b(?:from|join)\s*\(?\s*'/i;
+// DuckDB replacement scans: FROM '/path/file.parquet' / JOIN "https://…" — a quoted string that looks like a path or URL right after
+// FROM/JOIN. `EXTRACT(year FROM '2024-01-01'::date)` and `TRIM(BOTH 'x' FROM 'abc')` are not paths and pass.
+const QUOTED_SOURCE_RE = /\b(?:from|join)\s*\(?\s*(['"])([^'"]*)\1/gi;
+const PATH_LIKE_RE = /[\/\\]|^[a-z][a-z0-9+.-]*:\/\/|\.(?:parquet|csv|tsv|json|ndjson|gz|zst|db|duckdb|xlsx|txt)$/i;
+const quotedPathRead = (stmt: string): boolean => [...stmt.matchAll(QUOTED_SOURCE_RE)].some((m) => PATH_LIKE_RE.test(m[2] ?? ""));
 const JVM_CALL_RE = /\b(reflect|java_method|try_reflect|call_function)`?\s*\(/i;
 
 export function sqlGuard(sql: string, dialect = "hive"): GuardResult {
@@ -55,7 +58,7 @@ export function sqlGuard(sql: string, dialect = "hive"): GuardResult {
   const withIdents = maskSql(stmt, true);
   if (FILE_READ_RE.test(withIdents) || PATH_READ_RE.test(withIdents)) return { ok: false, reason: "direct file/source read", warnings };
   if (SCRIPT_RE.test(masked)) return { ok: false, reason: "USING outside a JOIN column list (script transform)", warnings };
-  if (DUCKDB_IO_RE.test(masked) || QUOTED_PATH_RE.test(stmt)) return { ok: false, reason: "file/URL/environment reader function", warnings };
+  if (DUCKDB_IO_RE.test(masked) || quotedPathRead(stmt)) return { ok: false, reason: "file/URL/environment reader function", warnings };
   if (JVM_CALL_RE.test(withIdents)) return { ok: false, reason: "JVM reflection call", warnings };
 
   try {

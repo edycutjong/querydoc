@@ -85,7 +85,9 @@ describe("DuckDB engine limits and guard extras", () => {
     for (const sql of ["SELECT * FROM '/etc/hosts'", "SELECT * FROM 'data/sample/zones.parquet'", "SELECT * FROM lake.trips t JOIN 'https://x.example/a.csv' c ON true"]) {
       expect(sqlGuard(sql, "postgresql").ok, sql).toBe(false);
     }
-    expect(sqlGuard("SELECT * FROM lake.trips WHERE store_and_fwd_flag = 'N'", "postgresql").ok).toBe(true);
+    expect(sqlGuard('SELECT * FROM  "/etc/hosts"', "postgresql").ok).toBe(false);
+    const fine = ["SELECT * FROM lake.trips WHERE store_and_fwd_flag = 'N'", "SELECT EXTRACT(year FROM '2024-01-01'::date) AS y", "SELECT TRIM(BOTH 'x' FROM 'xabcx') AS t", "SELECT a FROM (SELECT 'a' AS a) q", "SELECT 1 WHERE 'data from ''x''' = 'y'"];
+    for (const ok of fine) expect(sqlGuard(ok, "postgresql").ok, ok).toBe(true);
     const conn = (e as unknown as { conn: { runAndReadAll(sql: string): Promise<unknown> } }).conn;
     await expect(conn.runAndReadAll("SELECT * FROM '/etc/hosts'")).rejects.toThrow(/disabled|permission|external|does not exist/i); // with external access off the path is not even looked up as a file
   });

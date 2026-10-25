@@ -18,6 +18,6 @@ files are re-created by the command above. A route reads: attempt verdicts in or
 | `trap-t1-r2` | NO_SAFE_REWRITE/attempts_exhausted | NOT_FASTER/no_gain → ROW_DIFF → NOT_FASTER/under_gate |
 
 What these runs are: evidence that the live path works end to end on the instance and that the Verifier refuses rewrites that change rows
-(`hero-trap`, the T1 runs). What they are not: a benchmark. Two runs per query (one for the others) is a small-n observation, and the model
+(`hero-trap`, the T1 runs). What they are not: a benchmark. One or two runs per query is a small-n observation, and the model
 samples at temperature 1.0, so a fresh recording will route differently. Speedups are wall-clock medians of alternating pairs measured on one
 laptop over local JDBC; they say nothing about a hosted Zetaris deployment.

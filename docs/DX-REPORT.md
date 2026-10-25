@@ -93,7 +93,7 @@ for the hero, pair and trap executions; the adapter's default is 120 s, so live 
 - **Re-run on the fixed Verifier (run `2026-10-25T08-42-12Z`, the current evidence).** After the first review round (count/hash
   results validated, backtick-quoted file reads refused, top-N rules, kill-rule inputs tightened) the same two cases ran again.
   Hero: pre-check 42.5 s and 34.9 s, same fingerprint; three pairs, original **33.4 / 34.0 / 41.0 s** vs candidate
-  **28.5 / 16.0 / 16.6 s** → **ACCEPT**, median speedup **2.12×**, median saving **18.0 s**, 3 of 3 pairs faster, timing cap
+  **28.5 / 16.0 / 16.6 s** → **ACCEPT**, median speedup **2.12×**, median saving **18.0 s**, 3 of 3 pairs faster (the P21 verification run; the final recordings `recorded/live/hero-r1`/`-r2` measured 2.1× / 16.9 s and 2.15× / 19.4 s), timing cap
   232.2 s. Trap: candidate returned 129,752 where the original returns **129,776** → **REJECT (ROW_DIFF)**, not timed.
   `SELECT 1` median 49.4 ms, spread 8.2 ms over runs 2–10. Kill rule: **YES** (6 comparable queries; engine time
   34,808 ms = hero median 34,857.4 − `SELECT 1` median 49.4, against 6 × the config's noise floor of 1,782.9 ms = 10,697.4 ms;
@@ -147,7 +147,7 @@ for the hero, pair and trap executions; the adapter's default is 120 s, so live 
   the carryover block.
 - **The "no-gain control" was not one.** `evals/queries/zetaris/04-correlated-avg.sql` (a correlated `AVG` on the 18k-row `item`
   dimension) was picked as a query where nothing could be won. The Rewriter's window-function rewrite was proven same-rows and
-  1.69× faster (3/3 pairs, saving 7.6 s; `recorded/live/correlated-avg/`). It is kept as a second real ACCEPT; the control is now a
+  1.69× faster (3/3 pairs, saving 7.6 s; the first, since replaced recording). In the final recording (`recorded/live/correlated-avg-r1`) the first attempt was a no-gain and the ACCEPT came second at 1.44×, saving 3.9 s. It is kept as a second real ACCEPT; the control is now a
   one-column filter on the 300-row `promotion` table (`03-no-gain-control.sql`).
 - **GitHub Actions does not start on the private repo** — "recent account payments have failed or your spending limit needs to be
   increased" (run 40179255951). That is an account billing state, not a workflow error (HUMAN-TODO #17). The same steps run locally:
@@ -166,7 +166,9 @@ for the hero, pair and trap executions; the adapter's default is 120 s, so live 
   shrinks the 70 ms saving toward the 50 ms floor), so the README claims the verdict class, not the number. No ×K scaling is used.
 - **The first recorded hero run did not reach ACCEPT.** The model's pre-aggregate-then-`UNION ALL` rewrite counts a trip twice when
   pickup = dropoff; the Verifier refused it twice with the differing row (`["Bronx","4073"]`), then a third attempt hit a binder error.
-  That is the critique/retry beat on a product-shaped query; the recorded ACCEPT of the same hero comes from the supplied rewrite.
+  That is the critique/retry beat on a product-shaped query. The committed sample pack (`recorded/sample/`) contains no ACCEPT; an
+  ACCEPT with a measured speedup is shown on live Zetaris only (`recorded/live/hero-r1`, `hero-r2`). A supplied rewrite of the sample hero
+  does ACCEPT on the development machine (`test/service.test.ts` exercises the decision flow when it does).
 - **`NOT IN` is only slow when the subquery column has NULLs.** On a non-nullable key DuckDB runs it as a hash mark join in 4–10 ms;
   the NULL-aware path (T3) took 56 ms. T3's tempting `NOT EXISTS` rewrite changes the rows, so it stays a trap, not a hero.
 - **node-api returns BIGINT and DECIMAL as strings** under `getRowsJson()`; the canonicaliser already parses strings through `BigInt`,
