@@ -28,6 +28,6 @@ export function caseMarkdown(c: Case): string {
     out.push("");
   }
   out.push(`## Verdict: ${c.verdict}${c.no_rewrite_reason ? ` — ${c.no_rewrite_reason}` : ""}`);
-  if (c.detail) out.push(c.detail);
+  if (c.detail) out.push(`(${c.attempts.length ? "attempt summary / upstream message" : "upstream message"}) ${c.detail}`);
   return out.join("\n") + "\n";
 }

@@ -190,7 +190,7 @@ export class LlmGateway {
         r = await client.chat({ ...req, user, reasoning, timeoutMs: reasoning === "on" ? (req.timeoutMs ?? 90_000) : Math.min(req.timeoutMs ?? 90_000, 60_000) });
       } catch (e) {
         if (e instanceof NimError && e.timedOut) dumpCall(task, req, reasoning, user, null);
-        if (!(e instanceof NimError && e.timedOut) || tryN > 0) throw e;
+        if (!(e instanceof NimError && e.timedOut) || tryN > 0 || reasoning === "off") throw e; // already off: nothing cheaper to try
         lastErr = e.message;
         reasoning = "off"; // the reasoning call ran past its budget; answer directly
         continue;
@@ -220,9 +220,13 @@ export class LlmGateway {
 function dumpCall(task: string, req: ChatRequest, reasoning: ReasoningMode, user: string, r: ChatResult | null): void {
   const dir = process.env.QUERYDOC_DUMP_DIR;
   if (!dir) return;
-  mkdirSync(dir, { recursive: true });
+  try {
+    mkdirSync(dir, { recursive: true });
   const name = `${new Date().toISOString().replace(/[:.]/g, "-")}-${task}-${reasoning}.json`;
   writeFileSync(join(dir, name), JSON.stringify({ task, reasoning, system: req.system, user, timed_out: r === null, latency_ms: r ? Math.round(r.latencyMs) : null, finish: r?.finishReason ?? null, completion_tokens: r?.completionTokens ?? null, reasoning_chars: r?.reasoning.length ?? null, content_head: r?.content.slice(0, 600) ?? null }, null, 2) + "\n");
+  } catch {
+    // debug aid only: an unwritable dump directory never fails a call
+  }
 }
 
 export function nimClientFromEnv(env: NodeJS.ProcessEnv = process.env): NimClient | null {

@@ -42,7 +42,7 @@ const cap = (s: string, n = MAX_FIELD) => (s.length > n ? s.slice(0, n - 1) + "�
 
 // The vendored engine reads marker tokens ([TASK_COMPLETE], [FINAL], <DONE/>, <CARRYOVER>, @@@FINAL@@@, ---STATE---) anywhere in a
 // chunk's text. Rejected SQL, engine errors and diff rows are untrusted text that goes into that text, so the tokens are removed.
-const MARKERS = /\[(?:TASK_COMPLETE|FINAL|STATE_CHECKPOINT|STATE)\]|@@@\w+@@@|---(?:STATE|FINAL)---|<\/?(?:DONE|CARRYOVER|PROGRESS|NEEDS_[A-Z_]+)\b[^>]*>/gi;
+const MARKERS = /\[(?:TASK_COMPLETE|FINAL|STATE_CHECKPOINT|STATE)\]|@@@\w+@@@|---(?:STATE|FINAL)---|<\/?(?:DONE|CARRYOVER|PROGRESS)\s*\/?>|<NEEDS_[A-Z_]+(?:\s+\w+=(?:"[^"]*"|'[^']*'))*\s*\/?>/gi;
 export const neutralise = (s: string): string => s.replace(MARKERS, "(marker removed)");
 
 // Stable, timing-free description of the chain state for the llm-cache key (the carryover text itself may carry timings).
@@ -61,7 +61,8 @@ export function carryoverBlock(ledger: Hypothesis[], rejected: Attempt[]): strin
   // whatever budget is left.
   let context = "no attempt yet";
   if (last) {
-    const why = neutralise(`${last.detail ?? last.reason}${last.first_diff ? ` — first differing row (${last.first_diff.side} only): ${JSON.stringify(last.first_diff.row)}` : ""}`);
+    // one line: the engine reads CARRYOVER STATE only up to the first blank line, and a newline could fake a COMPLETED:/REMAINING: field
+    const why = neutralise(`${last.detail ?? last.reason}${last.first_diff ? ` — first differing row (${last.first_diff.side} only): ${JSON.stringify(last.first_diff.row)}` : ""}`).replace(/\s+/g, " ");
     const sql = neutralise(last.sql.replace(/\s+/g, " "));
     context = cap(`${cap(why, 220)} — rejected SQL: ${sql}`);
   }
@@ -121,7 +122,7 @@ export async function runChain(a: ChainArgs): Promise<ChainResult> {
           target_agent: "Orchestrator", retry_count: n - 1, status: llmError.unavailable ? "skipped" : "error",
         });
         finished = true;
-        return { content: `Rewriter unavailable: ${llmError.message}\n[TASK_COMPLETE]` };
+        return { content: `Rewriter unavailable: ${neutralise(llmError.message)}\n[TASK_COMPLETE]` };
       }
       a.trace.emit({
         agent_name: "Orchestrator", action: "handoff", input_summary: `attempt ${n} SQL from Rewriter`, output_summary: "to Verifier", target_agent: "Verifier",

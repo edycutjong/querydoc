@@ -93,6 +93,7 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
     const chain = await runChain({ sql: input.sql, plan, diagnosis: c.diagnosis, facts, pre, rewriter, verifier, trace, maxAttempts });
     c.attempts.push(...chain.attempts);
     if (c.llm === "none" && chain.attempts.length) c.llm = deps.llm.live ? "nim" : "cache"; // a Rewriter attempt ran, so a model (or its cache) was used
+    if (chain.llmError && !chain.llmError.unavailable && c.llm === "none") c.llm = deps.llm.live ? "nim" : "cache"; // a live call was made and failed
     if (chain.upstreamError) throw new Error(chain.upstreamError);
     return finalise(chain.accepted, chain.attempts, chain, finish);
   } catch (e) {

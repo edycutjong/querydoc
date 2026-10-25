@@ -114,6 +114,23 @@ describe("runCase — Diagnoser → Rewriter → Verifier end to end (stub engin
     expect(res.markovian.out_of_hypotheses).toBe(true);
   });
 
+  it("a single falsified hypothesis ends the chain after 1 attempt instead of being tried again", async () => {
+    const { runChain } = await import("../src/reasoning/chain.js");
+    const { Rewriter } = await import("../src/agents/rewriter.js");
+    const { Verifier } = await import("../src/agents/verifier.js");
+    const { Trace } = await import("../src/trace.js");
+    const { llm } = fakeLlm([SLOW, RIGHT]);
+    const trace = new Trace("t-falsified");
+    const verifier = new Verifier(new PlanEngine(queries), cfg, trace);
+    const pre = await verifier.precheck(ORIG);
+    const diagnosis = { bottleneck: "b", pattern_label: "unused_outer_join", plan_nodes: [], raw_refs: [], narrative: "omitted" as const, hypotheses: [{ id: "h1", source: "detector" as const, plan_node_id: "0", claim: "the join is unused", status: "untested" as const }] };
+    const res = await runChain({ sql: ORIG, plan: null, diagnosis, facts: [], pre, rewriter: new Rewriter(llm, trace), verifier, trace, maxAttempts: 3 });
+    expect(res.attempts.map((a) => [a.reason, a.not_faster_detail])).toEqual([["NOT_FASTER", "no_gain"]]);
+    expect(diagnosis.hypotheses[0]!.status).toBe("falsified");
+    expect(res.markovian.out_of_hypotheses).toBe(true);
+    expect(res.accepted).toBeNull();
+  });
+
   it("moves on to the next hypothesis after NOT_FASTER (falsified) and never re-picks a falsified one", async () => {
     const { llm } = fakeLlm([SLOW, RIGHT]);
     const { case: c } = await runCase({ sql: ORIG }, deps(llm), { runId: "t3" });

@@ -82,7 +82,7 @@ export function findJoins(m: string): Join[] {
 
 const SQL_WORDS = new Set(("select from where and or not null is in like between case when then else end as on using join left right full inner outer cross semi anti group by order " +
   "having limit distinct union all intersect except asc desc nulls first last count sum avg min max true false exists any some cast over partition rows range " +
-  "interval date timestamp int bigint double string decimal float with lateral view explode").split(" "));
+  "interval date timestamp int bigint double string decimal float with lateral view explode year month day current_date current_timestamp").split(" "));
 
 // True when the statement reads a column WITHOUT a qualifier outside the joins' ON conditions. An unqualified name could belong to
 // the joined table, so the join is not provably unused and `unused_outer_join` is not claimed (the Rewriter is not misled).
