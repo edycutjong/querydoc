@@ -1,0 +1,498 @@
+<!doctype html>
+<!--
+  Query Doctor — pitch deck (single file, 1920×1080 stage).
+  Keys: → / Space / PageDown next · ← / PageUp previous · Home / End · Esc overview grid · P presenter notes · C contrast debug.
+  Deep link: #3 opens slide 3. Print: Cmd/Ctrl+P → Save as PDF (16 × 9 in pages, one slide per page).
+  Images: ../assets/ui-hero-r1.webp (Report screen, #/recorded/hero-r1), ../assets/ui-trap-attempts.webp (#/recorded/hero-trap-r1 Attempts),
+  ../assets/icon.svg (mark). The QR is generated for https://querydoc-flax.vercel.app/.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Query Doctor — pitch deck</title>
+<meta name="description" content="Query Doctor pitch deck: an agent that signs a SQL rewrite only after executing both versions on Zetaris returns identical rows and a measured speedup.">
+<meta property="og:title" content="Query Doctor — pitch deck"><meta property="og:site_name" content="Query Doctor">
+<meta property="og:image" content="https://querydoc-flax.vercel.app/assets/og.png?v=56e6e5d968"><meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<style>
+@font-face{font-family:"Instrument Serif";font-style:normal;font-weight:400;font-display:swap;src:url(../assets/fonts/instrument-serif-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Instrument Serif";font-style:italic;font-weight:400;font-display:swap;src:url(../assets/fonts/instrument-serif-latin-400-italic.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-weight:400;font-display:swap;src:url(../assets/fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-weight:600;font-display:swap;src:url(../assets/fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;font-display:swap;src:url(../assets/fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-weight:600;font-display:swap;src:url(../assets/fonts/ibm-plex-mono-latin-600-normal.woff2) format("woff2")}
+:root{
+  --bg:#F3F0E8; --panel:#FBFAF6; --ink:#1A1C1E; --muted:#6B6A64; --before:#B03A2E; --after:#1E6B52; --rule:#CFC8B8;
+  --font-display:"Instrument Serif","Iowan Old Style",Georgia,serif;
+  --font-body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  --font-data:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:color-mix(in srgb,var(--ink) 90%,var(--bg));color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+::selection{background:var(--ink);color:var(--panel)}
+.viewport{position:fixed;inset:0;overflow:hidden}
+.stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:50% 50%}
+.slide{position:absolute;inset:0;background-color:var(--bg);overflow:hidden;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .35s ease,visibility 0s .35s;
+  background-image:repeating-linear-gradient(0deg,transparent 0 39px,rgba(207,200,184,.3) 39px 40px);padding:110px 120px 120px}
+.slide.on{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .35s ease}
+.speaker-notes{display:none}
+.slide{display:flex;flex-direction:column}
+/* letterhead + footer on every slide */
+.lh{position:absolute;left:0;right:0;top:0;height:56px;border-bottom:1px solid var(--ink);display:flex;justify-content:space-between;align-items:center;padding:0 120px;font:16px var(--font-data);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lh b{color:var(--ink);font-weight:600}
+.ft{position:absolute;left:120px;right:120px;bottom:34px;display:flex;justify-content:space-between;font:15px var(--font-data);color:var(--muted);border-top:1px solid var(--rule);padding-top:12px}
+.eb{font:18px var(--font-data);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 18px}
+h1,h2{font-family:var(--font-display);font-weight:400;margin:0;letter-spacing:-.01em}
+h2{font-size:96px;line-height:1}
+h2 em,h1 em{font-style:italic}
+.lead{font-size:30px;line-height:1.45;max-width:30em;margin:26px 0 0}
+.lead b,.mono b{font-family:var(--font-data);font-weight:600;font-size:.92em}
+.mono{font-family:var(--font-data)}
+.red{color:var(--before)}.green{color:var(--after)}.mut{color:var(--muted)}
+/* the case sheet (shared with the landing) */
+.sheet{position:relative;background:var(--panel);border:1px solid var(--rule);padding:26px 32px 28px;box-shadow:0 1px 0 var(--rule),0 40px 60px -44px rgba(26,28,30,.5)}
+.sheet .hd{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1.5px solid var(--ink);padding-bottom:8px}
+.sheet .hd h3{margin:0;font:italic 38px/1.1 var(--font-display)}
+.sheet .hd h3 code{font:400 22px var(--font-data);font-style:normal}
+.sheet .hd span{font:15px var(--font-data);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.sheet .l{font:14px var(--font-data);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:20px 0 8px}
+.sheet pre{margin:0;font:19px/1.65 var(--font-data);white-space:pre-wrap}
+.sheet pre s{color:var(--muted);text-decoration-color:var(--before);text-decoration-thickness:3px}
+.sheet pre u{text-decoration:none;border-bottom:3px solid var(--ink)}
+.res{display:grid;grid-template-columns:110px 1fr 96px;gap:12px 14px;align-items:center;font:19px var(--font-data)}
+.bar{height:22px;background:var(--before);position:relative;transform-origin:left}
+.bar i{position:absolute;right:7px;top:0;font:600 16px/22px var(--font-data);font-style:normal;color:var(--panel)}
+.bar.rw{background:var(--after)}
+.res .t{text-align:right}
+.fp{display:grid;grid-template-columns:110px 1fr;gap:6px 14px;font:19px var(--font-data);margin-top:14px}
+.stamp{position:absolute;border:4px solid currentColor;padding:9px 18px;font:600 26px/1.2 var(--font-data);letter-spacing:.06em;background:rgba(251,250,246,.85);color:var(--after);transform:rotate(-7deg);box-shadow:inset 0 0 0 3px rgba(251,250,246,.8),inset 0 0 0 6px currentColor}
+.stamp.no{color:var(--before);transform:rotate(5deg)}
+.sig{margin-top:20px;border-top:1px solid var(--rule);padding-top:12px;font-size:19px;color:var(--muted)}
+.sig b{color:var(--ink)}
+.pen{position:relative;white-space:nowrap;font-style:italic}
+.pen svg{position:absolute;left:-3%;bottom:-.13em;width:106%;height:.3em;overflow:visible}
+.pen path{fill:none;stroke:var(--before);stroke-width:5;stroke-linecap:round;vector-effect:non-scaling-stroke}
+/* animations play once when a slide is entered; the settled state is the default (print, no-JS, overview) */
+.play .pen path{stroke-dasharray:1;stroke-dashoffset:1;animation:pen .7s .35s cubic-bezier(.5,0,.2,1) forwards}
+@keyframes pen{to{stroke-dashoffset:0}}
+.play .stamp{animation:land .4s .55s cubic-bezier(.3,1.6,.5,1) both}
+.play .stamp.no{animation-name:land-no;animation-delay:.9s}
+@keyframes land{from{opacity:0;transform:rotate(-12deg) scale(1.5)}to{opacity:1;transform:rotate(-7deg) scale(1)}}
+@keyframes land-no{from{opacity:0;transform:rotate(11deg) scale(1.5)}to{opacity:1;transform:rotate(5deg) scale(1)}}
+.play .bar.rw{animation:shrink .8s .1s cubic-bezier(.6,0,.2,1) both}
+@keyframes shrink{from{width:100%!important;background:var(--before)}}
+.play .grow{animation:grow .7s cubic-bezier(.2,.7,.2,1) both}
+@keyframes grow{from{transform:scaleX(0)}}
+.play .rise{animation:rise .55s cubic-bezier(.2,.7,.2,1) both}
+.play .rise:nth-child(2){animation-delay:.08s}.play .rise:nth-child(3){animation-delay:.16s}.play .rise:nth-child(4){animation-delay:.24s}.play .rise:nth-child(5){animation-delay:.32s}
+@keyframes rise{from{opacity:0;transform:translateY(18px)}}
+
+/* 1 cover */
+.s1{display:grid;grid-template-columns:1fr 800px;grid-template-rows:1fr;gap:80px;align-items:center;padding-top:96px;padding-bottom:150px}
+.s1 h1{font-size:132px;line-height:.96}
+.s1 .tag{font-size:30px;line-height:1.45;margin-top:34px;max-width:24em}
+.s1 .tag b{font:600 .9em var(--font-data)}
+.s1 .sheet{transform:rotate(.5deg)}
+.s1 .verdict{position:relative}
+.s1 .stamp{right:0;top:-4px}
+.qr{position:absolute;right:120px;bottom:96px;display:flex;align-items:center;gap:16px;font:16px/1.4 var(--font-data);color:var(--muted)}
+.qr svg{width:108px;height:108px;background:var(--panel);padding:6px;border:1px solid var(--rule)}
+.brand{display:flex;align-items:center;gap:14px;font:italic 40px var(--font-display);margin-bottom:34px}
+.brand img{width:44px;height:44px}
+/* 2 problem */
+.s2 .cols{display:grid;grid-template-columns:1.25fr 1fr;gap:70px;margin-top:54px;align-items:start}
+.diff{background:var(--panel);border:1px solid var(--rule);font:28px/1.8 var(--font-data);padding:24px 28px;white-space:pre}
+.diff .del{background:color-mix(in srgb,var(--before) 12%,var(--panel));color:var(--before);display:block;margin:0 -28px;padding:0 28px}
+.keys{display:grid;gap:0;border-top:1.5px solid var(--ink)}
+.keys div{display:grid;grid-template-columns:1fr auto;padding:26px 0;border-bottom:1px solid var(--rule);font:24px var(--font-data);align-items:baseline}
+.keys .big{font:400 92px/1 var(--font-display)}
+.who{margin-top:44px;font-size:32px;line-height:1.45;max-width:34em}
+/* 3 solution */
+.agents{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:70px;border-top:1.5px solid var(--ink)}
+.agents>div{padding:40px 34px 40px 0}
+.agents>div+div{padding-left:34px;border-left:1px solid var(--rule)}
+.agents h3{font:italic 68px/1.05 var(--font-display);margin:18px 0 14px}
+.agents .k{font:18px var(--font-data);letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;border:1.5px solid var(--ink);display:inline-block}
+.agents .k.code{border-color:var(--after);color:var(--after)}
+.agents p{font-size:31px;line-height:1.4;margin:0}
+.agents .v{background:var(--panel);outline:1.5px solid var(--ink);padding-bottom:30px}
+.gate{list-style:none;margin:26px 0 0;padding:0;font:22px/1.45 var(--font-data);counter-reset:g}
+.gate li{display:grid;grid-template-columns:30px 1fr;padding:9px 0;border-top:1px solid var(--rule);counter-increment:g}
+.gate li::before{content:counter(g);color:var(--muted)}
+/* 4 architecture */
+.flow{position:relative;margin-top:50px;height:640px}
+.nd{position:absolute;background:var(--panel);border:1.5px solid var(--ink);padding:14px 18px;font:19px/1.35 var(--font-data)}
+.nd b{display:block;font:italic 30px/1.1 var(--font-display);margin-bottom:4px}
+.nd.model{border-style:dashed}
+.nd.gatek{border-width:3px;box-shadow:6px 6px 0 var(--rule)}
+.nd .sm{color:var(--muted);font-size:16px}
+.flow svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.flow svg path{fill:none;stroke:var(--ink);stroke-width:2}
+.flow svg path.r{stroke:var(--before);stroke-dasharray:7 6}
+.flow svg path.g{stroke:var(--after);stroke-width:3}
+.flow .lab{position:absolute;font:17px var(--font-data);background:var(--bg);padding:0 6px}
+.legend{position:absolute;right:0;top:-6px;font:17px var(--font-data);color:var(--muted);display:flex;gap:26px}
+.legend i{display:inline-block;width:34px;height:0;border-top:2px dashed var(--ink);vertical-align:middle;margin-right:8px}
+/* 5 product */
+.s5 .wrapx{display:grid;grid-template-columns:1fr 380px;gap:56px;margin-top:42px;align-items:start}
+.frame{border:1.5px solid var(--ink);background:var(--panel);box-shadow:10px 10px 0 var(--rule)}
+.frame .b0{display:flex;gap:10px;align-items:center;border-bottom:1.5px solid var(--ink);padding:9px 14px;font:16px var(--font-data);color:var(--muted)}
+.frame .b0 i{width:12px;height:12px;border:1.5px solid var(--muted);border-radius:50%}
+.frame img{display:block;width:100%;height:640px;object-fit:cover;object-position:top}
+.call{list-style:none;margin:0;padding:0;counter-reset:c}
+.call li{counter-increment:c;padding:28px 0;border-top:1px solid var(--rule);font-size:30px;line-height:1.35}
+.call li::before{content:counter(c);display:inline-grid;place-items:center;width:40px;height:40px;border:2px solid var(--ink);font:600 19px var(--font-data);margin-right:14px;vertical-align:middle}
+.mk{position:absolute;width:44px;height:44px;border:3px solid var(--before);display:grid;place-items:center;font:600 20px var(--font-data);color:var(--before);background:rgba(251,250,246,.9)}
+/* 6 frozen */
+.dip{display:grid;grid-template-columns:1fr 1fr;gap:56px;margin-top:44px}
+.dip .sheet{padding:24px 30px 120px}
+.dip .kp{display:flex;align-items:baseline;justify-content:space-between;margin:18px 0 0;padding:14px 0;border-top:1.5px solid var(--ink);border-bottom:1px solid var(--rule)}
+.dip .kp .big{font:400 80px/1 var(--font-display)}
+.dip .kp .mono{font-size:20px}
+.dip .verdict{font:23px/1.55 var(--font-data);margin-top:18px;min-height:90px}
+.dip pre{font-size:20px}
+.dip .stamp{font-size:30px}
+.dip .stamp{right:30px;bottom:30px}
+/* 7 evidence */
+.ev{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:0;margin-top:60px;border-top:1.5px solid var(--ink)}
+.ev>div{padding:40px 40px 10px 0}
+.ev>div+div{padding-left:40px;border-left:1px solid var(--rule)}
+.ev .n{font:400 170px/1 var(--font-display)}
+.ev .what{font-size:31px;font-weight:600;margin:18px 0 8px}
+.ev .src{font:21px/1.55 var(--font-data);color:var(--muted)}
+.pp{margin-top:30px;display:grid;grid-template-columns:80px 1fr;gap:18px 16px;font:21px var(--font-data);align-items:center}
+.pp .bb{display:flex;flex-direction:column;gap:6px}
+.pp .bb div{height:26px;background:var(--before);transform-origin:left}
+.pp .bb div.g{background:var(--after)}
+.pp .bb span{font-size:20px;color:var(--muted)}
+.dots{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px;max-width:460px}
+.dots i{width:44px;height:44px;border:2px solid var(--muted);display:grid;place-items:center;font:600 14px var(--font-data);font-style:normal;color:var(--muted)}
+.dots i.c{background:var(--before);border-color:var(--before);color:var(--panel)}
+.dots i.e{border-style:dashed}
+/* 8 sponsors */
+.sp{display:grid;grid-template-columns:1fr 1fr;gap:70px;margin-top:56px}
+.sp h3{font:italic 72px/1 var(--font-display);margin:0 0 24px}
+.calls{list-style:none;margin:0;padding:0;border-top:1.5px solid var(--ink)}
+.calls li{display:grid;grid-template-columns:130px 1fr;gap:20px;padding:24px 0;border-bottom:1px solid var(--rule);font-size:30px;line-height:1.35;align-items:baseline}
+.calls li b{font:400 64px/1 var(--font-display);text-align:right}
+.calls li code{font:.86em var(--font-data)}
+.also{margin-top:-30px;margin-bottom:40px;font-size:26px;color:var(--muted);display:flex;gap:46px}
+.also b{color:var(--ink)}
+/* 9 stack */
+.stack{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:56px;border-top:1.5px solid var(--ink)}
+.stack div{padding:44px 34px 44px 0;border-bottom:1px solid var(--rule)}
+.stack div:not(:nth-child(3n+1)){padding-left:34px;border-left:1px solid var(--rule)}
+.stack h3{font:italic 56px/1.1 var(--font-display);margin:0 0 12px}
+.stack p{font:24px/1.45 var(--font-data);margin:0;color:var(--ink)}
+.stack .big{font:400 124px/.9 var(--font-display)}
+/* 10 unique */
+.s10 .cols{display:grid;grid-template-columns:1fr 860px;gap:60px;margin-top:46px;align-items:start}
+.pts{list-style:none;margin:0;padding:0;border-top:1.5px solid var(--ink)}
+.pts li{padding:30px 0;border-bottom:1px solid var(--rule);font-size:33px;line-height:1.35}
+.pts li span{display:block;font:16px var(--font-data);letter-spacing:.1em;text-transform:uppercase;color:var(--before);margin-bottom:6px}
+.shot{width:100%;height:auto;display:block;border:1px solid var(--rule);background:var(--panel)}
+/* 11 future */
+.road{list-style:none;margin:50px 0 0;padding:0;border-top:1.5px solid var(--ink);max-width:1180px}
+.road li{display:grid;grid-template-columns:70px 1fr;padding:30px 0;border-bottom:1px solid var(--rule);font-size:38px;line-height:1.35}
+.road li::before{content:"□";font:30px var(--font-data);color:var(--muted)}
+.end{position:absolute;right:120px;top:330px;width:440px;text-align:left}
+.end svg{width:300px;height:300px;background:var(--panel);padding:12px;border:1px solid var(--rule)}
+.end p{font:20px/1.5 var(--font-data);margin:14px 0 0}
+
+/* chrome */
+.counter{position:fixed;right:22px;bottom:14px;font:14px var(--font-data);color:var(--rule);z-index:5}
+.navb{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:5;opacity:.0;transition:opacity .2s}
+body:hover .navb{opacity:1}
+.navb button{border:1px solid var(--rule);background:var(--ink);color:var(--panel);font:14px var(--font-data);padding:6px 12px;cursor:pointer;transition:background .15s}
+.navb button:hover{background:var(--muted)}
+.navb button:focus-visible{outline:2px solid var(--panel)}
+.presenter .viewport{bottom:20%}
+.notes{display:none;position:fixed;left:0;right:0;bottom:0;height:20%;background:var(--ink);color:var(--panel);font:22px/1.5 var(--font-body);padding:18px 32px;overflow:auto;z-index:6}
+.presenter .notes{display:block}
+.presenter.idle{cursor:none}
+.ov .slide{opacity:1;visibility:visible;pointer-events:auto;cursor:pointer;transition:none;outline:4px solid transparent}
+.ov .slide.on{outline-color:var(--before)}
+/* Press C to toggle contrast debug mode */
+.debug-contrast .slide :is(h1,h2,h3,p,li,.contrast-check){outline:1px dashed var(--before)}
+/* content blocks centre between the title and the footer (after the per-slide rules, which set margin-top) */
+.s2 .cols,.agents,.flow,.s5 .wrapx,.dip,.ev,.sp,.stack,.s10 .cols,.road{margin-top:auto;margin-bottom:auto}
+.slide>h2{margin-top:0}
+@page{size:16in 9in;margin:0}
+@media print{
+  html,body{background:var(--bg);height:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .viewport{position:static;overflow:visible}
+  .stage{position:static;transform:none!important;width:auto;height:auto}
+  .slide{position:relative;opacity:1!important;visibility:visible!important;zoom:.8;width:1920px;height:1080px;break-after:page;page-break-after:always;break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact;transition:none!important}
+  .slide *{animation:none!important;transition:none!important}
+  .counter,.navb,.notes{display:none!important}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="viewport"><div class="stage" id="stage">
+
+<!-- 1 COVER -->
+<section class="slide s1" data-n="1" aria-label="Cover">
+  <div class="lh"><span><b>Specimen QD-2939</b> · recorded live on Zetaris</span><span>Open Agent Hackathon 2026 · Reasoning Architecture</span></div>
+  <div>
+    <div class="brand"><img src="../assets/icon.svg" alt="Query Doctor — the Verifier's stamp">Query Doctor</div>
+    <h1>Same rows. Faster.<br>Or the doctor <span class="pen">won't sign.<svg viewBox="0 0 400 30" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 19 C 92 8, 214 27, 396 9"/></svg></span></h1>
+    <p class="tag">Executes the original and the rewrite on Zetaris; signs only when the rows match. Hero: <b>2.11×</b> over 10 paired runs.</p>
+  </div>
+  <div class="sheet art">
+    <div class="hd"><h3>Case report <code>hero-r1</code></h3><span>accepted</span></div>
+    <p class="l">Specimen · the rewrite drops the struck line</p>
+<pre>SELECT COUNT(1) AS n
+FROM   TPCDS_DB.store_sales ss
+<s>LEFT JOIN TPCDS_DB.promotion p ON ss.ss_promo_sk = p.p_promo_sk</s>
+WHERE  ss.ss_customer_sk IS NULL</pre>
+    <p class="l">Results vs reference · median of 3 alternating pairs</p>
+    <div class="res"><span>original</span><div class="bar" style="width:100%"><i>H</i></div><span class="t">29.3 s</span><span>rewrite</span><div class="bar rw" style="width:45.1%"></div><span class="t">13.2 s</span></div>
+    <div class="verdict"><div class="fp"><span>original</span><span>87cd00c5</span><span>rewrite</span><b class="green">87cd00c5</b></div>
+    <div class="stamp">ROW-IDENTICAL · 87CD00C5</div></div>
+    <p class="sig">Verified by <b>Verifier</b> — code, no model · 2.1× median, 3/3 pairs faster</p>
+  </div>
+  <div class="qr art"><svg viewBox="0 0 33 33" width="108" height="108" role="img" aria-label="QR code for https://querydoc-flax.vercel.app/" shape-rendering="crispEdges"><rect width="33" height="33" fill="#FBFAF6"/><path fill="#1A1C1E" d="M2,2h1v1h-1zM3,2h1v1h-1zM4,2h1v1h-1zM5,2h1v1h-1zM6,2h1v1h-1zM7,2h1v1h-1zM8,2h1v1h-1zM11,2h1v1h-1zM13,2h1v1h-1zM14,2h1v1h-1zM15,2h1v1h-1zM18,2h1v1h-1zM21,2h1v1h-1zM24,2h1v1h-1zM25,2h1v1h-1zM26,2h1v1h-1zM27,2h1v1h-1zM28,2h1v1h-1zM29,2h1v1h-1zM30,2h1v1h-1zM2,3h1v1h-1zM8,3h1v1h-1zM10,3h1v1h-1zM12,3h1v1h-1zM16,3h1v1h-1zM17,3h1v1h-1zM18,3h1v1h-1zM20,3h1v1h-1zM21,3h1v1h-1zM24,3h1v1h-1zM30,3h1v1h-1zM2,4h1v1h-1zM4,4h1v1h-1zM5,4h1v1h-1zM6,4h1v1h-1zM8,4h1v1h-1zM14,4h1v1h-1zM15,4h1v1h-1zM16,4h1v1h-1zM18,4h1v1h-1zM20,4h1v1h-1zM21,4h1v1h-1zM24,4h1v1h-1zM26,4h1v1h-1zM27,4h1v1h-1zM28,4h1v1h-1zM30,4h1v1h-1zM2,5h1v1h-1zM4,5h1v1h-1zM5,5h1v1h-1zM6,5h1v1h-1zM8,5h1v1h-1zM12,5h1v1h-1zM13,5h1v1h-1zM14,5h1v1h-1zM15,5h1v1h-1zM16,5h1v1h-1zM17,5h1v1h-1zM20,5h1v1h-1zM24,5h1v1h-1zM26,5h1v1h-1zM27,5h1v1h-1zM28,5h1v1h-1zM30,5h1v1h-1zM2,6h1v1h-1zM4,6h1v1h-1zM5,6h1v1h-1zM6,6h1v1h-1zM8,6h1v1h-1zM10,6h1v1h-1zM11,6h1v1h-1zM16,6h1v1h-1zM20,6h1v1h-1zM21,6h1v1h-1zM22,6h1v1h-1zM24,6h1v1h-1zM26,6h1v1h-1zM27,6h1v1h-1zM28,6h1v1h-1zM30,6h1v1h-1zM2,7h1v1h-1zM8,7h1v1h-1zM11,7h1v1h-1zM13,7h1v1h-1zM14,7h1v1h-1zM15,7h1v1h-1zM19,7h1v1h-1zM20,7h1v1h-1zM21,7h1v1h-1zM24,7h1v1h-1zM30,7h1v1h-1zM2,8h1v1h-1zM3,8h1v1h-1zM4,8h1v1h-1zM5,8h1v1h-1zM6,8h1v1h-1zM7,8h1v1h-1zM8,8h1v1h-1zM10,8h1v1h-1zM12,8h1v1h-1zM14,8h1v1h-1zM16,8h1v1h-1zM18,8h1v1h-1zM20,8h1v1h-1zM22,8h1v1h-1zM24,8h1v1h-1zM25,8h1v1h-1zM26,8h1v1h-1zM27,8h1v1h-1zM28,8h1v1h-1zM29,8h1v1h-1zM30,8h1v1h-1zM12,9h1v1h-1zM13,9h1v1h-1zM14,9h1v1h-1zM15,9h1v1h-1zM16,9h1v1h-1zM18,9h1v1h-1zM19,9h1v1h-1zM20,9h1v1h-1zM21,9h1v1h-1zM2,10h1v1h-1zM4,10h1v1h-1zM6,10h1v1h-1zM8,10h1v1h-1zM14,10h1v1h-1zM16,10h1v1h-1zM17,10h1v1h-1zM18,10h1v1h-1zM19,10h1v1h-1zM21,10h1v1h-1zM26,10h1v1h-1zM29,10h1v1h-1zM2,11h1v1h-1zM4,11h1v1h-1zM5,11h1v1h-1zM14,11h1v1h-1zM16,11h1v1h-1zM17,11h1v1h-1zM19,11h1v1h-1zM20,11h1v1h-1zM22,11h1v1h-1zM24,11h1v1h-1zM27,11h1v1h-1zM30,11h1v1h-1zM3,12h1v1h-1zM5,12h1v1h-1zM6,12h1v1h-1zM7,12h1v1h-1zM8,12h1v1h-1zM9,12h1v1h-1zM11,12h1v1h-1zM13,12h1v1h-1zM14,12h1v1h-1zM15,12h1v1h-1zM18,12h1v1h-1zM19,12h1v1h-1zM20,12h1v1h-1zM28,12h1v1h-1zM29,12h1v1h-1zM30,12h1v1h-1zM2,13h1v1h-1zM3,13h1v1h-1zM4,13h1v1h-1zM6,13h1v1h-1zM7,13h1v1h-1zM9,13h1v1h-1zM11,13h1v1h-1zM13,13h1v1h-1zM17,13h1v1h-1zM19,13h1v1h-1zM21,13h1v1h-1zM25,13h1v1h-1zM29,13h1v1h-1zM2,14h1v1h-1zM4,14h1v1h-1zM7,14h1v1h-1zM8,14h1v1h-1zM9,14h1v1h-1zM10,14h1v1h-1zM11,14h1v1h-1zM12,14h1v1h-1zM13,14h1v1h-1zM18,14h1v1h-1zM19,14h1v1h-1zM22,14h1v1h-1zM23,14h1v1h-1zM24,14h1v1h-1zM25,14h1v1h-1zM27,14h1v1h-1zM29,14h1v1h-1zM30,14h1v1h-1zM2,15h1v1h-1zM3,15h1v1h-1zM4,15h1v1h-1zM5,15h1v1h-1zM11,15h1v1h-1zM12,15h1v1h-1zM14,15h1v1h-1zM15,15h1v1h-1zM17,15h1v1h-1zM19,15h1v1h-1zM22,15h1v1h-1zM23,15h1v1h-1zM24,15h1v1h-1zM27,15h1v1h-1zM30,15h1v1h-1zM2,16h1v1h-1zM3,16h1v1h-1zM5,16h1v1h-1zM6,16h1v1h-1zM8,16h1v1h-1zM9,16h1v1h-1zM11,16h1v1h-1zM12,16h1v1h-1zM16,16h1v1h-1zM19,16h1v1h-1zM20,16h1v1h-1zM22,16h1v1h-1zM23,16h1v1h-1zM24,16h1v1h-1zM25,16h1v1h-1zM26,16h1v1h-1zM27,16h1v1h-1zM29,16h1v1h-1zM30,16h1v1h-1zM2,17h1v1h-1zM7,17h1v1h-1zM10,17h1v1h-1zM12,17h1v1h-1zM15,17h1v1h-1zM16,17h1v1h-1zM18,17h1v1h-1zM19,17h1v1h-1zM20,17h1v1h-1zM21,17h1v1h-1zM22,17h1v1h-1zM23,17h1v1h-1zM27,17h1v1h-1zM29,17h1v1h-1zM2,18h1v1h-1zM5,18h1v1h-1zM7,18h1v1h-1zM8,18h1v1h-1zM10,18h1v1h-1zM11,18h1v1h-1zM16,18h1v1h-1zM17,18h1v1h-1zM18,18h1v1h-1zM19,18h1v1h-1zM21,18h1v1h-1zM22,18h1v1h-1zM23,18h1v1h-1zM24,18h1v1h-1zM27,18h1v1h-1zM29,18h1v1h-1zM30,18h1v1h-1zM3,19h1v1h-1zM4,19h1v1h-1zM6,19h1v1h-1zM10,19h1v1h-1zM14,19h1v1h-1zM16,19h1v1h-1zM19,19h1v1h-1zM22,19h1v1h-1zM23,19h1v1h-1zM24,19h1v1h-1zM27,19h1v1h-1zM28,19h1v1h-1zM30,19h1v1h-1zM2,20h1v1h-1zM6,20h1v1h-1zM8,20h1v1h-1zM13,20h1v1h-1zM15,20h1v1h-1zM18,20h1v1h-1zM22,20h1v1h-1zM23,20h1v1h-1zM25,20h1v1h-1zM26,20h1v1h-1zM29,20h1v1h-1zM30,20h1v1h-1zM3,21h1v1h-1zM7,21h1v1h-1zM14,21h1v1h-1zM17,21h1v1h-1zM19,21h1v1h-1zM20,21h1v1h-1zM22,21h1v1h-1zM24,21h1v1h-1zM27,21h1v1h-1zM29,21h1v1h-1zM2,22h1v1h-1zM7,22h1v1h-1zM8,22h1v1h-1zM9,22h1v1h-1zM11,22h1v1h-1zM13,22h1v1h-1zM19,22h1v1h-1zM22,22h1v1h-1zM23,22h1v1h-1zM24,22h1v1h-1zM25,22h1v1h-1zM26,22h1v1h-1zM10,23h1v1h-1zM11,23h1v1h-1zM15,23h1v1h-1zM18,23h1v1h-1zM21,23h1v1h-1zM22,23h1v1h-1zM26,23h1v1h-1zM28,23h1v1h-1zM29,23h1v1h-1zM30,23h1v1h-1zM2,24h1v1h-1zM3,24h1v1h-1zM4,24h1v1h-1zM5,24h1v1h-1zM6,24h1v1h-1zM7,24h1v1h-1zM8,24h1v1h-1zM13,24h1v1h-1zM14,24h1v1h-1zM16,24h1v1h-1zM18,24h1v1h-1zM21,24h1v1h-1zM22,24h1v1h-1zM24,24h1v1h-1zM26,24h1v1h-1zM27,24h1v1h-1zM29,24h1v1h-1zM30,24h1v1h-1zM2,25h1v1h-1zM8,25h1v1h-1zM12,25h1v1h-1zM13,25h1v1h-1zM15,25h1v1h-1zM16,25h1v1h-1zM17,25h1v1h-1zM19,25h1v1h-1zM22,25h1v1h-1zM26,25h1v1h-1zM27,25h1v1h-1zM2,26h1v1h-1zM4,26h1v1h-1zM5,26h1v1h-1zM6,26h1v1h-1zM8,26h1v1h-1zM10,26h1v1h-1zM13,26h1v1h-1zM14,26h1v1h-1zM16,26h1v1h-1zM19,26h1v1h-1zM20,26h1v1h-1zM22,26h1v1h-1zM23,26h1v1h-1zM24,26h1v1h-1zM25,26h1v1h-1zM26,26h1v1h-1zM30,26h1v1h-1zM2,27h1v1h-1zM4,27h1v1h-1zM5,27h1v1h-1zM6,27h1v1h-1zM8,27h1v1h-1zM11,27h1v1h-1zM13,27h1v1h-1zM14,27h1v1h-1zM15,27h1v1h-1zM16,27h1v1h-1zM18,27h1v1h-1zM26,27h1v1h-1zM28,27h1v1h-1zM29,27h1v1h-1zM30,27h1v1h-1zM2,28h1v1h-1zM4,28h1v1h-1zM5,28h1v1h-1zM6,28h1v1h-1zM8,28h1v1h-1zM10,28h1v1h-1zM12,28h1v1h-1zM15,28h1v1h-1zM19,28h1v1h-1zM21,28h1v1h-1zM25,28h1v1h-1zM26,28h1v1h-1zM27,28h1v1h-1zM30,28h1v1h-1zM2,29h1v1h-1zM8,29h1v1h-1zM11,29h1v1h-1zM12,29h1v1h-1zM13,29h1v1h-1zM14,29h1v1h-1zM15,29h1v1h-1zM17,29h1v1h-1zM19,29h1v1h-1zM21,29h1v1h-1zM22,29h1v1h-1zM23,29h1v1h-1zM29,29h1v1h-1zM2,30h1v1h-1zM3,30h1v1h-1zM4,30h1v1h-1zM5,30h1v1h-1zM6,30h1v1h-1zM7,30h1v1h-1zM8,30h1v1h-1zM10,30h1v1h-1zM13,30h1v1h-1zM16,30h1v1h-1zM18,30h1v1h-1zM19,30h1v1h-1zM22,30h1v1h-1zM23,30h1v1h-1zM26,30h1v1h-1zM27,30h1v1h-1zM29,30h1v1h-1zM30,30h1v1h-1z"/></svg><span>landing + this deck<br>querydoc-flax.vercel.app</span></div>
+  <div class="ft"><span>Query Doctor · Open Agent Hackathon 2026</span><span>v0.0.0-dev · build 7bb1625 · 01 / 11</span></div>
+  <aside class="speaker-notes">A rewrite that makes a query faster can also make it wrong, and the diff looks the same either way. Query Doctor executes both on Zetaris and only signs when the rows match. Here it signed: 2.1× on this run, 2.11× over ten paired runs.</aside>
+</section>
+
+<!-- 2 PROBLEM + USERS -->
+<section class="slide s2" data-n="2" aria-label="Problem">
+  <div class="lh"><span><b>Specimen</b> · the problem</span><span>shape of trinodb/trino#2939</span></div>
+  <p class="eb">Problem · who signs off</p>
+  <h2>Faster can still be <em>wrong.</em></h2>
+  <div class="cols">
+    <div class="diff art">  SELECT COUNT(1) AS n
+  FROM   TPCDS_DB.store_sales ss
+<span class="del">- LEFT JOIN TPCDS_DB.promotion p
+-   ON ss.ss_item_sk = p.p_item_sk</span>  WHERE  ss.ss_customer_sk IS NULL</div>
+    <div>
+      <div class="keys">
+        <div><span>original count</span><span class="big">129,776</span></div>
+        <div><span>after the edit</span><span class="big red">129,752</span></div>
+      </div>
+      <p class="who">Reviewers see one deleted line. Analytics engineers sign off on that diff before it merges.</p>
+    </div>
+  </div>
+  <div class="ft"><span>evidence/verify/2026-10-25T08-42-12Z · Verifier REJECT ROW_DIFF</span><span>v0.0.0-dev · build 7bb1625 · 02 / 11</span></div>
+  <aside class="speaker-notes">This is the trino#2939 shape: drop a LEFT JOIN whose columns are never read. Safe when the joined key is unique. Here the key repeats, so the count drops by 24 rows. Nothing in the diff tells the reviewer which case they are in.</aside>
+</section>
+
+<!-- 3 SOLUTION -->
+<section class="slide s3" data-n="3" aria-label="Solution">
+  <div class="lh"><span><b>Method</b> · four agents, one rule</span><span>names as they appear in the traces</span></div>
+  <p class="eb">Solution</p>
+  <h2>A model proposes. <em>Code decides.</em></h2>
+  <div class="agents">
+    <div class="rise"><span class="k">model</span><h3>Diagnoser</h3><p>Reads the plan and the join key.</p></div>
+    <div class="rise"><span class="k">model</span><h3>Rewriter</h3><p>One rewrite per hypothesis.</p></div>
+    <div class="rise v"><span class="k code">code</span><h3>Verifier</h3><p>Executes both, compares rows, times pairs.</p>
+      <ol class="gate art"><li>original runs twice — deterministic?</li><li>same columns and types</li><li>0 rows differ (or equal row hash)</li><li>≥ 1.2×, saving &gt; 1,782.9 ms, most pairs won</li></ol></div>
+    <div class="rise"><span class="k code">code</span><h3>Orchestrator</h3><p>Sequences, retries, remembers refusals.</p></div>
+  </div>
+  <div class="ft"><span>Diagnoser + Rewriter: Nemotron 3 Ultra · Verifier + Orchestrator: TypeScript</span><span>v0.0.0-dev · build 7bb1625 · 03 / 11</span></div>
+  <aside class="speaker-notes">Two agents use the model, two are plain code. The Verifier has no model at all: it runs the queries on the engine. A refusal goes back to the Rewriter with the reason and the differing row.</aside>
+</section>
+
+<!-- 4 WORKFLOW / ARCHITECTURE -->
+<section class="slide s4" data-n="4" aria-label="Architecture">
+  <div class="lh"><span><b>Workflow</b> · one case, end to end</span><span>from ARCHITECTURE.md</span></div>
+  <p class="eb">Workflow · architecture</p>
+  <h2>Every rewrite passes <em>one gate.</em></h2>
+  <div class="flow art">
+    <div class="legend"><span><i></i>model call</span><span><i style="border-top-style:solid"></i>code</span></div>
+    <svg viewBox="0 0 1680 640" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M250 90 H330"/><path d="M640 90 H720"/><path d="M1030 90 H1110"/>
+      <path d="M1265 152 V205 H715 V270"/>
+      <path d="M870 320 H1110"/>
+      <path class="g" d="M1420 320 H1500"/>
+      <path class="r" d="M1265 372 V470 H870"/>
+      <path d="M560 470 H500 V320 H560"/>
+      <path class="r" d="M1420 290 H1462 V95 H1420"/>
+    </svg>
+    <div class="nd" style="left:0;top:40px;width:250px"><b>Paste SQL</b>guard: one read-only statement</div>
+    <div class="nd" style="left:330px;top:40px;width:310px"><b>Verifier pre-check</b>original runs twice · determinism lint</div>
+    <div class="nd" style="left:720px;top:40px;width:310px"><b>Plan + key facts</b>EXPLAIN FORMATTED · pattern detector · COUNT vs COUNT(DISTINCT)</div>
+    <div class="nd model" style="left:1110px;top:40px;width:310px"><b>Diagnoser</b>pattern + hypotheses<br><span class="sm">Nemotron 3 Ultra</span></div>
+    <div class="nd model" style="left:560px;top:270px;width:310px"><b>Rewriter</b>one rewrite per hypothesis<br><span class="sm">sees every refusal</span></div>
+    <div class="nd gatek" style="left:1110px;top:250px;width:310px"><b>Verifier</b>schema · row diff / xxhash64 · 3 alternating pairs</div>
+    <div class="nd" style="left:1500px;top:270px;width:180px;border-color:var(--after)"><b class="green">ACCEPTED</b>patch for a human</div>
+    <div class="nd" style="left:560px;top:420px;width:310px"><b>Playbook</b>H-MEM: refusals + outcomes<br><span class="sm">Markovian chain · ≤ 3 attempts</span></div>
+    <span class="lab red" style="left:930px;top:480px">ROW_DIFF → playbook, retry</span>
+    <span class="lab red" style="left:1180px;top:176px">NOT_FASTER → Diagnoser.revise</span>
+    <div class="nd" style="left:0;top:560px;width:1680px;display:flex;gap:40px;align-items:baseline;font-size:18px"><b style="display:inline;font-size:26px">Engines</b>Zetaris · local platform over a Java JDBC sidecar (live) <span class="mut">|</span> DuckDB · committed NYC TLC subset (sample, keyless) <span class="mut">|</span> model: Nightshift default · NIM fallback (recorded)</div>
+  </div>
+  <div class="ft"><span>src/orchestrator.ts · src/agents/verifier.ts · src/reasoning/chain.ts · src/memory/playbook.ts</span><span>v0.0.0-dev · build 7bb1625 · 04 / 11</span></div>
+  <aside class="speaker-notes">The pre-check runs the original twice so a non-deterministic query can never fake equal rows. The Diagnoser and Rewriter are the only model calls. Every candidate goes through the same Verifier; a changed-rows refusal is written to the playbook and the next attempt sees it.</aside>
+</section>
+
+<!-- 5 PRODUCT VISUALS -->
+<section class="slide s5" data-n="5" aria-label="Product">
+  <div class="lh"><span><b>Report</b> · the real screen</span><span>npm start → #/recorded/hero-r1</span></div>
+  <p class="eb">Product</p>
+  <h2>The report a reviewer <em>signs.</em></h2>
+  <div class="wrapx">
+    <div class="frame art" style="position:relative"><div class="b0"><i></i><i></i><i></i><span>localhost:8000/#/recorded/hero-r1</span></div>
+      <img src="../assets/ui-hero-r1.webp" width="1600" height="1000" alt="Query Doctor — the Report screen of the recorded live run hero-r1: Accepted, 2.1×, runtime bars, ROW-IDENTICAL stamp and the agent trace">
+      <span class="mk" style="left:21px;top:297px">1</span><span class="mk" style="left:14px;top:462px">2</span><span class="mk" style="left:819px;top:152px">3</span></div>
+    <ol class="call">
+      <li class="rise">Verdict and stamp, first.</li>
+      <li class="rise">Measured bars: original vs rewrite.</li>
+      <li class="rise">Agent trace: every engine and model call.</li>
+    </ol>
+  </div>
+  <div class="ft"><span>real screen of the frozen build · evidence from the recorded run, not a new execution</span><span>v0.0.0-dev · build 7bb1625 · 05 / 11</span></div>
+  <aside class="speaker-notes">This is the product's Report screen replaying the recorded live run. The verdict and the stamp come first, then the measured runtime bars, and on the right the agent trace with every engine and model call and its latency.</aside>
+</section>
+
+<!-- 6 FROZEN -->
+<section class="slide s6" data-n="6" aria-label="One edit, two keys, two verdicts">
+  <div class="lh"><span><b>Comments</b> · the same edit on two keys</span><span>recorded/live · 2026-10-25</span></div>
+  <p class="eb">The moment</p>
+  <h2>One edit. Two keys. <em>Two verdicts.</em></h2>
+  <div class="dip">
+    <div class="sheet">
+      <div class="hd art"><h3>Case report <code>hero-r1</code></h3><span>accepted</span></div>
+<pre class="art">LEFT JOIN TPCDS_DB.promotion p
+  ON <u>ss.ss_promo_sk = p.p_promo_sk</u></pre>
+      <div class="kp"><span class="mono">ON p_promo_sk</span><span class="big">300 of 300 distinct</span></div>
+      <div class="verdict mono art">fingerprint 87cd00c5 = 87cd00c5<br>2.1× median · 3/3 pairs faster</div>
+      <div class="stamp">ROW-IDENTICAL · 87CD00C5</div>
+    </div>
+    <div class="sheet">
+      <div class="hd art"><h3>Case report <code>hero-trap-r1</code></h3><span>refused</span></div>
+<pre class="art">LEFT JOIN TPCDS_DB.promotion p
+  ON <u>ss.ss_item_sk = p.p_item_sk</u></pre>
+      <div class="kp"><span class="mono">ON p_item_sk</span><span class="big red">291 of 300 distinct</span></div>
+      <div class="verdict mono art">fingerprint e51f9da7 ≠ 87cd00c5<br><span class="red">first differing row 129752</span></div>
+      <div class="stamp no">REFUSED · ROW_DIFF</div>
+    </div>
+  </div>
+  <div class="ft"><span>recorded/live/hero-r1/case.json · recorded/live/hero-trap-r1/case.json + trace.jsonl (profile_keys)</span><span>v0.0.0-dev · build 7bb1625 · 06 / 11</span></div>
+  <aside class="speaker-notes">Same query, same edit: drop the join. On the left the key is unique, the fingerprints match and it is 2.1× faster. On the right the key has duplicates, the rewrite returns 129,752 instead of the original's count, and the Verifier refuses it. Reading the SQL cannot tell these apart; executing it can.</aside>
+</section>
+
+<!-- 7 EVIDENCE -->
+<section class="slide s7" data-n="7" aria-label="Evidence">
+  <div class="lh"><span><b>Results vs reference</b></span><span>DEMO.md · evals/results.md · recorded/live</span></div>
+  <p class="eb">Evidence</p>
+  <h2>Measured on the engine, <em>not estimated.</em></h2>
+  <div class="ev">
+    <div class="rise"><div class="n green">2.1×</div><p class="what">live hero verdict</p><p class="src">hero-r1 · 3/3 pairs<br>hero-r2 · 2.15×<br>fingerprint 87cd00c5</p></div>
+    <div class="rise"><div class="n">2.11×</div><p class="what">bench, 10 alternating pairs</p>
+      <div class="pp art"><span>p50</span><div class="bb"><div class="grow" style="width:69%"></div><div class="g grow" style="width:35%"></div><span>32442.6 → 16428 ms</span></div>
+        <span>p95</span><div class="bb"><div class="grow" style="width:100%"></div><div class="g grow" style="width:45%"></div><span>46950.8 → 21100.8 ms</span></div></div></div>
+    <div class="rise"><div class="n red">6 / 15</div><p class="what">baseline changed rows</p><p class="src">one model call, same Verifier<br>Query Doctor shipped: 0</p>
+      <div class="dots art"><i class="c">Δ</i><i class="c">Δ</i><i class="c">Δ</i><i class="c">Δ</i><i class="c">Δ</i><i class="c">Δ</i><i>=</i><i>=</i><i>=</i><i>=</i><i>=</i><i class="e">·</i><i class="e">·</i><i class="e">·</i><i class="e">·</i></div></div>
+  </div>
+  <div class="ft"><span>designed queries, small N — not a rate on real workloads · one laptop, local JDBC</span><span>v0.0.0-dev · build 7bb1625 · 07 / 11</span></div>
+  <aside class="speaker-notes">The live verdict and the benchmark are separate runs: 2.1× and 2.15× on the two recorded hero runs, 2.11× median over ten alternating pairs in the bench. A one-shot baseline scored by the same Verifier changed rows in 6 of 15 runs; Query Doctor shipped none.</aside>
+</section>
+
+<!-- 8 ZETARIS + METERLESS -->
+<section class="slide s8" data-n="8" aria-label="Zetaris and Meterless">
+  <div class="lh"><span><b>Instruments</b> · in one live case (hero-r1)</span><span>logs/live-hero-r1.jsonl</span></div>
+  <p class="eb">Zetaris + Meterless</p>
+  <h2>Zetaris runs it. <em>Meterless remembers it.</em></h2>
+  <div class="sp">
+    <div><h3>Zetaris</h3><ul class="calls">
+      <li class="rise"><b>10</b><span><code>run_sql</code> — pre-check, key profile, diff, timing</span></li>
+      <li class="rise"><b>1</b><span><code>EXPLAIN FORMATTED</code> — the plan</span></li>
+      <li class="rise"><b>JDBC</b><span>local platform, no MCP endpoint</span></li></ul></div>
+    <div><h3>Meterless</h3><ul class="calls">
+      <li class="rise"><b>2</b><span>H-MEM <code>open</code> + <code>query</code> — the playbook</span></li>
+      <li class="rise"><b>1</b><span>Markovian <code>chunk</code> — attempt hand-off</span></li>
+      <li class="rise"><b>mock</b><span>Nightshift — default provider, not run live</span></li></ul></div>
+  </div>
+  <p class="also"><span><b>NVIDIA</b> Nemotron 3 Ultra · 2 calls (diagnose, rewrite)</span></p>
+  <div class="ft"><span>counts from the recorded trace of hero-r1 · Nightshift: 16 mock-runtime tests</span><span>v0.0.0-dev · build 7bb1625 · 08 / 11</span></div>
+  <aside class="speaker-notes">Counted from one live case. Ten queries on Zetaris, one EXPLAIN. H-MEM is opened and queried before the rewrite, and the Markovian chain hands the attempt to the Verifier. Nightshift is the default provider in code but has only run against a mock; the recorded runs used NIM directly.</aside>
+</section>
+
+<!-- 9 STACK -->
+<section class="slide s9" data-n="9" aria-label="Stack">
+  <div class="lh"><span><b>Stack</b> · and how it was built</span><span>README · Getting started</span></div>
+  <p class="eb">Stack</p>
+  <h2>Small, tested, <em>runs keyless.</em></h2>
+  <div class="stack">
+    <div class="rise"><h3>TypeScript</h3><p>Node 22 · API + UI on :8000</p></div>
+    <div class="rise"><h3>Java sidecar</h3><p>one warm JDBC connection to Zetaris</p></div>
+    <div class="rise"><h3>DuckDB</h3><p>sample engine · NYC TLC subset</p></div>
+    <div class="rise"><span class="big">286</span><p>tests · 26 files · no keys</p></div>
+    <div class="rise"><h3>Docker</h3><p>one command, SAMPLE_MODE=true</p></div>
+    <div class="rise"><h3>Built with</h3><p>Cursor: scaffold d3e823c<br>Claude Code: every other commit</p></div>
+  </div>
+  <div class="ft"><span>docker build -t querydoc . &amp;&amp; docker run --rm -p 8000:8000 -e SAMPLE_MODE=true querydoc</span><span>v0.0.0-dev · build 7bb1625 · 09 / 11</span></div>
+  <aside class="speaker-notes">A judge can run it with one Docker command and no keys: DuckDB on a committed NYC taxi subset with recorded model answers. Cursor's agent wrote the scaffold commit; Claude Code wrote the rest, and every commit carries a Tool trailer saying which.</aside>
+</section>
+
+<!-- 10 UNIQUE -->
+<section class="slide s10" data-n="10" aria-label="What was unique">
+  <div class="lh"><span><b>Comments</b> · hero-trap-r1</span><span>#/recorded/hero-trap-r1 · Attempts</span></div>
+  <p class="eb">What was unique</p>
+  <h2>It keeps the <em>wrong answers.</em></h2>
+  <div class="cols">
+    <ul class="pts">
+      <li class="rise"><span>on the page</span>Refused rewrites stay, struck through, with the differing row.</li>
+      <li class="rise"><span>in memory</span>A repeat refusal comes from the ledger, not re-run.</li>
+      <li class="rise"><span>in the report</span>"Identical on the current data" — not a proof.</li>
+    </ul>
+    <img class="shot art" src="../assets/ui-trap-attempts.webp" width="1568" height="1164" alt="Query Doctor — three refused attempts on the duplicated-key trap, each struck through with the Verifier's reason">
+  </div>
+  <div class="ft"><span>real screen · README Limitations: the retry loop does not reliably learn from a refusal</span><span>v0.0.0-dev · build 7bb1625 · 10 / 11</span></div>
+  <aside class="speaker-notes">Most tools show you the winning rewrite. We keep the losing ones on the report, with the row that proves them wrong. Honestly: the retry loop did not learn here; all three attempts changed the rows. What saved it was the gate, not the model.</aside>
+</section>
+
+<!-- 11 FUTURE -->
+<section class="slide s11" data-n="11" aria-label="Future">
+  <div class="lh"><span><b>Next</b> · from the README roadmap</span><span>querydoc-flax.vercel.app</span></div>
+  <p class="eb">Future</p>
+  <h2>Next: queries <em>we didn't write.</em></h2>
+  <ul class="road">
+    <li class="rise"><span>A query set not designed by us, and the baseline on Zetaris</span></li>
+    <li class="rise"><span>Re-record the hero through a live Nightshift runtime</span></li>
+    <li class="rise"><span>Zetaris MCP intake (<span class="mono">get_slow_queries</span>) when an endpoint exists</span></li>
+    <li class="rise"><span>Write-back of an approved rewrite</span></li>
+  </ul>
+  <div class="end art"><svg viewBox="0 0 33 33" width="300" height="300" role="img" aria-label="QR code for https://querydoc-flax.vercel.app/" shape-rendering="crispEdges"><rect width="33" height="33" fill="#FBFAF6"/><path fill="#1A1C1E" d="M2,2h1v1h-1zM3,2h1v1h-1zM4,2h1v1h-1zM5,2h1v1h-1zM6,2h1v1h-1zM7,2h1v1h-1zM8,2h1v1h-1zM11,2h1v1h-1zM13,2h1v1h-1zM14,2h1v1h-1zM15,2h1v1h-1zM18,2h1v1h-1zM21,2h1v1h-1zM24,2h1v1h-1zM25,2h1v1h-1zM26,2h1v1h-1zM27,2h1v1h-1zM28,2h1v1h-1zM29,2h1v1h-1zM30,2h1v1h-1zM2,3h1v1h-1zM8,3h1v1h-1zM10,3h1v1h-1zM12,3h1v1h-1zM16,3h1v1h-1zM17,3h1v1h-1zM18,3h1v1h-1zM20,3h1v1h-1zM21,3h1v1h-1zM24,3h1v1h-1zM30,3h1v1h-1zM2,4h1v1h-1zM4,4h1v1h-1zM5,4h1v1h-1zM6,4h1v1h-1zM8,4h1v1h-1zM14,4h1v1h-1zM15,4h1v1h-1zM16,4h1v1h-1zM18,4h1v1h-1zM20,4h1v1h-1zM21,4h1v1h-1zM24,4h1v1h-1zM26,4h1v1h-1zM27,4h1v1h-1zM28,4h1v1h-1zM30,4h1v1h-1zM2,5h1v1h-1zM4,5h1v1h-1zM5,5h1v1h-1zM6,5h1v1h-1zM8,5h1v1h-1zM12,5h1v1h-1zM13,5h1v1h-1zM14,5h1v1h-1zM15,5h1v1h-1zM16,5h1v1h-1zM17,5h1v1h-1zM20,5h1v1h-1zM24,5h1v1h-1zM26,5h1v1h-1zM27,5h1v1h-1zM28,5h1v1h-1zM30,5h1v1h-1zM2,6h1v1h-1zM4,6h1v1h-1zM5,6h1v1h-1zM6,6h1v1h-1zM8,6h1v1h-1zM10,6h1v1h-1zM11,6h1v1h-1zM16,6h1v1h-1zM20,6h1v1h-1zM21,6h1v1h-1zM22,6h1v1h-1zM24,6h1v1h-1zM26,6h1v1h-1zM27,6h1v1h-1zM28,6h1v1h-1zM30,6h1v1h-1zM2,7h1v1h-1zM8,7h1v1h-1zM11,7h1v1h-1zM13,7h1v1h-1zM14,7h1v1h-1zM15,7h1v1h-1zM19,7h1v1h-1zM20,7h1v1h-1zM21,7h1v1h-1zM24,7h1v1h-1zM30,7h1v1h-1zM2,8h1v1h-1zM3,8h1v1h-1zM4,8h1v1h-1zM5,8h1v1h-1zM6,8h1v1h-1zM7,8h1v1h-1zM8,8h1v1h-1zM10,8h1v1h-1zM12,8h1v1h-1zM14,8h1v1h-1zM16,8h1v1h-1zM18,8h1v1h-1zM20,8h1v1h-1zM22,8h1v1h-1zM24,8h1v1h-1zM25,8h1v1h-1zM26,8h1v1h-1zM27,8h1v1h-1zM28,8h1v1h-1zM29,8h1v1h-1zM30,8h1v1h-1zM12,9h1v1h-1zM13,9h1v1h-1zM14,9h1v1h-1zM15,9h1v1h-1zM16,9h1v1h-1zM18,9h1v1h-1zM19,9h1v1h-1zM20,9h1v1h-1zM21,9h1v1h-1zM2,10h1v1h-1zM4,10h1v1h-1zM6,10h1v1h-1zM8,10h1v1h-1zM14,10h1v1h-1zM16,10h1v1h-1zM17,10h1v1h-1zM18,10h1v1h-1zM19,10h1v1h-1zM21,10h1v1h-1zM26,10h1v1h-1zM29,10h1v1h-1zM2,11h1v1h-1zM4,11h1v1h-1zM5,11h1v1h-1zM14,11h1v1h-1zM16,11h1v1h-1zM17,11h1v1h-1zM19,11h1v1h-1zM20,11h1v1h-1zM22,11h1v1h-1zM24,11h1v1h-1zM27,11h1v1h-1zM30,11h1v1h-1zM3,12h1v1h-1zM5,12h1v1h-1zM6,12h1v1h-1zM7,12h1v1h-1zM8,12h1v1h-1zM9,12h1v1h-1zM11,12h1v1h-1zM13,12h1v1h-1zM14,12h1v1h-1zM15,12h1v1h-1zM18,12h1v1h-1zM19,12h1v1h-1zM20,12h1v1h-1zM28,12h1v1h-1zM29,12h1v1h-1zM30,12h1v1h-1zM2,13h1v1h-1zM3,13h1v1h-1zM4,13h1v1h-1zM6,13h1v1h-1zM7,13h1v1h-1zM9,13h1v1h-1zM11,13h1v1h-1zM13,13h1v1h-1zM17,13h1v1h-1zM19,13h1v1h-1zM21,13h1v1h-1zM25,13h1v1h-1zM29,13h1v1h-1zM2,14h1v1h-1zM4,14h1v1h-1zM7,14h1v1h-1zM8,14h1v1h-1zM9,14h1v1h-1zM10,14h1v1h-1zM11,14h1v1h-1zM12,14h1v1h-1zM13,14h1v1h-1zM18,14h1v1h-1zM19,14h1v1h-1zM22,14h1v1h-1zM23,14h1v1h-1zM24,14h1v1h-1zM25,14h1v1h-1zM27,14h1v1h-1zM29,14h1v1h-1zM30,14h1v1h-1zM2,15h1v1h-1zM3,15h1v1h-1zM4,15h1v1h-1zM5,15h1v1h-1zM11,15h1v1h-1zM12,15h1v1h-1zM14,15h1v1h-1zM15,15h1v1h-1zM17,15h1v1h-1zM19,15h1v1h-1zM22,15h1v1h-1zM23,15h1v1h-1zM24,15h1v1h-1zM27,15h1v1h-1zM30,15h1v1h-1zM2,16h1v1h-1zM3,16h1v1h-1zM5,16h1v1h-1zM6,16h1v1h-1zM8,16h1v1h-1zM9,16h1v1h-1zM11,16h1v1h-1zM12,16h1v1h-1zM16,16h1v1h-1zM19,16h1v1h-1zM20,16h1v1h-1zM22,16h1v1h-1zM23,16h1v1h-1zM24,16h1v1h-1zM25,16h1v1h-1zM26,16h1v1h-1zM27,16h1v1h-1zM29,16h1v1h-1zM30,16h1v1h-1zM2,17h1v1h-1zM7,17h1v1h-1zM10,17h1v1h-1zM12,17h1v1h-1zM15,17h1v1h-1zM16,17h1v1h-1zM18,17h1v1h-1zM19,17h1v1h-1zM20,17h1v1h-1zM21,17h1v1h-1zM22,17h1v1h-1zM23,17h1v1h-1zM27,17h1v1h-1zM29,17h1v1h-1zM2,18h1v1h-1zM5,18h1v1h-1zM7,18h1v1h-1zM8,18h1v1h-1zM10,18h1v1h-1zM11,18h1v1h-1zM16,18h1v1h-1zM17,18h1v1h-1zM18,18h1v1h-1zM19,18h1v1h-1zM21,18h1v1h-1zM22,18h1v1h-1zM23,18h1v1h-1zM24,18h1v1h-1zM27,18h1v1h-1zM29,18h1v1h-1zM30,18h1v1h-1zM3,19h1v1h-1zM4,19h1v1h-1zM6,19h1v1h-1zM10,19h1v1h-1zM14,19h1v1h-1zM16,19h1v1h-1zM19,19h1v1h-1zM22,19h1v1h-1zM23,19h1v1h-1zM24,19h1v1h-1zM27,19h1v1h-1zM28,19h1v1h-1zM30,19h1v1h-1zM2,20h1v1h-1zM6,20h1v1h-1zM8,20h1v1h-1zM13,20h1v1h-1zM15,20h1v1h-1zM18,20h1v1h-1zM22,20h1v1h-1zM23,20h1v1h-1zM25,20h1v1h-1zM26,20h1v1h-1zM29,20h1v1h-1zM30,20h1v1h-1zM3,21h1v1h-1zM7,21h1v1h-1zM14,21h1v1h-1zM17,21h1v1h-1zM19,21h1v1h-1zM20,21h1v1h-1zM22,21h1v1h-1zM24,21h1v1h-1zM27,21h1v1h-1zM29,21h1v1h-1zM2,22h1v1h-1zM7,22h1v1h-1zM8,22h1v1h-1zM9,22h1v1h-1zM11,22h1v1h-1zM13,22h1v1h-1zM19,22h1v1h-1zM22,22h1v1h-1zM23,22h1v1h-1zM24,22h1v1h-1zM25,22h1v1h-1zM26,22h1v1h-1zM10,23h1v1h-1zM11,23h1v1h-1zM15,23h1v1h-1zM18,23h1v1h-1zM21,23h1v1h-1zM22,23h1v1h-1zM26,23h1v1h-1zM28,23h1v1h-1zM29,23h1v1h-1zM30,23h1v1h-1zM2,24h1v1h-1zM3,24h1v1h-1zM4,24h1v1h-1zM5,24h1v1h-1zM6,24h1v1h-1zM7,24h1v1h-1zM8,24h1v1h-1zM13,24h1v1h-1zM14,24h1v1h-1zM16,24h1v1h-1zM18,24h1v1h-1zM21,24h1v1h-1zM22,24h1v1h-1zM24,24h1v1h-1zM26,24h1v1h-1zM27,24h1v1h-1zM29,24h1v1h-1zM30,24h1v1h-1zM2,25h1v1h-1zM8,25h1v1h-1zM12,25h1v1h-1zM13,25h1v1h-1zM15,25h1v1h-1zM16,25h1v1h-1zM17,25h1v1h-1zM19,25h1v1h-1zM22,25h1v1h-1zM26,25h1v1h-1zM27,25h1v1h-1zM2,26h1v1h-1zM4,26h1v1h-1zM5,26h1v1h-1zM6,26h1v1h-1zM8,26h1v1h-1zM10,26h1v1h-1zM13,26h1v1h-1zM14,26h1v1h-1zM16,26h1v1h-1zM19,26h1v1h-1zM20,26h1v1h-1zM22,26h1v1h-1zM23,26h1v1h-1zM24,26h1v1h-1zM25,26h1v1h-1zM26,26h1v1h-1zM30,26h1v1h-1zM2,27h1v1h-1zM4,27h1v1h-1zM5,27h1v1h-1zM6,27h1v1h-1zM8,27h1v1h-1zM11,27h1v1h-1zM13,27h1v1h-1zM14,27h1v1h-1zM15,27h1v1h-1zM16,27h1v1h-1zM18,27h1v1h-1zM26,27h1v1h-1zM28,27h1v1h-1zM29,27h1v1h-1zM30,27h1v1h-1zM2,28h1v1h-1zM4,28h1v1h-1zM5,28h1v1h-1zM6,28h1v1h-1zM8,28h1v1h-1zM10,28h1v1h-1zM12,28h1v1h-1zM15,28h1v1h-1zM19,28h1v1h-1zM21,28h1v1h-1zM25,28h1v1h-1zM26,28h1v1h-1zM27,28h1v1h-1zM30,28h1v1h-1zM2,29h1v1h-1zM8,29h1v1h-1zM11,29h1v1h-1zM12,29h1v1h-1zM13,29h1v1h-1zM14,29h1v1h-1zM15,29h1v1h-1zM17,29h1v1h-1zM19,29h1v1h-1zM21,29h1v1h-1zM22,29h1v1h-1zM23,29h1v1h-1zM29,29h1v1h-1zM2,30h1v1h-1zM3,30h1v1h-1zM4,30h1v1h-1zM5,30h1v1h-1zM6,30h1v1h-1zM7,30h1v1h-1zM8,30h1v1h-1zM10,30h1v1h-1zM13,30h1v1h-1zM16,30h1v1h-1zM18,30h1v1h-1zM19,30h1v1h-1zM22,30h1v1h-1zM23,30h1v1h-1zM26,30h1v1h-1zM27,30h1v1h-1zM29,30h1v1h-1zM30,30h1v1h-1z"/></svg><p>querydoc-flax.vercel.app<br>landing · deck · recorded runs</p></div>
+  <div class="ft"><span>Query Doctor · Apache-2.0 · github.com/edycutjong/querydoc</span><span>v0.0.0-dev · build 7bb1625 · 11 / 11</span></div>
+  <aside class="speaker-notes">Everything you saw ran on queries we designed. The next step is a workload we did not write, plus the baseline on Zetaris. Then the live Nightshift recording, MCP intake when Zetaris exposes it, and write-back once a human approves.</aside>
+</section>
+
+</div></div>
+<div class="notes" id="notes" aria-live="polite"></div>
+<div class="navb"><button type="button" id="prev" aria-label="Previous slide">←</button><button type="button" id="ovb" aria-label="Overview">grid</button><button type="button" id="next" aria-label="Next slide">→</button></div>
+<div class="counter" id="counter">01 / 11</div>
+<script>
+(()=>{
+const stage=document.getElementById("stage"),S=[...document.querySelectorAll(".slide")],N=S.length;
+let i=Math.max(0,Math.min(N-1,(parseInt(location.hash.slice(1))||1)-1)),ov=false,idleT;
+function fit(){if(ov)return;const w=document.documentElement.clientWidth,h=document.querySelector(".viewport").clientHeight,s=Math.min(w/1920,h/1080);stage.style.transform=`translate(-50%,-50%) scale(${s})`}
+function show(k,play=true){i=(k+N)%N;S.forEach((s,j)=>{s.classList.toggle("on",j===i);s.classList.remove("play")});
+  if(play&&!ov){void S[i].offsetWidth;S[i].classList.add("play")}
+  document.getElementById("counter").textContent=String(i+1).padStart(2,"0")+" / "+String(N).padStart(2,"0");
+  const n=S[i].querySelector(".speaker-notes");document.getElementById("notes").textContent=n?n.textContent:"";
+  history.replaceState(null,"","#"+(i+1))}
+function overview(on){ov=on;document.body.classList.toggle("ov",on);
+  if(on){const w=document.documentElement.clientWidth,cols=4,sc=(w*.94/cols)/1920;stage.style.transform="none";stage.style.left="3%";stage.style.top="2%";
+    S.forEach((s,j)=>{s.style.transformOrigin="0 0";s.style.transform=`translate(${(j%cols)*1920*1.04}px,${Math.floor(j/cols)*1080*1.06}px)`});stage.style.transform=`scale(${sc})`;stage.style.transformOrigin="0 0"}
+  else{S.forEach(s=>{s.style.transform="";s.style.transformOrigin=""});stage.style.left="";stage.style.top="";stage.style.transformOrigin="";fit();show(i)}}
+S.forEach((s,j)=>s.addEventListener("click",()=>{if(ov){i=j;overview(false)}}));
+addEventListener("keydown",e=>{const k=e.key;
+  if(["ArrowRight"," ","PageDown"].includes(k)){e.preventDefault();show(i+1)}
+  else if(["ArrowLeft","PageUp"].includes(k)){e.preventDefault();show(i-1)}
+  else if(k==="Home")show(0);else if(k==="End")show(N-1);
+  else if(k==="Escape")overview(!ov);
+  else if(k==="p"||k==="P"){document.body.classList.toggle("presenter");fit()}
+  else if(k==="c"||k==="C")document.body.classList.toggle("debug-contrast")});
+document.getElementById("next").onclick=()=>show(i+1);document.getElementById("prev").onclick=()=>show(i-1);document.getElementById("ovb").onclick=()=>overview(!ov);
+addEventListener("mousemove",()=>{document.body.classList.remove("idle");clearTimeout(idleT);idleT=setTimeout(()=>document.body.classList.add("idle"),2000)});
+addEventListener("resize",fit);addEventListener("beforeprint",()=>S.forEach(s=>s.classList.remove("play")));
+fit();show(i);
+})();
+</script>
+</body>
+</html>
