@@ -1,0 +1,10 @@
+{
+  "input": {
+    "sql": "SELECT z.LocationID, z.Borough, z.Zone, COUNT(t.PULocationID) AS cash_trips\nFROM ops.zones z\nLEFT JOIN lake.trips t ON t.PULocationID = z.LocationID AND t.payment_type = 2\nGROUP BY z.LocationID, z.Borough, z.Zone\nORDER BY z.LocationID",
+    "source": "paste"
+  },
+  "options": {
+    "sample_mode": true,
+    "playbook": "empty"
+  }
+}

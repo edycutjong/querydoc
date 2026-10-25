@@ -13,7 +13,9 @@
     "spike": "tsx scripts/spike_zetaris.ts",
     "typecheck": "node scripts/typecheck.mjs",
     "test": "vitest run",
-    "check:config": "tsx scripts/check_config_sources.ts"
+    "check:config": "tsx scripts/check_config_sources.ts",
+    "start": "tsx src/main.ts",
+    "seed": "tsx scripts/seed.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

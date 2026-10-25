@@ -1,0 +1,10 @@
+{
+  "input": {
+    "sql": "SELECT payment_type, COUNT(*) AS trips\nFROM lake.trips\nGROUP BY payment_type\nORDER BY payment_type",
+    "source": "paste"
+  },
+  "options": {
+    "sample_mode": true,
+    "playbook": "empty"
+  }
+}

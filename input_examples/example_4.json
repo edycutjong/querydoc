@@ -1,0 +1,10 @@
+{
+  "input": {
+    "sql": "SELECT z.Borough, COUNT(*) AS touches\nFROM lake.trips t\nJOIN ops.zones z ON z.LocationID = t.PULocationID OR z.LocationID = t.DOLocationID\nGROUP BY z.Borough\nORDER BY z.Borough",
+    "source": "paste"
+  },
+  "options": {
+    "sample_mode": true,
+    "playbook": "empty"
+  }
+}
