@@ -1,0 +1,77 @@
+== Physical Plan ==
+AdaptiveSparkPlan (12)
++- HashAggregate (11)
+   +- Exchange (10)
+      +- HashAggregate (9)
+         +- Project (8)
+            +- BroadcastHashJoin LeftOuter BuildRight (7)
+               :- Project (3)
+               :  +- Filter (2)
+               :     +- Scan parquet TPCDS_DB.store_sales (1)
+               +- BroadcastExchange (6)
+                  +- Filter (5)
+                     +- Scan parquet TPCDS_DB.promotion (4)
+
+
+(1) Scan parquet TPCDS_DB.store_sales
+Output [2]: [ss_customer_sk#28770, ss_promo_sk#28775]
+Batched: true
+Location: InMemoryFileIndex [s3a://zetaris-public-dataset/tpcds/store_sales]
+PushedFilters: [IsNull(ss_customer_sk)]
+ReadSchema: struct<ss_customer_sk:int,ss_promo_sk:int>
+
+(2) Filter
+Input [2]: [ss_customer_sk#28770, ss_promo_sk#28775]
+Condition : isnull(ss_customer_sk#28770)
+
+(3) Project
+Output [1]: [ss_promo_sk#28775]
+Input [2]: [ss_customer_sk#28770, ss_promo_sk#28775]
+
+(4) Scan parquet TPCDS_DB.promotion
+Output [1]: [p_promo_sk#28790]
+Batched: true
+Location: InMemoryFileIndex [s3a://zetaris-public-dataset/tpcds/promotion]
+PushedFilters: [IsNotNull(p_promo_sk)]
+ReadSchema: struct<p_promo_sk:int>
+
+(5) Filter
+Input [1]: [p_promo_sk#28790]
+Condition : isnotnull(p_promo_sk#28790)
+
+(6) BroadcastExchange
+Input [1]: [p_promo_sk#28790]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=571]
+
+(7) BroadcastHashJoin
+Left keys [1]: [ss_promo_sk#28775]
+Right keys [1]: [p_promo_sk#28790]
+Join type: LeftOuter
+Join condition: None
+
+(8) Project
+Output: []
+Input [2]: [ss_promo_sk#28775, p_promo_sk#28790]
+
+(9) HashAggregate
+Input: []
+Keys: []
+Functions [1]: [partial_count(1)]
+Aggregate Attributes [1]: [count#28812L]
+Results [1]: [count#28813L]
+
+(10) Exchange
+Input [1]: [count#28813L]
+Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=576]
+
+(11) HashAggregate
+Input [1]: [count#28813L]
+Keys: []
+Functions [1]: [count(1)]
+Aggregate Attributes [1]: [count(1)#28809L]
+Results [1]: [count(1)#28809L AS n#28762L]
+
+(12) AdaptiveSparkPlan
+Output [1]: [n#28762L]
+Arguments: isFinalPlan=false
+

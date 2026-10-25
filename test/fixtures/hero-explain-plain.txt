@@ -1,0 +1,14 @@
+== Physical Plan ==
+AdaptiveSparkPlan isFinalPlan=false
++- HashAggregate(keys=[], functions=[count(1)])
+   +- Exchange SinglePartition, ENSURE_REQUIREMENTS, [plan_id=528]
+      +- HashAggregate(keys=[], functions=[partial_count(1)])
+         +- Project
+            +- BroadcastHashJoin [ss_promo_sk#28718], [p_promo_sk#28733], LeftOuter, BuildRight, false
+               :- Project [ss_promo_sk#28718]
+               :  +- Filter isnull(ss_customer_sk#28713)
+               :     +- FileScan parquet TPCDS_DB.store_sales[ss_customer_sk#28713,ss_promo_sk#28718] Batched: true, DataFilters: [isnull(ss_customer_sk#28713)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3a://zetaris-public-dataset/tpcds/store_sales], PartitionFilters: [], PushedFilters: [IsNull(ss_customer_sk)], ReadSchema: struct<ss_customer_sk:int,ss_promo_sk:int>
+               +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=523]
+                  +- Filter isnotnull(p_promo_sk#28733)
+                     +- FileScan parquet TPCDS_DB.promotion[p_promo_sk#28733] Batched: true, DataFilters: [isnotnull(p_promo_sk#28733)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[s3a://zetaris-public-dataset/tpcds/promotion], PartitionFilters: [], PushedFilters: [IsNotNull(p_promo_sk)], ReadSchema: struct<p_promo_sk:int>
+
