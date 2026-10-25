@@ -15,6 +15,7 @@ describe("determinism lint", () => {
     expect(lint("SELECT a FROM t LIMIT 10")).toContain("LIMIT without a top-level ORDER BY");
     expect(lint("SELECT a FROM t ORDER BY a LIMIT 10")).toEqual([]);
     expect(lint("SELECT COUNT(1) AS n FROM t")).toEqual([]);
+    expect(lint("SELECT a FROM t QUALIFY ??? LIMIT 10")).toContain("LIMIT without a top-level ORDER BY"); // parser failed
   });
   it("builds the top-N tie probe and detects a tie at the cut", () => {
     expect(tieProbeSql("SELECT a FROM t ORDER BY a LIMIT 10;", 10)).toBe("SELECT a FROM t ORDER BY a LIMIT 11");

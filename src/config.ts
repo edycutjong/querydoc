@@ -25,7 +25,7 @@ export function loadConfig(path = resolve(ROOT, "querydoc.config.json")): Verifi
     speedupMin: p.speedupMin,
     noGainSpeedup: p.noGainSpeedup,
     noiseFloorMs: c.noise?.noiseFloorMs ?? p.noiseFloorMinMs,
-    minPairs: p.timedPairs,
+    minPairs: Math.max(3, p.timedPairs), // never fewer than 3 valid pairs before an ACCEPT (architecture §Verifier order step 4)
     maxPairs: p.maxTimedPairs,
     rowCap: p.rowCap,
     floatSigDigits: p.floatSigDigits,

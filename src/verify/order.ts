@@ -38,8 +38,11 @@ export function orderSpec(sql: string, outputColumns: string[], dialect = "hive"
     const parsed = parser.astify(sql, { database: dialect }) as AstLike | AstLike[];
     ast = Array.isArray(parsed) ? parsed[0]! : parsed;
   } catch {
-    const hasOrder = /\border\s+by\b/i.test(maskSql(sql));
-    return hasOrder ? { kind: "raw", reason: "ORDER BY not parsed", limit: null } : { kind: "multiset", limit: null };
+    const masked = maskSql(sql);
+    const hasOrder = /\border\s+by\b/i.test(masked);
+    const m = /\bLIMIT\s+(\d+)\s*;?\s*$/i.exec(masked);
+    const limit = m ? Number(m[1]) : null;
+    return hasOrder ? { kind: "raw", reason: "ORDER BY not parsed", limit } : { kind: "multiset", limit };
   }
   // In a UNION chain the trailing ORDER BY / LIMIT belong to the whole statement and sit on the last branch.
   let top: AstLike = ast;
