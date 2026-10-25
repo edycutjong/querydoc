@@ -39,6 +39,11 @@ Open source (Apache-2.0), evals with a baseline arm, and written failure modes (
 
 ## 📸 See it in Action
 
+<div align="center">
+  <img src="docs/assets/broll.gif" alt="Query Doctor B-roll from real screen recordings: on a live Zetaris run the Verifier executes the original and the rewrite in alternating timed pairs; the report lands with a 2.32× faster verdict, 37.8 s vs 16.1 s bars, and a ROW-IDENTICAL stamp; then the duplicated-key trap: every rewrite is refused with its first differing row." width="100%">
+  <br/><sub>Real screen recordings: a live Zetaris take (time-lapsed ×43, then real time) and the recorded trap run <code>hero-trap-r1</code>.</sub>
+</div>
+
 ```bash
 docker build -t querydoc . && docker run --rm -p 8000:8000 -e SAMPLE_MODE=true querydoc
 # open http://localhost:8000  (Intake → Report), or:
