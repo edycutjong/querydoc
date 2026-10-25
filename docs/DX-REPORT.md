@@ -87,3 +87,25 @@ unique key), re-expressed on `TPCDS_DB.store_sales` × `TPCDS_DB.promotion`. Run
 Friction: the hero runs for about 36 s, longer than we expected. One live verification (pre-check plus three timed pairs) will
 therefore take about three to three and a half minutes (the six pair runs alone sum to 167 s). The spike used a 300 s timeout
 for the hero, pair and trap executions; the adapter's default is 120 s, so live verification must raise it.
+
+## 2026-10-25 — Day 2: the Verifier on the instance (`scripts/verify_live.ts`, run `2026-10-25T08-13-25Z`)
+
+- **First live verdicts.** Hero, pre-check: two runs of the original, 36.7 s and 25.2 s, same fingerprint, 1 row. Candidate
+  (the hand-written join elimination, `evals/queries/zetaris/01-hero-rewrite.sql`): same row, then three alternating pairs,
+  original **28.8 / 29.3 / 35.3 s** vs candidate **17.5 / 17.1 / 16.0 s** → **ACCEPT**, median speedup **1.72×**, median
+  saving **12.2 s**, 3 of 3 pairs faster. Trap: pre-check passed (20.7 s, 25.8 s), candidate returned **129,752** where the
+  original returns 129,776 → **REJECT (ROW_DIFF)**, not timed. All in `evidence/verify/2026-10-25T08-13-25Z/` (trace.jsonl:
+  16 Verifier events, 4 of them critiques).
+- **Timing cap.** The design's 150 s timing cap assumed a 5–12 s hero. At ~30 s per original run, three pairs need ~140–170 s,
+  so the cap is now max(150 s, 3 pairs × 2 × the pre-check median of the original), which came to 185.8 s here
+  (`querydoc.config.json` policy.timingCapRule). A rewrite as slow as the original still gets its three pairs.
+- **Result-schema check** reads the column names and types from the candidate's own diff-run payload (the JDBC metadata),
+  so no separate `LIMIT 0` probe is needed. That saves an execution, and on this platform planning alone takes seconds.
+- **Float tolerance, measured live.** Per-store `SUM(ss_net_paid)` (DOUBLE) on the hero's rows, computed directly and
+  pre-aggregated by (store, day): all 7 stores differ in the raw bits, and the largest relative difference is 4.9e-15. At 9
+  significant digits the rows compare equal, and the engine-side fingerprint (`format_string('%.8e')` for float columns)
+  matches. Recorded under `floatTolerance` and recomputed by `npm run check:config`. The CI test
+  `test/duckdb-sum.test.ts` shows the same effect on DuckDB.
+- **Run-to-run spread.** In this run the original took 25.2–36.7 s over 5 runs, and `SELECT 1` had a median of 47.4 ms
+  (spread 131.7 ms over runs 2–10). That spread is lower than Day 1's 594.3 ms; the noise floor in the config is still Day 1's
+  1,782.9 ms, the more conservative of the two.
