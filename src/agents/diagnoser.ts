@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { LlmGateway, NIM_MODEL, SampleModeNoLLM } from "../adapters/nim.js";
 import type { Plan } from "../engine/types.js";
+import { schemaFqn } from "../memory/playbook.js";
+import { canonicalSql } from "../sql/text.js";
 import type { Attempt } from "./verifier.js";
 import type { Trace } from "../trace.js";
 import type { Diagnosis, Hypothesis } from "../types.js";
@@ -97,7 +99,7 @@ export class Diagnoser {
     try {
       const r = await this.llm.call(
         "diagnose",
-        { template: "diagnoser@1", model: NIM_MODEL, engine: this.engine, sql: normaliseSql(sql), pattern: d.label, nodes: [...cited], facts: facts.map(keyFactLine) },
+        { template: "diagnoser@1", model: NIM_MODEL, engine: this.engine, schema: schemaFqn(d.tables), sql: normaliseSql(sql), pattern: d.label, nodes: [...cited], facts: facts.map(keyFactLine) },
         { system: engineSystem(DIAGNOSER_SYSTEM, this.engine), user, reasoning: this.reasoning, maxTokens: 6000, temperature: 1.0 },
         (raw) => Reply.parse(raw),
       );
@@ -130,7 +132,7 @@ export class Diagnoser {
 
   // Called by the chain after NOT_FASTER(no_gain), with the ledger already updated (current → falsified). Throws SampleModeNoLLM
   // when there is no key and no cache entry; an answer that cites an unknown id or plan node is returned as a withdrawal.
-  async revise(a: { sql: string; plan: Plan | null; diagnosis: Diagnosis; attempt: Attempt; carryoverKey: string; attemptNo: number }): Promise<ReviseOutcome> {
+  async revise(a: { schema?: string; sql: string; plan: Plan | null; diagnosis: Diagnosis; attempt: Attempt; carryoverKey: string; attemptNo: number }): Promise<ReviseOutcome> {
     const untested = a.diagnosis.hypotheses.filter((h) => h.status === "untested" || h.status === "unproven");
     const nodes = new Set([...a.diagnosis.plan_nodes.map((n) => n.id), ...(a.plan?.nodes.map((n) => String(n.id)) ?? [])]);
     const t = a.attempt.timing_ms;
@@ -145,7 +147,7 @@ export class Diagnoser {
     const t0 = performance.now();
     const r = await this.llm.call(
       "diagnose_revise",
-      { template: "diagnoser.revise@1", model: NIM_MODEL, engine: this.engine, sql: normaliseSql(a.sql), pattern: a.diagnosis.pattern_label, attempt: a.attemptNo, carryover: a.carryoverKey },
+      { template: "diagnoser.revise@1", model: NIM_MODEL, engine: this.engine, schema: a.schema ?? "", sql: normaliseSql(a.sql), pattern: a.diagnosis.pattern_label, attempt: a.attemptNo, carryover: a.carryoverKey },
       { system: engineSystem(REVISE_SYSTEM, this.engine), user, reasoning: this.reasoning, maxTokens: 4000, temperature: 1.0 },
       (raw) => ReviseReply.parse(raw),
     );
@@ -167,4 +169,4 @@ export class Diagnoser {
   }
 }
 
-export const normaliseSql = (sql: string): string => sql.replace(/--[^\n]*/g, " ").replace(/\s+/g, " ").trim().replace(/\s*;$/, "").toLowerCase();
+export const normaliseSql = canonicalSql;

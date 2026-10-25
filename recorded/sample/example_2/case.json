@@ -4,42 +4,56 @@
   "source": "paste",
   "engine": "duckdb",
   "llm": "nim",
-  "started_at": "2026-10-25T11:08:51.667Z",
+  "started_at": "2026-10-25T12:11:01.959Z",
   "attempts": [
     {
       "n": 1,
-      "origin": "candidate_sql",
-      "hypothesis_id": null,
-      "sql": "SELECT z.LocationID, z.Borough, z.Zone, COUNT(t.PULocationID) AS cash_trips\nFROM ops.zones z\nLEFT JOIN lake.trips t ON t.PULocationID = z.LocationID\nWHERE t.payment_type = 2\nGROUP BY z.LocationID, z.Borough, z.Zone\nORDER BY z.LocationID",
-      "change_summary": "candidate supplied with the request",
+      "origin": "rewriter",
+      "hypothesis_id": "h1",
+      "sql": "SELECT z.LocationID, z.Borough, z.Zone, COALESCE(agg.cnt, 0) AS cash_trips\nFROM ops.zones z\nLEFT JOIN (\n    SELECT PULocationID, COUNT(*) AS cnt\n    FROM lake.trips\n    WHERE payment_type = 2\n    GROUP BY PULocationID\n) agg ON agg.PULocationID = z.LocationID\nORDER BY z.LocationID",
+      "change_summary": "Pre-aggregate trips by PULocationID after filtering payment_type=2, then join the tiny aggregated result to zones, avoiding a large hash join and group-by on the full trip set.",
       "verdict": "REJECT",
       "rows": {
         "orig": 265,
-        "rewrite": 200
+        "rewrite": 265
       },
       "fingerprint": {
         "orig": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df",
-        "rewrite": "59297ed6fe12c20d30aab7db46f02a5f102495c4f18ef8d877893bc079910690"
+        "rewrite": "43cbbebc33d85c2bf91a80a705bc0e5458028a14cdde773f12fee1235eeea5df"
       },
       "fingerprint_kind": "rows",
-      "reason": "ROW_DIFF",
-      "first_diff": {
-        "side": "orig",
-        "row": [
-          "2",
-          "Queens",
-          "Jamaica Bay",
-          "0"
-        ]
+      "timing_ms": {
+        "orig": [
+          5.1,
+          3.9,
+          3.8
+        ],
+        "rewrite": [
+          1.8,
+          1.6,
+          1.8
+        ],
+        "median_speedup": 2.44,
+        "median_saving_ms": 2.3,
+        "faster_pairs": 3,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "floor"
+        ],
+        "cap_ms": 150000
       },
-      "detail": "rows differ (265 vs 200 rows); first differing row [\"2\",\"Queens\",\"Jamaica Bay\",\"0\"] returned by the original, missing from the candidate"
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "under_gate",
+      "detail": "median 2.44×, saving 2.3 ms, 3/3 pairs faster — missed: floor"
     },
     {
       "n": 2,
       "origin": "rewriter",
-      "hypothesis_id": "h1",
-      "sql": "SELECT z.LocationID, z.Borough, z.Zone, COALESCE(t.cnt, 0) AS cash_trips FROM ops.zones z LEFT JOIN (SELECT PULocationID, COUNT(*) AS cnt FROM lake.trips WHERE payment_type = 2 GROUP BY PULocationID) t ON z.LocationID = t.PULocationID ORDER BY z.LocationID",
-      "change_summary": "Pre-aggregate lake.trips by PULocationID for payment_type=2 to reduce the join probe from 99k rows to distinct locations, then left join the aggregated counts to zones.",
+      "hypothesis_id": "h2",
+      "sql": "SELECT z.LocationID, z.Borough, z.Zone, COUNT(t.PULocationID) AS cash_trips FROM ops.zones z LEFT JOIN lake.trips t ON t.PULocationID = z.LocationID AND t.payment_type = 2 GROUP BY z.LocationID, z.Borough, z.Zone ORDER BY z.LocationID",
+      "change_summary": "No rewrite possible without indexes; query already uses optimal hash join and grouping order for DuckDB columnar engine.",
       "verdict": "REJECT",
       "rows": {
         "orig": 265,
@@ -52,36 +66,37 @@
       "fingerprint_kind": "rows",
       "timing_ms": {
         "orig": [
-          3.9,
-          4.9,
-          3.9
+          5.1,
+          3.8,
+          3.7
         ],
         "rewrite": [
-          1.9,
-          1.7,
-          1.7
+          4.7,
+          4,
+          3.2
         ],
-        "median_speedup": 2.29,
-        "median_saving_ms": 2.2,
-        "faster_pairs": 3,
+        "median_speedup": 1.09,
+        "median_saving_ms": 0.4,
+        "faster_pairs": 2,
         "excluded_pairs": 0,
         "timed_as": "plain",
         "noise_floor_ms": 50,
         "gates_missed": [
+          "ratio",
           "floor"
         ],
         "cap_ms": 150000
       },
       "reason": "NOT_FASTER",
-      "not_faster_detail": "under_gate",
-      "detail": "median 2.29×, saving 2.2 ms, 3/3 pairs faster — missed: floor"
+      "not_faster_detail": "no_gain",
+      "detail": "median 1.09×, saving 0.4 ms, 2/3 pairs faster — missed: ratio, floor"
     },
     {
       "n": 3,
       "origin": "rewriter",
-      "hypothesis_id": "h1",
-      "sql": "SELECT z.LocationID, z.Borough, z.Zone, COALESCE(t.cnt, 0) AS cash_trips FROM ops.zones z LEFT JOIN (SELECT CAST(PULocationID AS BIGINT) AS PULocationID, COUNT(*) AS cnt FROM lake.trips WHERE payment_type = 2 GROUP BY PULocationID) t ON z.LocationID = t.PULocationID ORDER BY z.LocationID",
-      "change_summary": "Push filter before join and pre-aggregate trips by PULocationID with explicit cast to match join semantics",
+      "hypothesis_id": "h3",
+      "sql": "SELECT z.LocationID, z.Borough, z.Zone, COUNT(t.PULocationID) AS cash_trips FROM ops.zones z LEFT JOIN lake.trips t ON t.PULocationID::BIGINT = z.LocationID AND t.payment_type = 2 GROUP BY z.LocationID, z.Borough, z.Zone ORDER BY z.LocationID",
+      "change_summary": "Explicitly cast PULocationID to BIGINT in the join condition to match LocationID's type, eliminating the implicit per-row cast on the probe side.",
       "verdict": "REJECT",
       "rows": {
         "orig": 265,
@@ -94,34 +109,35 @@
       "fingerprint_kind": "rows",
       "timing_ms": {
         "orig": [
-          5.5,
           5.1,
-          4.2
+          3.6,
+          3.5
         ],
         "rewrite": [
-          2.4,
-          2.3,
-          1.6
+          4.4,
+          3.9,
+          3
         ],
-        "median_speedup": 2.29,
-        "median_saving_ms": 2.8,
-        "faster_pairs": 3,
+        "median_speedup": 1.16,
+        "median_saving_ms": 0.5,
+        "faster_pairs": 2,
         "excluded_pairs": 0,
         "timed_as": "plain",
         "noise_floor_ms": 50,
         "gates_missed": [
+          "ratio",
           "floor"
         ],
         "cap_ms": 150000
       },
       "reason": "NOT_FASTER",
-      "not_faster_detail": "under_gate",
-      "detail": "median 2.29×, saving 2.8 ms, 3/3 pairs faster — missed: floor"
+      "not_faster_detail": "no_gain",
+      "detail": "median 1.16×, saving 0.5 ms, 2/3 pairs faster — missed: ratio, floor"
     }
   ],
   "verdict": "NO_SAFE_REWRITE",
   "playbook_hits": [
-    "mem-1"
+    "mem-2"
   ],
   "precheck": {
     "deterministic": true,
@@ -149,7 +165,7 @@
     ]
   },
   "diagnosis": {
-    "bottleneck": "The query scans ~99k trips rows (filtered by payment_type=2), performs a hash join with a CAST on the join key, then aggregates all 99k rows down to 265 zones. The join probe and subsequent hash group-by on the full trips result dominate runtime.",
+    "bottleneck": "The query spends most of its time scanning the trips table (495k rows) to filter payment_type=2, then hash-joining the 99k matching rows to the tiny zones table (265 rows) and grouping. The sequential scan on trips is the largest data movement.",
     "pattern_label": "outer_join_predicate",
     "plan_nodes": [
       {
@@ -165,18 +181,35 @@
         "plan_node_id": "8",
         "claim": "A filter on the joined side sits in the ON clause of a LEFT JOIN; the join dominates the cost. (matched: left join lake.trips t on … and t.payment_type = 2)",
         "status": "unproven"
+      },
+      {
+        "id": "h2",
+        "source": "llm",
+        "plan_node_id": "8",
+        "claim": "The sequential scan on trips reads all rows to evaluate payment_type=2; creating an index on payment_type (if DuckDB supported secondary indexes) or partitioning the table by payment_type would avoid the full scan.",
+        "status": "falsified"
+      },
+      {
+        "id": "h3",
+        "source": "llm",
+        "plan_node_id": "7",
+        "claim": "The join condition CAST(PULocationID AS BIGINT) = LocationID forces a per-row cast on the 99k probe rows; aligning the data types of PULocationID and LocationID would eliminate this CPU overhead.",
+        "status": "falsified"
+      },
+      {
+        "id": "h4",
+        "source": "llm",
+        "plan_node_id": "4",
+        "claim": "The hash group by processes 99k rows with string columns (Borough, Zone) in the grouping key; replacing those with integer surrogates (e.g., zone_id) would reduce hash/comparison cost.",
+        "status": "untested"
       }
     ],
-    "raw_refs": [
-      "dropped hypothesis citing unknown plan node HASH_JOIN",
-      "dropped hypothesis citing unknown plan node HASH_JOIN",
-      "dropped hypothesis citing unknown plan node SEQ_SCAN (trips)"
-    ],
+    "raw_refs": [],
     "narrative": "llm"
   },
   "schema_fqn": "lake+ops",
-  "finished_at": "2026-10-25T11:09:21.038Z",
+  "finished_at": "2026-10-25T12:12:40.856Z",
   "no_rewrite_reason": "attempts_exhausted",
-  "detail": "#2 REJECT NOT_FASTER, #3 REJECT NOT_FASTER",
+  "detail": "#1 REJECT NOT_FASTER, #2 REJECT NOT_FASTER, #3 REJECT NOT_FASTER",
   "playbook_state": "empty"
 }

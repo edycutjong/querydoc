@@ -1,0 +1,18 @@
+{
+  "task": "diagnose_revise",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b",
+  "key_fields": {
+    "template": "diagnoser.revise@1",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "engine": "duckdb",
+    "schema": "lake+ops",
+    "sql": "select z.locationid, z.borough, z.zone, count(t.pulocationid) as cash_trips from ops.zones z left join lake.trips t on t.pulocationid = z.locationid and t.payment_type = 2 group by z.locationid, z.borough, z.zone order by z.locationid",
+    "pattern": "outer_join_predicate",
+    "attempt": 2,
+    "carryover": "{\"ledger\":[[\"h1\",\"unproven\"],[\"h2\",\"falsified\"],[\"h3\",\"untested\"],[\"h4\",\"untested\"]],\"rejected\":[[1,\"rewriter\",\"h1\",\"NOT_FASTER\",\"under_gate\",\"f58b28adc2d83fbaa28dc3ff163c3d0a13fb22c2db3a92a7e3b286e663aa96c8\",null],[2,\"rewriter\",\"h2\",\"NOT_FASTER\",\"no_gain\",\"68979fd8b56e7f63ceb6ae1928ffe6dfaded84f7dcaae38f620b5ef9ff32d3ce\",null]]}"
+  },
+  "value": {
+    "action": "next",
+    "hypothesis_id": "h3"
+  }
+}

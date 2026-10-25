@@ -1,0 +1,154 @@
+{
+  "run_id": "live-hero-trap-r1",
+  "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.store_sales ss\nLEFT JOIN TPCDS_DB.promotion p ON ss.ss_item_sk = p.p_item_sk\nWHERE  ss.ss_customer_sk IS NULL",
+  "source": "paste",
+  "engine": "zetaris",
+  "llm": "nim",
+  "started_at": "2026-10-25T12:56:21.793Z",
+  "attempts": [
+    {
+      "n": 1,
+      "origin": "rewriter",
+      "hypothesis_id": "h1",
+      "sql": "SELECT COUNT(1) AS n FROM TPCDS_DB.store_sales ss WHERE ss.ss_customer_sk IS NULL",
+      "change_summary": "Removed unnecessary LEFT JOIN to promotion table since no promotion columns are referenced and the join cannot affect the row count of a LEFT JOIN with COUNT(1).",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 1,
+        "rewrite": 1
+      },
+      "fingerprint": {
+        "orig": "e51f9da70057feb68bb05a3c0d55f54623ecb3eba9fd892e2a394818cc29b4fe",
+        "rewrite": "87cd00c56c06b340c26eb368c7775e833b337c8746e7882df6611ac1ec59b8e4"
+      },
+      "fingerprint_kind": "rows",
+      "reason": "ROW_DIFF",
+      "first_diff": {
+        "side": "rewrite",
+        "row": [
+          "129752"
+        ]
+      },
+      "detail": "rows differ (1 vs 1 rows); first differing row [\"129752\"] returned by the candidate, not by the original"
+    },
+    {
+      "n": 2,
+      "origin": "rewriter",
+      "hypothesis_id": "h1",
+      "sql": "SELECT COUNT(1) AS n FROM TPCDS_DB.store_sales ss LEFT SEMI JOIN TPCDS_DB.promotion p ON ss.ss_item_sk = p.p_item_sk WHERE ss.ss_customer_sk IS NULL",
+      "change_summary": "Replace LEFT OUTER JOIN with LEFT SEMI JOIN to preserve row-count semantics while avoiding broadcast hash join overhead by eliminating duplicate matches from non-unique p_item_sk.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 1,
+        "rewrite": 1
+      },
+      "fingerprint": {
+        "orig": "e51f9da70057feb68bb05a3c0d55f54623ecb3eba9fd892e2a394818cc29b4fe",
+        "rewrite": "f04f20784412a8bc9c704b5d8a3b089bc1326bddda1e3d32753a6357526abb99"
+      },
+      "fingerprint_kind": "rows",
+      "reason": "ROW_DIFF",
+      "first_diff": {
+        "side": "rewrite",
+        "row": [
+          "2853"
+        ]
+      },
+      "detail": "rows differ (1 vs 1 rows); first differing row [\"2853\"] returned by the candidate, not by the original"
+    },
+    {
+      "n": 3,
+      "origin": "rewriter",
+      "hypothesis_id": "h2",
+      "sql": "SELECT COUNT(1) AS n FROM TPCDS_DB.store_sales ss WHERE ss.ss_customer_sk IS NULL",
+      "change_summary": "Removed the redundant LEFT JOIN to promotion table since no promotion columns are used and the join cannot affect COUNT(1) result",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 1,
+        "rewrite": 1
+      },
+      "fingerprint": {
+        "orig": "e51f9da70057feb68bb05a3c0d55f54623ecb3eba9fd892e2a394818cc29b4fe",
+        "rewrite": null
+      },
+      "reason": "ROW_DIFF",
+      "reused_from": "mem-11",
+      "first_diff": {
+        "side": "rewrite",
+        "row": [
+          "129752"
+        ]
+      },
+      "detail": "refusal reused from ledger mem-11 — same original-result fingerprint; the candidate was not executed (unused_outer_join: rewrite changed the rows (ROW_DIFF). Removed unnecessary LEFT JOIN to promotion table since no promotion columns are referenced and the join cannot affect the row count of a LEFT JO)"
+    }
+  ],
+  "verdict": "NO_SAFE_REWRITE",
+  "playbook_hits": [
+    "mem-3",
+    "mem-2",
+    "mem-1",
+    "mem-11",
+    "mem-12"
+  ],
+  "precheck": {
+    "deterministic": true,
+    "rows": 1,
+    "fingerprint": "e51f9da70057feb68bb05a3c0d55f54623ecb3eba9fd892e2a394818cc29b4fe",
+    "fingerprint_kind": "rows",
+    "vacuous": false,
+    "columns": [
+      {
+        "name": "n",
+        "type": "bigint"
+      }
+    ]
+  },
+  "diagnosis": {
+    "bottleneck": "The query performs a completely unnecessary LEFT JOIN to the promotion table - the join preserves all store_sales rows (since it's LEFT) and no promotion columns are referenced in SELECT or WHERE, so the join cannot change the COUNT(1) result. Time is spent scanning promotion (300 rows), broadcasting it, and executing the join.",
+    "pattern_label": "unused_outer_join",
+    "plan_nodes": [
+      {
+        "id": "7",
+        "op": "BroadcastHashJoin",
+        "note": "LeftOuter BuildRight; Left keys [1]: [ss_item_sk#47975]; Right keys [1]: [p_item_sk#48000]; Join type: LeftOuter; Join c"
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "h1",
+        "source": "detector",
+        "plan_node_id": "7",
+        "claim": "A LEFT JOIN whose columns are never read still costs a join; if the joined key is unique it cannot change the rows and can be removed. (matched: left join tpcds_db.promotion p on ss.ss_item_sk = p.p_item_sk)",
+        "status": "unproven"
+      },
+      {
+        "id": "h2",
+        "source": "llm",
+        "plan_node_id": "7",
+        "claim": "The BroadcastHashJoin LeftOuter is semantically redundant: removing it (and the promotion scan/broadcast) would produce identical results while eliminating the join, broadcast, and promotion I/O entirely.",
+        "status": "unproven"
+      },
+      {
+        "id": "h3",
+        "source": "llm",
+        "plan_node_id": "4",
+        "claim": "Scanning the promotion table (node 4) with pushed IsNotNull filter is wasted I/O because the join result is never used; the scan could be removed if the optimizer recognized the unused outer join.",
+        "status": "untested"
+      },
+      {
+        "id": "h4",
+        "source": "llm",
+        "plan_node_id": "6",
+        "claim": "The BroadcastExchange (node 6) serializes and broadcasts the promotion relation to all executors, consuming network and memory for a relation that does not affect the final count.",
+        "status": "untested"
+      }
+    ],
+    "raw_refs": [],
+    "narrative": "llm"
+  },
+  "schema_fqn": "tpcds_db",
+  "finished_at": "2026-10-25T12:58:44.857Z",
+  "no_rewrite_reason": "attempts_exhausted",
+  "detail": "#1 REJECT ROW_DIFF, #2 REJECT ROW_DIFF, #3 REJECT ROW_DIFF",
+  "playbook_state": "empty"
+}

@@ -1,0 +1,18 @@
+{
+  "task": "diagnose_revise",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b",
+  "key_fields": {
+    "template": "diagnoser.revise@1",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "engine": "duckdb",
+    "schema": "lake",
+    "sql": "select payment_type, count(*) as trips from lake.trips group by payment_type order by payment_type",
+    "pattern": "other",
+    "attempt": 2,
+    "carryover": "{\"ledger\":[[\"h1\",\"falsified\"],[\"h2\",\"untested\"],[\"h3\",\"falsified\"]],\"rejected\":[[1,\"rewriter\",\"h1\",\"NOT_FASTER\",\"no_gain\",\"79ca8d26b15276a63281ff15173da97a018532c1eaa6c488c62e8ea83b52d0ed\",null],[2,\"rewriter\",\"h3\",\"NOT_FASTER\",\"no_gain\",\"79ca8d26b15276a63281ff15173da97a018532c1eaa6c488c62e8ea83b52d0ed\",null]]}"
+  },
+  "value": {
+    "action": "next",
+    "hypothesis_id": "h2"
+  }
+}

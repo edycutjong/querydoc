@@ -1,6 +1,6 @@
 # Query Doctor — NOT_VERIFIABLE
 
-run `canon-example_5` · engine duckdb · llm none · 2026-10-25T11:10:09.370Z
+run `canon-example_5` · engine duckdb · llm none · 2026-10-25T12:16:27.803Z
 
 ## Original
 ```sql

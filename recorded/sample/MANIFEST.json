@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-10-25T11:05:07.000Z",
+  "recorded_at": "2026-10-25T12:11:01.800Z",
   "model": "nvidia/nemotron-3-ultra-550b-a55b",
   "prompt_hashes": {
     "rewriter": "75b886bb8fc848d2",
@@ -14,18 +14,10 @@
     "T1": [
       {
         "verdict": "NO_SAFE_REWRITE",
-        "no_rewrite_reason": "attempts_exhausted",
-        "attempts": 3,
-        "first_attempt": "REJECT/NOT_FASTER/under_gate",
-        "route": "REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/under_gate",
-        "llm": "nim"
-      },
-      {
-        "verdict": "NO_SAFE_REWRITE",
-        "no_rewrite_reason": "attempts_exhausted",
-        "attempts": 3,
-        "first_attempt": "REJECT/NOT_FASTER/under_gate",
-        "route": "REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/under_gate",
+        "no_rewrite_reason": "upstream",
+        "attempts": 0,
+        "first_attempt": "none",
+        "route": "none",
         "llm": "nim"
       },
       {
@@ -40,8 +32,16 @@
         "verdict": "NO_SAFE_REWRITE",
         "no_rewrite_reason": "attempts_exhausted",
         "attempts": 3,
-        "first_attempt": "REJECT/NOT_FASTER/no_gain",
-        "route": "REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/under_gate",
+        "first_attempt": "REJECT/NOT_FASTER/under_gate",
+        "route": "REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/no_gain",
+        "llm": "nim"
+      },
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/NOT_FASTER/under_gate",
+        "route": "REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/no_gain",
         "llm": "nim"
       },
       {
@@ -58,8 +58,8 @@
         "verdict": "NO_SAFE_REWRITE",
         "no_rewrite_reason": "attempts_exhausted",
         "attempts": 3,
-        "first_attempt": "REJECT/NOT_FASTER/no_gain",
-        "route": "REJECT/NOT_FASTER/no_gain → REJECT/ROW_DIFF → REJECT/NOT_FASTER/no_gain",
+        "first_attempt": "REJECT/ROW_DIFF",
+        "route": "REJECT/ROW_DIFF → REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/no_gain",
         "llm": "nim"
       },
       {
@@ -67,7 +67,15 @@
         "no_rewrite_reason": "attempts_exhausted",
         "attempts": 3,
         "first_attempt": "REJECT/ROW_DIFF",
-        "route": "REJECT/ROW_DIFF → REJECT/ROW_DIFF → REJECT/NOT_FASTER/no_gain",
+        "route": "REJECT/ROW_DIFF → REJECT/ROW_DIFF → REJECT/ROW_DIFF",
+        "llm": "nim"
+      },
+      {
+        "verdict": "NO_SAFE_REWRITE",
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
+        "first_attempt": "REJECT/NOT_FASTER/no_gain",
+        "route": "REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/no_gain",
         "llm": "nim"
       },
       {
@@ -82,26 +90,18 @@
         "verdict": "NO_SAFE_REWRITE",
         "no_rewrite_reason": "attempts_exhausted",
         "attempts": 3,
-        "first_attempt": "REJECT/NOT_FASTER/no_gain",
-        "route": "REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/no_gain → REJECT/ROW_DIFF",
-        "llm": "nim"
-      },
-      {
-        "verdict": "NO_SAFE_REWRITE",
-        "no_rewrite_reason": "attempts_exhausted",
-        "attempts": 3,
-        "first_attempt": "REJECT/NOT_FASTER/no_gain",
-        "route": "REJECT/NOT_FASTER/no_gain → REJECT/ROW_DIFF → REJECT/NOT_FASTER/no_gain",
+        "first_attempt": "REJECT/ROW_DIFF",
+        "route": "REJECT/ROW_DIFF → REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/no_gain",
         "llm": "nim"
       }
     ],
     "T3": [
       {
         "verdict": "NO_SAFE_REWRITE",
-        "no_rewrite_reason": "upstream",
-        "attempts": 2,
+        "no_rewrite_reason": "attempts_exhausted",
+        "attempts": 3,
         "first_attempt": "REJECT/ROW_DIFF",
-        "route": "REJECT/ROW_DIFF → REJECT/ROW_DIFF",
+        "route": "REJECT/ROW_DIFF → REJECT/ROW_DIFF → REJECT/ROW_DIFF",
         "llm": "nim"
       },
       {
@@ -139,12 +139,12 @@
     ]
   },
   "runs": {
-    "example_1": {
+    "example_2": {
       "verdict": "NO_SAFE_REWRITE",
       "no_rewrite_reason": "attempts_exhausted",
       "attempts": 3,
       "first_attempt": "REJECT/NOT_FASTER/under_gate",
-      "route": "REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/under_gate",
+      "route": "REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/no_gain",
       "llm": "nim"
     },
     "example_4": {
@@ -152,7 +152,7 @@
       "no_rewrite_reason": "attempts_exhausted",
       "attempts": 3,
       "first_attempt": "REJECT/ROW_DIFF",
-      "route": "REJECT/ROW_DIFF → REJECT/ROW_DIFF → REJECT/ROW_DIFF",
+      "route": "REJECT/ROW_DIFF → REJECT/ROW_DIFF → REJECT/ERROR",
       "llm": "nim"
     },
     "example_6": {
@@ -160,15 +160,15 @@
       "no_rewrite_reason": "attempts_exhausted",
       "attempts": 3,
       "first_attempt": "REJECT/NOT_FASTER/no_gain",
-      "route": "REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/no_gain",
+      "route": "REJECT/NOT_FASTER/no_gain → REJECT/NOT_FASTER/no_gain → REJECT/ROW_DIFF",
       "llm": "nim"
     },
-    "example_2": {
+    "example_1": {
       "verdict": "NO_SAFE_REWRITE",
       "no_rewrite_reason": "attempts_exhausted",
       "attempts": 3,
       "first_attempt": "REJECT/ROW_DIFF",
-      "route": "REJECT/ROW_DIFF → REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/under_gate",
+      "route": "REJECT/ROW_DIFF → REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/no_gain",
       "llm": "nim"
     },
     "example_3": {
@@ -176,7 +176,7 @@
       "no_rewrite_reason": "attempts_exhausted",
       "attempts": 3,
       "first_attempt": "REJECT/ROW_DIFF",
-      "route": "REJECT/ROW_DIFF → REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/no_gain",
+      "route": "REJECT/ROW_DIFF → REJECT/NOT_FASTER/under_gate → REJECT/NOT_FASTER/under_gate",
       "llm": "nim"
     },
     "example_5": {

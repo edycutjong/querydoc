@@ -3,13 +3,15 @@ import { join } from "node:path";
 import { HMEM } from "../../vendor/meterless/hmem/src/index.ts";
 import type { MemoryRecord } from "../../vendor/meterless/hmem/src/index.ts";
 import type { Attempt } from "../agents/verifier.js";
+import { canonicalSql } from "../sql/text.js";
 import { sha256Text } from "../verify/canonical.js";
 
 // The playbook: a thin layer over the vendored Meterless H-MEM (store + append-only trust ledger). The Verifier's outcomes are
 // written as measured facts; before every Rewriter call the entries for the same pattern and schema are retrieved and put in its
 // prompt; a refusal recorded on the same original, candidate and original-result fingerprint is reused without executing the
 // candidate. Relevance is the closed enum (exact pattern + schema tags), not the embedding score: T is only a sanity floor.
-// Nothing here produces a verdict — an ACCEPT is never read back, only refusals are reused.
+// Nothing here produces a verdict — only refusals recorded by the Verifier are ever reused as a verdict; a human-approved entry is reinjected
+// into the Rewriter prompt as context, never replayed.
 
 export const RETRIEVAL_FLOOR = 0.15;
 export const SAMPLE_CLOCK_MS = 1_760_000_000_000; // injected in sample mode so ids, scores and the llm-cache key replay identically
@@ -40,7 +42,7 @@ export interface LedgerView {
 }
 
 const SUFFIX = "\n#json ";
-export const canonSql = (sql: string): string => sql.replace(/--[^\n]*/g, " ").replace(/\s+/g, " ").trim().replace(/\s*;$/, "").toLowerCase();
+export const canonSql = canonicalSql;
 export const sqlSha = (sql: string): string => sha256Text(canonSql(sql)).slice(0, 16);
 const tagValue = (m: MemoryRecord, prefix: string): string | undefined => m.tags.find((t) => t.startsWith(prefix))?.slice(prefix.length);
 const stripSuffix = (content: string): string => (content.includes(SUFFIX) ? content.slice(0, content.indexOf(SUFFIX)) : content);

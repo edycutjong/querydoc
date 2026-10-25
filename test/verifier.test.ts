@@ -53,9 +53,18 @@ describe("Verifier — hero and trap shapes", () => {
       "SELECT k FROM a": { columns: K, rows: [[1]], wallMs: 1000 },
       "SELECT k FROM b": { columns: K, rows: [[1]], wallMs: 990 },
     });
-    const a = await v.verify(attempt("SELECT k FROM b"), await v.precheck("SELECT k FROM a"));
+    const a = await v.verify({ ...attempt("SELECT k FROM b"), origin: "rewriter", hypothesis_id: "h1" }, await v.precheck("SELECT k FROM a"));
     expect(a).toMatchObject({ verdict: "REJECT", reason: "NOT_FASTER", not_faster_detail: "no_gain" });
     expect(critiques(trace).at(-1)?.target_agent).toBe("Diagnoser");
+  });
+
+  it("a no-gain supplied candidate goes back to the Rewriter (revise only follows the agents' own attempts)", async () => {
+    const { v, trace } = setup({
+      "SELECT k FROM a": { columns: K, rows: [[1]], wallMs: 1000 },
+      "SELECT k FROM b": { columns: K, rows: [[1]], wallMs: 990 },
+    });
+    await v.verify(attempt("SELECT k FROM b"), await v.precheck("SELECT k FROM a"));
+    expect(critiques(trace).at(-1)?.target_agent).toBe("Rewriter");
   });
 
   it("refuses a write statement without executing it", async () => {

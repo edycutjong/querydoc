@@ -11,32 +11,28 @@
     }
   },
   "response": {
-    "status": "partial",
+    "status": "ok",
     "engine": "duckdb",
     "llm": "cache",
     "verdict": "NO_SAFE_REWRITE",
-    "no_rewrite_reason": "llm_unavailable",
-    "llm_unavailable": true,
-    "error": {
-      "type": "SampleModeNoLLM",
-      "message": "needs NVIDIA_API_KEY for rewrites, or pass candidate_sql"
-    },
+    "no_rewrite_reason": "attempts_exhausted",
+    "llm_unavailable": false,
     "output": {
-      "dossier": "# Query Doctor — NO_SAFE_REWRITE\n\nrun `replay-example_6` · engine duckdb · llm cache · 2026-10-25T11:29:13.573Z\n\n## Original\n```sql\nSELECT payment_type, COUNT(*) AS trips\nFROM lake.trips\nGROUP BY payment_type\nORDER BY payment_type\n```\n\nPre-check: deterministic true, 5 row(s), fingerprint `d8710a873f8bd21d` (rows).\n\n> Sample mode: DuckDB on the committed NYC TLC subset. A different optimiser from Zetaris — speedups here say nothing about Zetaris.\n\n## Diagnosis\n- pattern: `other` (deterministic detector)\n- Diagnoser's reading (model text, unverified): The query scans the entire payment_type column (≈495K rows) via a sequential scan and then performs a perfect hash aggregation. With only ~5 distinct payment_type values, the aggregation itself is cheap, so the dominant cost is reading and decompressing the payment_type column for every row.\n- narrative: llm-cache\n- **h1** [falsified] (detector, plan node 8) No known pattern matched; the plan's most expensive operator is the candidate.\n- **h2** [untested] (model claim, unverified, plan node 8) The SEQ_SCAN reads all 495,833 payment_type values from disk; if the table is partitioned or sorted by payment_type, partition pruning or a zone-map skip could avoid reading entire row groups.\n- **h3** [unproven] (model claim, unverified, plan node 5) The PERFECT_HASH_GROUP_BY processes every row despite extremely low cardinality (5 groups); a pre-aggregated metadata cache or materialized view could answer this query without scanning the fact table.\n- **h4** [untested] (model claim, unverified, plan node 6) The compression/decompression projections (nodes 6/7) add CPU overhead per row; using a dictionary-encoded column with direct aggregation on dictionary codes could eliminate the decompress step.\n\n## Attempts\n### Attempt 1 — REJECT (NOT_FASTER/no_gain)\norigin rewriter · hypothesis h1 · Rewriter's note (model text): Wrapped the column projection in a derived table to potentially enable more efficient columnar scanning and aggregation pushdown\n```sql\nSELECT payment_type, COUNT(*) AS trips FROM (SELECT payment_type FROM lake.trips) t GROUP BY payment_type ORDER BY payment_type\n```\nrows 5 vs 5 · median 0.91×, saving -0.1 ms, 1/3 pairs faster — missed: ratio, floor, majority\ntiming: median 0.91×, saving -0.1 ms, 1/3 pairs faster (noise floor 50 ms)\n\n### Attempt 2 — REJECT (NOT_FASTER/under_gate)\norigin rewriter · hypothesis h3 · Rewriter's note (model text): Original query retained as no pre-aggregated metadata cache or materialized view exists for payment_type counts; hypothesis h3 cannot be implemented without additional database objects.\n```sql\nSELECT payment_type, COUNT(*) AS trips FROM lake.trips GROUP BY payment_type ORDER BY payment_type\n```\nrows 5 vs 5 · median 1.2×, saving 0.2 ms, 3/3 pairs faster — missed: floor\ntiming: median 1.2×, saving 0.2 ms, 3/3 pairs faster (noise floor 50 ms)\n\n## Verdict: NO_SAFE_REWRITE — llm_unavailable\n(attempt summary / upstream message) needs NVIDIA_API_KEY, or pass candidate_sql (llm-cache miss for rewrite)\n",
+      "dossier": "# Query Doctor — NO_SAFE_REWRITE\n\nrun `replay-example_6` · engine duckdb · llm cache · 2026-10-25T12:41:48.695Z\n\n## Original\n```sql\nSELECT payment_type, COUNT(*) AS trips\nFROM lake.trips\nGROUP BY payment_type\nORDER BY payment_type\n```\n\nPre-check: deterministic true, 5 row(s), fingerprint `d8710a873f8bd21d` (rows).\n\n> Sample mode: DuckDB on the committed NYC TLC subset. A different optimiser from Zetaris — speedups here say nothing about Zetaris.\n\n## Diagnosis\n- pattern: `other` (deterministic detector)\n- Diagnoser's reading (model text, unverified): The query performs a full sequential scan of 495,833 rows from the trips table followed by a hash aggregation on payment_type. The scan dominates execution time since every row must be read and processed despite only 5 distinct groups in the result.\n- narrative: llm-cache\n- **h1** [falsified] (detector, plan node 8) No known pattern matched; the plan's most expensive operator is the candidate.\n- **h2** [unproven] (model claim, unverified, plan node 4) The PERFECT_HASH_GROUP_BY builds a hash table for only 5 groups but still processes 495,833 rows individually; a pre-aggregated metadata cache or materialized view would avoid the scan entirely.\n- **h3** [falsified] (model claim, unverified, plan node 6) Multiple PROJECTION nodes compress/decompress payment_type between operators, adding per-row CPU overhead; fusing projections or using a more direct encoding path could reduce per-row cost.\n\n## Attempts\n### Attempt 1 — REJECT (NOT_FASTER/no_gain)\norigin rewriter · hypothesis h1 · Rewriter's note (model text): No rewrite applied - original query is already optimal for full table aggregation with 5 distinct groups; no partitioning, indexing, or filtering opportunities exist without additional schema information.\n```sql\nSELECT payment_type, COUNT(*) AS trips FROM lake.trips GROUP BY payment_type ORDER BY payment_type\n```\nrows 5 vs 5 · median 0.63×, saving -0.6 ms, 0/3 pairs faster — missed: ratio, floor, majority\ntiming: median 0.63×, saving -0.6 ms, 0/3 pairs faster (noise floor 50 ms)\n\n### Attempt 2 — REJECT (NOT_FASTER/no_gain)\norigin rewriter · hypothesis h3 · Rewriter's note (model text): No change — verified no projection fusion optimization possible in DuckDB for this query structure; original SQL is already optimal for the given execution pattern\n```sql\nSELECT payment_type, COUNT(*) AS trips FROM lake.trips GROUP BY payment_type ORDER BY payment_type\n```\nrows 5 vs 5 · median 1×, saving 0 ms, 1/3 pairs faster — missed: ratio, floor, majority\ntiming: median 1×, saving 0 ms, 1/3 pairs faster (noise floor 50 ms)\n\n### Attempt 3 — REJECT (ROW_DIFF)\norigin rewriter · hypothesis h2 · Rewriter's note (model text): Added a redundant GROUP BY to force a two-phase aggregation, testing if partial aggregation reduces hash table overhead despite identical logical result.\n```sql\nSELECT payment_type, COUNT(*) AS trips FROM (SELECT payment_type FROM lake.trips GROUP BY payment_type) GROUP BY payment_type ORDER BY payment_type\n```\nrows 5 vs 5 · rows differ (5 vs 5 rows); first differing row [\"0\",\"23773\"] returned by the original, missing from the candidate\nfirst difference (orig only): `[\"0\",\"23773\"]`\n\n## Verdict: NO_SAFE_REWRITE — attempts_exhausted\n(attempt summary / upstream message) #1 REJECT NOT_FASTER, #2 REJECT NOT_FASTER, #3 REJECT ROW_DIFF\n",
       "case": {
         "run_id": "replay-example_6",
         "sql": "SELECT payment_type, COUNT(*) AS trips\nFROM lake.trips\nGROUP BY payment_type\nORDER BY payment_type",
         "source": "paste",
         "engine": "duckdb",
         "llm": "cache",
-        "started_at": "2026-10-25T11:29:13.573Z",
+        "started_at": "2026-10-25T12:41:48.695Z",
         "attempts": [
           {
             "n": 1,
             "origin": "rewriter",
             "hypothesis_id": "h1",
-            "sql": "SELECT payment_type, COUNT(*) AS trips FROM (SELECT payment_type FROM lake.trips) t GROUP BY payment_type ORDER BY payment_type",
-            "change_summary": "Wrapped the column projection in a derived table to potentially enable more efficient columnar scanning and aggregation pushdown",
+            "sql": "SELECT payment_type, COUNT(*) AS trips FROM lake.trips GROUP BY payment_type ORDER BY payment_type",
+            "change_summary": "No rewrite applied - original query is already optimal for full table aggregation with 5 distinct groups; no partitioning, indexing, or filtering opportunities exist without additional schema information.",
             "verdict": "REJECT",
             "rows": {
               "orig": 5,
@@ -51,15 +47,59 @@
               "orig": [
                 0.9,
                 1,
-                1
+                1.3
+              ],
+              "rewrite": [
+                2.4,
+                1.6,
+                1.6
+              ],
+              "median_speedup": 0.63,
+              "median_saving_ms": -0.6,
+              "faster_pairs": 0,
+              "excluded_pairs": 0,
+              "timed_as": "plain",
+              "noise_floor_ms": 50,
+              "gates_missed": [
+                "ratio",
+                "floor",
+                "majority"
+              ],
+              "cap_ms": 150000
+            },
+            "reason": "NOT_FASTER",
+            "not_faster_detail": "no_gain",
+            "detail": "median 0.63×, saving -0.6 ms, 0/3 pairs faster — missed: ratio, floor, majority"
+          },
+          {
+            "n": 2,
+            "origin": "rewriter",
+            "hypothesis_id": "h3",
+            "sql": "SELECT payment_type, COUNT(*) AS trips FROM lake.trips GROUP BY payment_type ORDER BY payment_type",
+            "change_summary": "No change — verified no projection fusion optimization possible in DuckDB for this query structure; original SQL is already optimal for the given execution pattern",
+            "verdict": "REJECT",
+            "rows": {
+              "orig": 5,
+              "rewrite": 5
+            },
+            "fingerprint": {
+              "orig": "d8710a873f8bd21d1e939a7f0705f3b559c909ca7e7dfeb188b48fda3dcde231",
+              "rewrite": "d8710a873f8bd21d1e939a7f0705f3b559c909ca7e7dfeb188b48fda3dcde231"
+            },
+            "fingerprint_kind": "rows",
+            "timing_ms": {
+              "orig": [
+                1.1,
+                0.9,
+                0.9
               ],
               "rewrite": [
                 1,
-                1.1,
+                0.9,
                 0.9
               ],
-              "median_speedup": 0.91,
-              "median_saving_ms": -0.1,
+              "median_speedup": 1,
+              "median_saving_ms": 0,
               "faster_pairs": 1,
               "excluded_pairs": 0,
               "timed_as": "plain",
@@ -73,14 +113,14 @@
             },
             "reason": "NOT_FASTER",
             "not_faster_detail": "no_gain",
-            "detail": "median 0.91×, saving -0.1 ms, 1/3 pairs faster — missed: ratio, floor, majority"
+            "detail": "median 1×, saving 0 ms, 1/3 pairs faster — missed: ratio, floor, majority"
           },
           {
-            "n": 2,
+            "n": 3,
             "origin": "rewriter",
-            "hypothesis_id": "h3",
-            "sql": "SELECT payment_type, COUNT(*) AS trips FROM lake.trips GROUP BY payment_type ORDER BY payment_type",
-            "change_summary": "Original query retained as no pre-aggregated metadata cache or materialized view exists for payment_type counts; hypothesis h3 cannot be implemented without additional database objects.",
+            "hypothesis_id": "h2",
+            "sql": "SELECT payment_type, COUNT(*) AS trips FROM (SELECT payment_type FROM lake.trips GROUP BY payment_type) GROUP BY payment_type ORDER BY payment_type",
+            "change_summary": "Added a redundant GROUP BY to force a two-phase aggregation, testing if partial aggregation reduces hash table overhead despite identical logical result.",
             "verdict": "REJECT",
             "rows": {
               "orig": 5,
@@ -88,34 +128,18 @@
             },
             "fingerprint": {
               "orig": "d8710a873f8bd21d1e939a7f0705f3b559c909ca7e7dfeb188b48fda3dcde231",
-              "rewrite": "d8710a873f8bd21d1e939a7f0705f3b559c909ca7e7dfeb188b48fda3dcde231"
+              "rewrite": "73c464ad23fb2b485291d42ef9d0b07be2291605cbeb5a24791fdebe53a86938"
             },
             "fingerprint_kind": "rows",
-            "timing_ms": {
-              "orig": [
-                1,
-                1.2,
-                2
-              ],
-              "rewrite": [
-                0.9,
-                1,
-                1.1
-              ],
-              "median_speedup": 1.2,
-              "median_saving_ms": 0.2,
-              "faster_pairs": 3,
-              "excluded_pairs": 0,
-              "timed_as": "plain",
-              "noise_floor_ms": 50,
-              "gates_missed": [
-                "floor"
-              ],
-              "cap_ms": 150000
+            "reason": "ROW_DIFF",
+            "first_diff": {
+              "side": "orig",
+              "row": [
+                "0",
+                "23773"
+              ]
             },
-            "reason": "NOT_FASTER",
-            "not_faster_detail": "under_gate",
-            "detail": "median 1.2×, saving 0.2 ms, 3/3 pairs faster — missed: floor"
+            "detail": "rows differ (5 vs 5 rows); first differing row [\"0\",\"23773\"] returned by the original, missing from the candidate"
           }
         ],
         "verdict": "NO_SAFE_REWRITE",
@@ -138,7 +162,7 @@
           ]
         },
         "diagnosis": {
-          "bottleneck": "The query scans the entire payment_type column (≈495K rows) via a sequential scan and then performs a perfect hash aggregation. With only ~5 distinct payment_type values, the aggregation itself is cheap, so the dominant cost is reading and decompressing the payment_type column for every row.",
+          "bottleneck": "The query performs a full sequential scan of 495,833 rows from the trips table followed by a hash aggregation on payment_type. The scan dominates execution time since every row must be read and processed despite only 5 distinct groups in the result.",
           "pattern_label": "other",
           "plan_nodes": [
             {
@@ -158,47 +182,42 @@
             {
               "id": "h2",
               "source": "llm",
-              "plan_node_id": "8",
-              "claim": "The SEQ_SCAN reads all 495,833 payment_type values from disk; if the table is partitioned or sorted by payment_type, partition pruning or a zone-map skip could avoid reading entire row groups.",
-              "status": "untested"
+              "plan_node_id": "4",
+              "claim": "The PERFECT_HASH_GROUP_BY builds a hash table for only 5 groups but still processes 495,833 rows individually; a pre-aggregated metadata cache or materialized view would avoid the scan entirely.",
+              "status": "unproven"
             },
             {
               "id": "h3",
               "source": "llm",
-              "plan_node_id": "5",
-              "claim": "The PERFECT_HASH_GROUP_BY processes every row despite extremely low cardinality (5 groups); a pre-aggregated metadata cache or materialized view could answer this query without scanning the fact table.",
-              "status": "unproven"
-            },
-            {
-              "id": "h4",
-              "source": "llm",
               "plan_node_id": "6",
-              "claim": "The compression/decompression projections (nodes 6/7) add CPU overhead per row; using a dictionary-encoded column with direct aggregation on dictionary codes could eliminate the decompress step.",
-              "status": "untested"
+              "claim": "Multiple PROJECTION nodes compress/decompress payment_type between operators, adding per-row CPU overhead; fusing projections or using a more direct encoding path could reduce per-row cost.",
+              "status": "falsified"
             }
           ],
-          "raw_refs": [],
+          "raw_refs": [
+            "dropped hypothesis citing unknown plan node 0"
+          ],
           "narrative": "llm-cache"
         },
         "schema_fqn": "lake",
-        "finished_at": "2026-10-25T11:29:13.606Z",
-        "no_rewrite_reason": "llm_unavailable",
-        "detail": "needs NVIDIA_API_KEY, or pass candidate_sql (llm-cache miss for rewrite)",
+        "finished_at": "2026-10-25T12:41:48.734Z",
+        "no_rewrite_reason": "attempts_exhausted",
+        "detail": "#1 REJECT NOT_FASTER, #2 REJECT NOT_FASTER, #3 REJECT ROW_DIFF",
         "playbook_state": "empty"
       }
     },
     "agents": [
       {
         "name": "Orchestrator",
-        "events": 11
+        "events": 13
       },
       {
         "name": "Verifier",
-        "events": 19
+        "events": 21
       },
       {
         "name": "Diagnoser",
-        "events": 3
+        "events": 4
       },
       {
         "name": "Rewriter",

@@ -1,0 +1,25 @@
+{
+  "task": "rewrite",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b",
+  "key_fields": {
+    "template": "rewriter@1",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "engine": "duckdb",
+    "schema": "lake+ops",
+    "sql": "select z.locationid, z.borough, z.zone, count(t.pulocationid) as cash_trips from ops.zones z left join lake.trips t on t.pulocationid = z.locationid and t.payment_type = 2 group by z.locationid, z.borough, z.zone order by z.locationid",
+    "pattern": "outer_join_predicate",
+    "hypothesis": "h3",
+    "claim": "The join condition CAST(PULocationID AS BIGINT) = LocationID forces a per-row cast on the 99k probe rows; aligning the data types of PULocationID and LocationID would eliminate this CPU overhead.",
+    "attempt": 3,
+    "carryover": "{\"ledger\":[[\"h1\",\"unproven\"],[\"h2\",\"falsified\"],[\"h3\",\"untested\"],[\"h4\",\"untested\"]],\"rejected\":[[1,\"rewriter\",\"h1\",\"NOT_FASTER\",\"under_gate\",\"f58b28adc2d83fbaa28dc3ff163c3d0a13fb22c2db3a92a7e3b286e663aa96c8\",null],[2,\"rewriter\",\"h2\",\"NOT_FASTER\",\"no_gain\",\"68979fd8b56e7f63ceb6ae1928ffe6dfaded84f7dcaae38f620b5ef9ff32d3ce\",null]]}",
+    "playbook": [
+      "mem-2"
+    ]
+  },
+  "value": {
+    "hypothesis_id": "h3",
+    "sql": "SELECT z.LocationID, z.Borough, z.Zone, COUNT(t.PULocationID) AS cash_trips FROM ops.zones z LEFT JOIN lake.trips t ON t.PULocationID::BIGINT = z.LocationID AND t.payment_type = 2 GROUP BY z.LocationID, z.Borough, z.Zone ORDER BY z.LocationID",
+    "change_summary": "Explicitly cast PULocationID to BIGINT in the join condition to match LocationID's type, eliminating the implicit per-row cast on the probe side.",
+    "risk_notes": "If PULocationID contains non-numeric values or values outside BIGINT range, the explicit cast could fail or change semantics; otherwise behavior is identical to the original implicit cast."
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "task": "rewrite",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b",
+  "key_fields": {
+    "template": "rewriter@1",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "engine": "duckdb",
+    "schema": "lake",
+    "sql": "select payment_type, count(*) as trips from lake.trips group by payment_type order by payment_type",
+    "pattern": "other",
+    "hypothesis": "h1",
+    "claim": "No known pattern matched; the plan's most expensive operator is the candidate.",
+    "attempt": 1,
+    "carryover": "{\"ledger\":[[\"h1\",\"untested\"],[\"h2\",\"untested\"],[\"h3\",\"untested\"]],\"rejected\":[]}",
+    "playbook": []
+  },
+  "value": {
+    "hypothesis_id": "h1",
+    "sql": "SELECT payment_type, COUNT(*) AS trips FROM lake.trips GROUP BY payment_type ORDER BY payment_type",
+    "change_summary": "No rewrite applied - original query is already optimal for full table aggregation with 5 distinct groups; no partitioning, indexing, or filtering opportunities exist without additional schema information.",
+    "risk_notes": "None - identical to original query."
+  }
+}

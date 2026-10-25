@@ -16,7 +16,7 @@ let root: string;
 let engine: DuckDbEngine;
 beforeAll(async () => {
   root = mkdtempSync(join(tmpdir(), "qd-http-"));
-  for (const f of ["evals", "querydoc.config.json", "recorded"]) symlinkSync(join(ROOT, f), join(root, f));
+  for (const f of ["evals", "querydoc.config.json", "recorded", "fixtures"]) symlinkSync(join(ROOT, f), join(root, f));
   engine = await DuckDbEngine.open();
   const svc = new QueryDocService({ root, env: { SAMPLE_MODE: "true" }, llm: new LlmGateway({ client: null, cacheDir: join(root, "llm-cache") }), engineFactory: async () => engine });
   server = createApp(svc);
@@ -63,8 +63,8 @@ describe("HTTP API on the Hub self-test path", () => {
     expect(((await (await fetch(`${base}/playbook`)).json()) as any).status).toBe("ok");
     const rec = (await (await fetch(`${base}/traces/recorded`)).json()) as any;
     expect(rec.label).toBe("recorded live run");
-    expect(rec.runs).toContain("hero");
-    const one = (await (await fetch(`${base}/traces/recorded/hero`)).json()) as any;
+    expect(rec.runs).toContain("hero-r1");
+    const one = (await (await fetch(`${base}/traces/recorded/hero-r1`)).json()) as any;
     expect(one.label).toMatch(/^recorded live run · hero/);
     expect(one.trace.length).toBeGreaterThan(5);
     expect((await fetch(`${base}/traces/recorded/..%2f..`)).status).toBe(404);

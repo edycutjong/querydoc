@@ -4,11 +4,11 @@
   "source": "paste",
   "engine": "duckdb",
   "llm": "none",
-  "started_at": "2026-10-25T11:10:09.370Z",
+  "started_at": "2026-10-25T12:16:27.803Z",
   "attempts": [],
   "verdict": "NOT_VERIFIABLE",
   "playbook_hits": [],
-  "finished_at": "2026-10-25T11:10:09.371Z",
+  "finished_at": "2026-10-25T12:16:27.803Z",
   "detail": "LIMIT without a top-level ORDER BY",
   "playbook_state": "empty"
 }

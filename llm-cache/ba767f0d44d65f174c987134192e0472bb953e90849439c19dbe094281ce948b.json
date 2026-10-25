@@ -1,0 +1,23 @@
+{
+  "task": "rewrite",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b",
+  "key_fields": {
+    "template": "rewriter@1",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "engine": "duckdb",
+    "schema": "lake+ops",
+    "sql": "select z.locationid, z.borough, z.zone, count(t.pulocationid) as cash_trips from ops.zones z left join lake.trips t on t.pulocationid = z.locationid and t.payment_type = 2 group by z.locationid, z.borough, z.zone order by z.locationid",
+    "pattern": "outer_join_predicate",
+    "hypothesis": "h1",
+    "claim": "A filter on the joined side sits in the ON clause of a LEFT JOIN; the join dominates the cost. (matched: left join lake.trips t on … and t.payment_type = 2)",
+    "attempt": 1,
+    "carryover": "{\"ledger\":[[\"h1\",\"untested\"],[\"h2\",\"untested\"],[\"h3\",\"untested\"],[\"h4\",\"untested\"]],\"rejected\":[]}",
+    "playbook": []
+  },
+  "value": {
+    "hypothesis_id": "h1",
+    "sql": "SELECT z.LocationID, z.Borough, z.Zone, COALESCE(agg.cnt, 0) AS cash_trips\nFROM ops.zones z\nLEFT JOIN (\n    SELECT PULocationID, COUNT(*) AS cnt\n    FROM lake.trips\n    WHERE payment_type = 2\n    GROUP BY PULocationID\n) agg ON agg.PULocationID = z.LocationID\nORDER BY z.LocationID;",
+    "change_summary": "Pre-aggregate trips by PULocationID after filtering payment_type=2, then join the tiny aggregated result to zones, avoiding a large hash join and group-by on the full trip set.",
+    "risk_notes": "None; the rewrite preserves all zones rows and produces identical counts because the subquery groups by the exact join key before the left join."
+  }
+}

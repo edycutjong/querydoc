@@ -1,0 +1,23 @@
+{
+  "task": "rewrite",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b",
+  "key_fields": {
+    "template": "rewriter@1",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "engine": "duckdb",
+    "schema": "lake+ops",
+    "sql": "select z.borough, count(*) as touches from lake.trips t join ops.zones z on z.locationid = t.pulocationid or z.locationid = t.dolocationid group by z.borough order by z.borough",
+    "pattern": "or_join_condition",
+    "hypothesis": "h1",
+    "claim": "An OR inside the JOIN condition cannot use a hash join; the engine falls back to a nested-loop style join, which is far more expensive than two equi-joins. (matched: inner join ops.zones z on z.locationid = t.pulocationid or z.locationid = t.dolocationid)",
+    "attempt": 1,
+    "carryover": "{\"ledger\":[[\"h1\",\"untested\"],[\"h2\",\"untested\"],[\"h3\",\"untested\"],[\"h4\",\"untested\"]],\"rejected\":[]}",
+    "playbook": []
+  },
+  "value": {
+    "hypothesis_id": "h1",
+    "sql": "SELECT z.Borough, SUM(cnt) AS touches FROM (SELECT Borough, COUNT(*) AS cnt FROM ops.zones z JOIN lake.trips t ON z.LocationID = t.PULocationID GROUP BY z.Borough UNION ALL SELECT Borough, COUNT(*) AS cnt FROM ops.zones z JOIN lake.trips t ON z.LocationID = t.DOLocationID GROUP BY z.Borough) z GROUP BY z.Borough ORDER BY z.Borough",
+    "change_summary": "Split the OR join into two separate equi-joins on PULocationID and DOLocationID, aggregated each side, then combined with UNION ALL and a final aggregation to preserve exact counts per borough.",
+    "risk_notes": ""
+  }
+}

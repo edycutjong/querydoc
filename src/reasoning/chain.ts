@@ -33,6 +33,7 @@ export interface ChainArgs {
   maxAttempts: number;
   prior?: Attempt[]; // attempts made before the chain started (a rejected candidate_sql): numbering continues, the rejection is in the carryover
   engine?: string;
+  schema?: string;
   // Playbook hooks (all optional): hits retrieved before each Rewriter call, a ledger-reuse lookup for each attempt, and a callback
   // for every finished attempt so the orchestrator can write the Verifier's outcome to the playbook.
   retrieve?: () => PlaybookHit[];
@@ -119,7 +120,7 @@ export async function runChain(a: ChainArgs): Promise<ChainResult> {
   const mk = new Markovian({ chunkConfig: { ...CHUNK_CONFIG, maxChunks: Math.max(1, a.maxAttempts - prior.length) } });
   const carryovers: string[] = [];
   const run = await mk.run({
-    goal: "Find a faster rewrite that the Verifier proves returns the same rows",
+    goal: "Find a faster rewrite that the Verifier verifies, by execution, returns the same rows",
     reflect: false,
     stopWhen: () => finished,
     stepFn: async ({ carryover }) => {
@@ -137,7 +138,7 @@ export async function runChain(a: ChainArgs): Promise<ChainResult> {
       const hits = a.retrieve?.() ?? [];
       for (const h of hits) if (!seenHits.includes(h.id)) seenHits.push(h.id);
       try {
-        rw = await a.rewriter.rewrite({ sql: a.sql, plan: a.plan, diagnosis: a.diagnosis, hypothesis: current, facts: a.facts, carryover, carryoverKey: carryoverKey(ledger, rejected), attemptNo: n, playbook: hits, engine: a.engine });
+        rw = await a.rewriter.rewrite({ sql: a.sql, plan: a.plan, diagnosis: a.diagnosis, hypothesis: current, facts: a.facts, carryover, carryoverKey: carryoverKey(ledger, rejected), attemptNo: n, playbook: hits, engine: a.engine, ...(a.schema ? { schema: a.schema } : {}) });
       } catch (e) {
         llmError = { unavailable: e instanceof SampleModeNoLLM, message: (e as Error).message.slice(0, 300) };
         a.trace.emit({
@@ -171,7 +172,7 @@ export async function runChain(a: ChainArgs): Promise<ChainResult> {
       // NOT_FASTER(no_gain), attempts left: the ledger is updated (falsified), then the Diagnoser revises — pick, new hypothesis or withdraw.
       if (a.diagnoser && att.reason === "NOT_FASTER" && att.not_faster_detail === "no_gain" && n < a.maxAttempts) {
         try {
-          const rv = await a.diagnoser.revise({ sql: a.sql, plan: a.plan, diagnosis: a.diagnosis, attempt: att, carryoverKey: carryoverKey(ledger, rejected), attemptNo: n });
+          const rv = await a.diagnoser.revise({ sql: a.sql, plan: a.plan, diagnosis: a.diagnosis, attempt: att, ...(a.schema ? { schema: a.schema } : {}), carryoverKey: carryoverKey(ledger, rejected), attemptNo: n });
           if (rv.action === "next") preferred = rv.hypothesis_id;
           else if (rv.action === "new") {
             const id = `h${ledger.length + 1}`;

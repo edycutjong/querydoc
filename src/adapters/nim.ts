@@ -148,6 +148,19 @@ function sortKeys(v: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1)));
 }
 
+// Candidate-origin rule (architecture §llm-cache protocol): a Rewriter/revise response whose state key holds a rejected attempt that
+// came from a supplied candidate_sql is never written to the cache, whoever set cacheWrite — the canonical pass records only the
+// agents' own path. carryoverKey() lists each rejected attempt as [n, origin, hypothesis, reason, detail, sql sha, first_diff sha].
+export function hasCandidateOrigin(keyFields: Record<string, unknown>): boolean {
+  if (typeof keyFields.carryover !== "string") return false;
+  try {
+    const k = JSON.parse(keyFields.carryover) as { rejected?: unknown[][] };
+    return !!k.rejected?.some((r) => r[1] === "candidate_sql");
+  } catch {
+    return false;
+  }
+}
+
 export interface LlmOutcome {
   value: unknown; // the parsed JSON object
   source: "nim" | "llm-cache";
@@ -201,7 +214,7 @@ export class LlmGateway {
         if (r.finishReason === "length") throw new Error(`reply truncated at max_tokens (finish_reason length, ${r.completionTokens ?? "?"} tokens, reasoning ${r.reasoning.length} chars)`);
         const raw = extractJson(r.content);
         const out = parse(raw);
-        if (this.o.cacheWrite) {
+        if (this.o.cacheWrite && !hasCandidateOrigin(keyFields)) {
           mkdirSync(this.dir, { recursive: true });
           writeFileSync(file, JSON.stringify({ task, model: client.model, key_fields: keyFields, value: raw }, null, 2) + "\n");
         }

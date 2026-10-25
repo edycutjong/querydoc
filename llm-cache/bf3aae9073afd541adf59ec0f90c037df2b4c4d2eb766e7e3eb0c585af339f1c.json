@@ -1,0 +1,26 @@
+{
+  "task": "rewrite",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b",
+  "key_fields": {
+    "template": "rewriter@1",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "engine": "duckdb",
+    "schema": "lake+ops",
+    "sql": "select z.borough, count(*) as touches from lake.trips t join ops.zones z on z.locationid = t.pulocationid or z.locationid = t.dolocationid group by z.borough order by z.borough",
+    "pattern": "or_join_condition",
+    "hypothesis": "h2",
+    "claim": "The BLOCKWISE_NL_JOIN is chosen because the OR predicate prevents hash join optimization; rewriting as a UNION ALL of two separate joins (one on PULocationID, one on DOLocationID) would enable hash joins and avoid the nested loop.",
+    "attempt": 3,
+    "carryover": "{\"ledger\":[[\"h1\",\"unproven\"],[\"h2\",\"untested\"],[\"h3\",\"untested\"],[\"h4\",\"untested\"]],\"rejected\":[[1,\"rewriter\",\"h1\",\"ROW_DIFF\",null,\"af36a5143b3f1384ea3e0d078606ee74597f72ef423229252d131d0d6b71289d\",\"6a403034875528c5316c54420965d1ab08614840a955af0482122f8e18307462\"],[2,\"rewriter\",\"h1\",\"ROW_DIFF\",null,\"b6dacff849ed0ab4d2df4390fda8ccd87dabbaf9f2a19835388bbdec3633d890\",null]]}",
+    "playbook": [
+      "mem-1",
+      "mem-2"
+    ]
+  },
+  "value": {
+    "hypothesis_id": "h2",
+    "sql": "WITH pu AS (SELECT z.Borough, COUNT(*) AS cnt FROM lake.trips t JOIN ops.zones z ON z.LocationID = t.PULocationID GROUP BY z.Borough), do AS (SELECT z.Borough, COUNT(*) AS cnt FROM lake.trips t JOIN ops.zones z ON z.LocationID = t.DOLocationID GROUP BY z.Borough), both AS (SELECT z.Borough, COUNT(*) AS cnt FROM lake.trips t JOIN ops.zones z ON z.LocationID = t.PULocationID AND z.LocationID = t.DOLocationID GROUP BY z.Borough) SELECT coalesce(pu.Borough, do.Borough, both.Borough) AS Borough, (coalesce(pu.cnt, 0) + coalesce(do.cnt, 0) - coalesce(both.cnt, 0)) AS touches FROM pu FULL JOIN do ON pu.Borough = do.Borough FULL JOIN both ON coalesce(pu.Borough, do.Borough) = both.Borough ORDER BY Borough;",
+    "change_summary": "Replaced the OR join with two separate equi-joins (PU and DO) plus an intersection join, aggregated each, then combined via full outer join using inclusion-exclusion to preserve exact per-borough counts.",
+    "risk_notes": "None; inclusion-exclusion with full outer join guarantees row-equivalence because zones.LocationID is unique and every trip row contributes to PU, DO, or both without duplication."
+  }
+}

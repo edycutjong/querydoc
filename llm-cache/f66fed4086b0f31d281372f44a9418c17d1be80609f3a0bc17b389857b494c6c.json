@@ -1,0 +1,25 @@
+{
+  "task": "rewrite",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b",
+  "key_fields": {
+    "template": "rewriter@1",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "engine": "duckdb",
+    "schema": "lake+ops",
+    "sql": "select z.borough, count(*) as touches from lake.trips t join ops.zones z on z.locationid = t.pulocationid or z.locationid = t.dolocationid group by z.borough order by z.borough",
+    "pattern": "or_join_condition",
+    "hypothesis": "h1",
+    "claim": "An OR inside the JOIN condition cannot use a hash join; the engine falls back to a nested-loop style join, which is far more expensive than two equi-joins. (matched: inner join ops.zones z on z.locationid = t.pulocationid or z.locationid = t.dolocationid)",
+    "attempt": 2,
+    "carryover": "{\"ledger\":[[\"h1\",\"unproven\"],[\"h2\",\"untested\"],[\"h3\",\"untested\"],[\"h4\",\"untested\"]],\"rejected\":[[1,\"rewriter\",\"h1\",\"ROW_DIFF\",null,\"af36a5143b3f1384ea3e0d078606ee74597f72ef423229252d131d0d6b71289d\",\"6a403034875528c5316c54420965d1ab08614840a955af0482122f8e18307462\"]]}",
+    "playbook": [
+      "mem-1"
+    ]
+  },
+  "value": {
+    "hypothesis_id": "h1",
+    "sql": "SELECT borough, SUM(touches) AS touches FROM (SELECT z.Borough AS borough, COUNT(*) AS touches FROM lake.trips t JOIN ops.zones z ON z.LocationID = t.PULocationID GROUP BY z.Borough UNION ALL SELECT z.Borough AS borough, COUNT(*) AS touches FROM lake.trips t JOIN ops.zones z ON z.LocationID = t.DOLocationID GROUP BY z.Borough) sub GROUP BY borough ORDER BY borough",
+    "change_summary": "Split the OR join into two separate equi-joins (PU and DO), each aggregated per borough, then combined with UNION ALL and a final SUM aggregation to preserve exact per-borough counts.",
+    "risk_notes": "Requires ops.zones.LocationID to be unique (it is: 265 distinct non-NULL values). If a trip row has identical PULocationID and DOLocationID, it will be counted twice, matching the original OR-join semantics."
+  }
+}

@@ -19,14 +19,14 @@
     "no_rewrite_reason": "llm_unavailable",
     "llm_unavailable": true,
     "output": {
-      "dossier": "# Query Doctor — NO_SAFE_REWRITE\n\nrun `replay-example_3` · engine duckdb · llm cache · 2026-10-25T11:29:13.365Z\n\n## Original\n```sql\nSELECT z.LocationID, z.Borough, z.Zone, COUNT(t.PULocationID) AS cash_trips\nFROM ops.zones z\nLEFT JOIN lake.trips t ON t.PULocationID = z.LocationID AND t.payment_type = 2\nGROUP BY z.LocationID, z.Borough, z.Zone\nORDER BY z.LocationID\n```\n\nPre-check: deterministic true, 265 row(s), fingerprint `43cbbebc33d85c2b` (rows).\n\n> Sample mode: DuckDB on the committed NYC TLC subset. A different optimiser from Zetaris — speedups here say nothing about Zetaris.\n\n## Diagnosis\n- pattern: `outer_join_predicate` (deterministic detector)\n- Diagnoser's reading (model text, unverified): The hash join (node 8) forces a CAST(PULocationID AS BIGINT) on the probe side for ~99K filtered trips rows, preventing predicate pushdown and adding per-row conversion cost; the join then feeds 99K rows into a hash aggregation that only produces 265 groups.\n- narrative: llm-cache\n- **h1** [untested] (detector, plan node 8) A filter on the joined side sits in the ON clause of a LEFT JOIN; the join dominates the cost. (matched: left join lake.trips t on … and t.payment_type = 2)\n- **h2** [untested] (model claim, unverified, plan node 8) The CAST in the join condition (CAST(PULocationID AS BIGINT) = LocationID) disables join-key partition pruning and forces a type conversion on every probe row; removing the cast or aligning column types would allow a faster hash join.\n- **h3** [untested] (model claim, unverified, plan node 8) The hash join builds on the larger filtered trips input (~99K rows) instead of the tiny zones table (265 rows); forcing a build on zones (e.g., via join order hint or rewriting as aggregated subquery) would shrink the hash table and reduce probe cost.\n- **h4** [untested] (model claim, unverified, plan node 10) The HASH_GROUP_BY processes 99K rows to produce only 265 groups; pre-aggregating trips by PULocationID + payment_type before the join would reduce the join input cardinality by ~400x and eliminate the post-join aggregation.\n\n## Attempts\n### Attempt 1 — REJECT (ROW_DIFF)\norigin candidate_sql · candidate supplied with the request\n```sql\nSELECT z.LocationID, z.Borough, z.Zone, COUNT(t.PULocationID) AS cash_trips\nFROM ops.zones z\nLEFT JOIN lake.trips t ON t.PULocationID = z.LocationID\nWHERE t.payment_type = 2\nGROUP BY z.LocationID, z.Borough, z.Zone\nORDER BY z.LocationID\n```\n**Rows:** differ (first differing row [\"2\",\"Queens\",\"Jamaica Bay\",\"0\"], orig only)\n**Speed:** not measured — refused before timing\n**Memory:** this refusal was reused from the playbook ledger (mem-1); the candidate was not executed.\nrows 265 vs 200 · refusal reused from ledger mem-1 — same original-result fingerprint; the candidate was not executed (outer_join_predicate: rewrite changed the rows (ROW_DIFF). candidate supplied with the request Rows original 265, rewrite 200. First differing row (orig only): [\"2\",\"Queens\",\"Jamaica Bay\",\"0\"].)\nfirst difference (orig only): `[\"2\",\"Queens\",\"Jamaica Bay\",\"0\"]`\n\nPlaybook entries used: `mem-1`\n\n## Verdict: NO_SAFE_REWRITE — llm_unavailable\n(attempt summary / upstream message) needs NVIDIA_API_KEY, or pass candidate_sql (llm-cache miss for rewrite)\n",
+      "dossier": "# Query Doctor — NO_SAFE_REWRITE\n\nrun `replay-example_3` · engine duckdb · llm cache · 2026-10-25T12:41:48.497Z\n\n## Original\n```sql\nSELECT z.LocationID, z.Borough, z.Zone, COUNT(t.PULocationID) AS cash_trips\nFROM ops.zones z\nLEFT JOIN lake.trips t ON t.PULocationID = z.LocationID AND t.payment_type = 2\nGROUP BY z.LocationID, z.Borough, z.Zone\nORDER BY z.LocationID\n```\n\nPre-check: deterministic true, 265 row(s), fingerprint `43cbbebc33d85c2b` (rows).\n\n> Sample mode: DuckDB on the committed NYC TLC subset. A different optimiser from Zetaris — speedups here say nothing about Zetaris.\n\n## Diagnosis\n- pattern: `outer_join_predicate` (deterministic detector)\n- Diagnoser's reading (model text, unverified): The query spends most of its time scanning the trips table (495k rows) to filter payment_type=2, then hash-joining the 99k matching rows to the tiny zones table (265 rows) and grouping. The sequential scan on trips is the largest data movement.\n- narrative: llm-cache\n- **h1** [untested] (detector, plan node 8) A filter on the joined side sits in the ON clause of a LEFT JOIN; the join dominates the cost. (matched: left join lake.trips t on … and t.payment_type = 2)\n- **h2** [untested] (model claim, unverified, plan node 8) The sequential scan on trips reads all rows to evaluate payment_type=2; creating an index on payment_type (if DuckDB supported secondary indexes) or partitioning the table by payment_type would avoid the full scan.\n- **h3** [untested] (model claim, unverified, plan node 7) The join condition CAST(PULocationID AS BIGINT) = LocationID forces a per-row cast on the 99k probe rows; aligning the data types of PULocationID and LocationID would eliminate this CPU overhead.\n- **h4** [untested] (model claim, unverified, plan node 4) The hash group by processes 99k rows with string columns (Borough, Zone) in the grouping key; replacing those with integer surrogates (e.g., zone_id) would reduce hash/comparison cost.\n\n## Attempts\n### Attempt 1 — REJECT (ROW_DIFF)\norigin candidate_sql · candidate supplied with the request\n```sql\nSELECT z.LocationID, z.Borough, z.Zone, COUNT(t.PULocationID) AS cash_trips\nFROM ops.zones z\nLEFT JOIN lake.trips t ON t.PULocationID = z.LocationID\nWHERE t.payment_type = 2\nGROUP BY z.LocationID, z.Borough, z.Zone\nORDER BY z.LocationID\n```\n**Rows:** differ (first differing row [\"2\",\"Queens\",\"Jamaica Bay\",\"0\"], orig only)\n**Speed:** not measured — refused before timing\n**Memory:** this refusal was reused from the playbook ledger (mem-1); the candidate was not executed.\nrows 265 vs 200 · refusal reused from ledger mem-1 — same original-result fingerprint; the candidate was not executed (outer_join_predicate: rewrite changed the rows (ROW_DIFF). candidate supplied with the request Rows original 265, rewrite 200. First differing row (orig only): [\"2\",\"Queens\",\"Jamaica Bay\",\"0\"].)\nfirst difference (orig only): `[\"2\",\"Queens\",\"Jamaica Bay\",\"0\"]`\n\nPlaybook entries used: `mem-1`\n\n## Verdict: NO_SAFE_REWRITE — llm_unavailable\n(attempt summary / upstream message) needs NVIDIA_API_KEY, or pass candidate_sql (llm-cache miss for rewrite)\n",
       "case": {
         "run_id": "replay-example_3",
         "sql": "SELECT z.LocationID, z.Borough, z.Zone, COUNT(t.PULocationID) AS cash_trips\nFROM ops.zones z\nLEFT JOIN lake.trips t ON t.PULocationID = z.LocationID AND t.payment_type = 2\nGROUP BY z.LocationID, z.Borough, z.Zone\nORDER BY z.LocationID",
         "source": "paste",
         "engine": "duckdb",
         "llm": "cache",
-        "started_at": "2026-10-25T11:29:13.365Z",
+        "started_at": "2026-10-25T12:41:48.497Z",
         "attempts": [
           {
             "n": 1,
@@ -87,7 +87,7 @@
           ]
         },
         "diagnosis": {
-          "bottleneck": "The hash join (node 8) forces a CAST(PULocationID AS BIGINT) on the probe side for ~99K filtered trips rows, preventing predicate pushdown and adding per-row conversion cost; the join then feeds 99K rows into a hash aggregation that only produces 265 groups.",
+          "bottleneck": "The query spends most of its time scanning the trips table (495k rows) to filter payment_type=2, then hash-joining the 99k matching rows to the tiny zones table (265 rows) and grouping. The sequential scan on trips is the largest data movement.",
           "pattern_label": "outer_join_predicate",
           "plan_nodes": [
             {
@@ -108,21 +108,21 @@
               "id": "h2",
               "source": "llm",
               "plan_node_id": "8",
-              "claim": "The CAST in the join condition (CAST(PULocationID AS BIGINT) = LocationID) disables join-key partition pruning and forces a type conversion on every probe row; removing the cast or aligning column types would allow a faster hash join.",
+              "claim": "The sequential scan on trips reads all rows to evaluate payment_type=2; creating an index on payment_type (if DuckDB supported secondary indexes) or partitioning the table by payment_type would avoid the full scan.",
               "status": "untested"
             },
             {
               "id": "h3",
               "source": "llm",
-              "plan_node_id": "8",
-              "claim": "The hash join builds on the larger filtered trips input (~99K rows) instead of the tiny zones table (265 rows); forcing a build on zones (e.g., via join order hint or rewriting as aggregated subquery) would shrink the hash table and reduce probe cost.",
+              "plan_node_id": "7",
+              "claim": "The join condition CAST(PULocationID AS BIGINT) = LocationID forces a per-row cast on the 99k probe rows; aligning the data types of PULocationID and LocationID would eliminate this CPU overhead.",
               "status": "untested"
             },
             {
               "id": "h4",
               "source": "llm",
-              "plan_node_id": "10",
-              "claim": "The HASH_GROUP_BY processes 99K rows to produce only 265 groups; pre-aggregating trips by PULocationID + payment_type before the join would reduce the join input cardinality by ~400x and eliminate the post-join aggregation.",
+              "plan_node_id": "4",
+              "claim": "The hash group by processes 99k rows with string columns (Borough, Zone) in the grouping key; replacing those with integer surrogates (e.g., zone_id) would reduce hash/comparison cost.",
               "status": "untested"
             }
           ],
@@ -130,7 +130,7 @@
           "narrative": "llm-cache"
         },
         "schema_fqn": "lake+ops",
-        "finished_at": "2026-10-25T11:29:13.382Z",
+        "finished_at": "2026-10-25T12:41:48.515Z",
         "no_rewrite_reason": "llm_unavailable",
         "detail": "needs NVIDIA_API_KEY, or pass candidate_sql (llm-cache miss for rewrite)",
         "playbook_state": "seed"

@@ -1,0 +1,196 @@
+{
+  "run_id": "live-no-gain-r2",
+  "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.promotion p\nWHERE  p.p_channel_tv = 'N'",
+  "source": "paste",
+  "engine": "zetaris",
+  "llm": "nim",
+  "started_at": "2026-10-25T13:11:30.387Z",
+  "attempts": [
+    {
+      "n": 1,
+      "origin": "rewriter",
+      "hypothesis_id": "h1",
+      "sql": "SELECT COUNT(1) AS n FROM TPCDS_DB.promotion p WHERE p.p_channel_tv = 'N'",
+      "change_summary": "No rewrite applied because no indexed or partitioning optimizations are available for the p_channel_tv column; the original query already uses predicate pushdown effectively.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 1,
+        "rewrite": 1
+      },
+      "fingerprint": {
+        "orig": "9b4161899e1b76a5676aec507bb54f89e2d7dea344e213697f430d42deabf6dd",
+        "rewrite": "9b4161899e1b76a5676aec507bb54f89e2d7dea344e213697f430d42deabf6dd"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          8869.7,
+          6703.3,
+          6632.9
+        ],
+        "rewrite": [
+          9089.3,
+          7817.6,
+          7151.6
+        ],
+        "median_speedup": 0.93,
+        "median_saving_ms": -518.7,
+        "faster_pairs": 0,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 1782.9,
+        "gates_missed": [
+          "ratio",
+          "floor",
+          "majority"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "no_gain",
+      "detail": "median 0.93×, saving -518.7 ms, 0/3 pairs faster — missed: ratio, floor, majority"
+    },
+    {
+      "n": 2,
+      "origin": "rewriter",
+      "hypothesis_id": "h2",
+      "sql": "SELECT COUNT(1) AS n FROM TPCDS_DB.promotion p WHERE p.p_channel_tv = 'N' AND p.p_channel_tv IS NOT NULL",
+      "change_summary": "Added explicit IS NOT NULL predicate to potentially improve partition pruning and predicate pushdown in Parquet scan",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 1,
+        "rewrite": 1
+      },
+      "fingerprint": {
+        "orig": "9b4161899e1b76a5676aec507bb54f89e2d7dea344e213697f430d42deabf6dd",
+        "rewrite": "9b4161899e1b76a5676aec507bb54f89e2d7dea344e213697f430d42deabf6dd"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          8997.6,
+          8558.3,
+          9128.2
+        ],
+        "rewrite": [
+          9077.8,
+          9221.2,
+          9706.1
+        ],
+        "median_speedup": 0.94,
+        "median_saving_ms": -577.9,
+        "faster_pairs": 0,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 1782.9,
+        "gates_missed": [
+          "ratio",
+          "floor",
+          "majority"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "no_gain",
+      "detail": "median 0.94×, saving -577.9 ms, 0/3 pairs faster — missed: ratio, floor, majority"
+    },
+    {
+      "n": 3,
+      "origin": "rewriter",
+      "hypothesis_id": "h4",
+      "sql": "SELECT COUNT(1) AS n FROM (SELECT 1 FROM TPCDS_DB.promotion p WHERE p.p_channel_tv = 'N' AND p.p_channel_tv IS NOT NULL GROUP BY p.p_channel_tv) t",
+      "change_summary": "Added pre-aggregation by the filtered column p_channel_tv to reduce the number of partial count partitions before the final shuffle exchange.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 1,
+        "rewrite": 1
+      },
+      "fingerprint": {
+        "orig": "9b4161899e1b76a5676aec507bb54f89e2d7dea344e213697f430d42deabf6dd",
+        "rewrite": "74322552cacd92245103cb84d22d448f1fb9857c0ddd36825687f321ff152fa3"
+      },
+      "fingerprint_kind": "rows",
+      "reason": "ROW_DIFF",
+      "first_diff": {
+        "side": "rewrite",
+        "row": [
+          "1"
+        ]
+      },
+      "detail": "rows differ (1 vs 1 rows); first differing row [\"1\"] returned by the candidate, not by the original"
+    }
+  ],
+  "verdict": "NO_SAFE_REWRITE",
+  "playbook_hits": [],
+  "precheck": {
+    "deterministic": true,
+    "rows": 1,
+    "fingerprint": "9b4161899e1b76a5676aec507bb54f89e2d7dea344e213697f430d42deabf6dd",
+    "fingerprint_kind": "rows",
+    "vacuous": false,
+    "columns": [
+      {
+        "name": "n",
+        "type": "bigint"
+      }
+    ]
+  },
+  "diagnosis": {
+    "bottleneck": "The query spends most of its time scanning the promotion table and applying the filter p_channel_tv = 'N'. Even though the scan pushes down the filter, the column is not a partition key, so many row groups may be read if statistics are missing or if the predicate selectivity is high (i.e., a large fraction of rows match 'N').",
+    "pattern_label": "other",
+    "plan_nodes": [
+      {
+        "id": "6",
+        "op": "HashAggregate",
+        "note": "Input [1]: [count#49959L]; Keys: []; Functions [1]: [count(1)]; Aggregate Attributes [1]: [count(1)#49956L]; Results [1]"
+      },
+      {
+        "id": "4",
+        "op": "HashAggregate",
+        "note": "Input: []; Keys: []; Functions [1]: [partial_count(1)]; Aggregate Attributes [1]: [count#49958L]; Results [1]: [count#49"
+      },
+      {
+        "id": "1",
+        "op": "Scan",
+        "note": "parquet TPCDS_DB.promotion; Output [1]: [p_channel_tv#49948]; Batched: true; Location: InMemoryFileIndex [s3a://zetaris-"
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "h1",
+        "source": "detector",
+        "plan_node_id": "6",
+        "claim": "No known pattern matched; the plan's most expensive operator is the candidate.",
+        "status": "falsified"
+      },
+      {
+        "id": "h2",
+        "source": "llm",
+        "plan_node_id": "1",
+        "claim": "The Parquet scan reads a large portion of the table because p_channel_tv lacks partitioning or min/max statistics, causing unnecessary I/O; adding partitioning or a bloom filter on p_channel_tv would reduce data read.",
+        "status": "falsified"
+      },
+      {
+        "id": "h3",
+        "source": "llm",
+        "plan_node_id": "4",
+        "claim": "The partial aggregate processes a high volume of rows because the filter selectivity is high (most rows satisfy p_channel_tv='N'), making the aggregation CPU-bound; a more selective predicate or pre-aggregation would reduce the row count.",
+        "status": "untested"
+      },
+      {
+        "id": "h4",
+        "source": "llm",
+        "plan_node_id": "6",
+        "claim": "The final aggregate and preceding exchange are trivially small (single long per partition), but if the number of partitions is very large the shuffle coordination could add overhead; reducing the number of partitions before the exchange would cut that cost.",
+        "status": "unproven"
+      }
+    ],
+    "raw_refs": [],
+    "narrative": "llm"
+  },
+  "schema_fqn": "tpcds_db",
+  "finished_at": "2026-10-25T13:16:04.435Z",
+  "no_rewrite_reason": "attempts_exhausted",
+  "detail": "#1 REJECT NOT_FASTER, #2 REJECT NOT_FASTER, #3 REJECT ROW_DIFF",
+  "playbook_state": "empty"
+}

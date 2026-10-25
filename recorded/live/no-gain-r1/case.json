@@ -1,0 +1,188 @@
+{
+  "run_id": "live-no-gain-r1",
+  "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.promotion p\nWHERE  p.p_channel_tv = 'N'",
+  "source": "paste",
+  "engine": "zetaris",
+  "llm": "nim",
+  "started_at": "2026-10-25T13:07:59.294Z",
+  "attempts": [
+    {
+      "n": 1,
+      "origin": "rewriter",
+      "hypothesis_id": "h1",
+      "sql": "SELECT COUNT(*) AS n FROM TPCDS_DB.promotion WHERE p_channel_tv = 'N'",
+      "change_summary": "Replaced COUNT(1) with COUNT(*) for standard SQL syntax while maintaining identical semantics and execution plan.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 1,
+        "rewrite": 1
+      },
+      "fingerprint": {
+        "orig": "9b4161899e1b76a5676aec507bb54f89e2d7dea344e213697f430d42deabf6dd",
+        "rewrite": "9b4161899e1b76a5676aec507bb54f89e2d7dea344e213697f430d42deabf6dd"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          8491.3,
+          8987,
+          8864.1
+        ],
+        "rewrite": [
+          8757.9,
+          9205.5,
+          8598.7
+        ],
+        "median_speedup": 0.98,
+        "median_saving_ms": -218.5,
+        "faster_pairs": 1,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 1782.9,
+        "gates_missed": [
+          "ratio",
+          "floor",
+          "majority"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "no_gain",
+      "detail": "median 0.98×, saving -218.5 ms, 1/3 pairs faster — missed: ratio, floor, majority"
+    },
+    {
+      "n": 2,
+      "origin": "rewriter",
+      "hypothesis_id": "h2",
+      "sql": "SELECT COUNT(1) AS n FROM TPCDS_DB.promotion WHERE p.p_channel_tv = 'N' AND p.p_channel_tv IS NOT NULL",
+      "change_summary": "Added explicit IS NOT NULL predicate to enable potential partition/row-group pruning if statistics exist",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 1,
+        "rewrite": 0
+      },
+      "fingerprint": {
+        "orig": "9b4161899e1b76a5676aec507bb54f89e2d7dea344e213697f430d42deabf6dd",
+        "rewrite": null
+      },
+      "reason": "ERROR",
+      "detail": "org.apache.hive.service.cli.HiveSQLException: com.zetaris.lightning.error.LightningException: <<<[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column or function parameter with name `p`.`p_channel_tv` cannot be resolved. Did you mean one of the following? [`promotion`.`p_channel_tv`, `promotion`.`p_channel_"
+    },
+    {
+      "n": 3,
+      "origin": "rewriter",
+      "hypothesis_id": "h2",
+      "sql": "SELECT COUNT(*) AS n FROM TPCDS_DB.promotion WHERE p_channel_tv = 'N'",
+      "change_summary": "Removed unnecessary IS NOT NULL check and used COUNT(*) which is more idiomatic",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 1,
+        "rewrite": 1
+      },
+      "fingerprint": {
+        "orig": "9b4161899e1b76a5676aec507bb54f89e2d7dea344e213697f430d42deabf6dd",
+        "rewrite": "9b4161899e1b76a5676aec507bb54f89e2d7dea344e213697f430d42deabf6dd"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          7191.6,
+          9319.3,
+          8771.2
+        ],
+        "rewrite": [
+          6787.5,
+          9192.1,
+          9065.3
+        ],
+        "median_speedup": 1.01,
+        "median_saving_ms": 127.2,
+        "faster_pairs": 2,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 1782.9,
+        "gates_missed": [
+          "ratio",
+          "floor"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "no_gain",
+      "detail": "median 1.01×, saving 127.2 ms, 2/3 pairs faster — missed: ratio, floor"
+    }
+  ],
+  "verdict": "NO_SAFE_REWRITE",
+  "playbook_hits": [],
+  "precheck": {
+    "deterministic": true,
+    "rows": 1,
+    "fingerprint": "9b4161899e1b76a5676aec507bb54f89e2d7dea344e213697f430d42deabf6dd",
+    "fingerprint_kind": "rows",
+    "vacuous": false,
+    "columns": [
+      {
+        "name": "n",
+        "type": "bigint"
+      }
+    ]
+  },
+  "diagnosis": {
+    "bottleneck": "The query scans the entire p_channel_tv column of the promotion table because no partitioning or indexing exists on the filter column, forcing a full column read and filter evaluation.",
+    "pattern_label": "other",
+    "plan_nodes": [
+      {
+        "id": "6",
+        "op": "HashAggregate",
+        "note": "Input [1]: [count#49455L]; Keys: []; Functions [1]: [count(1)]; Aggregate Attributes [1]: [count(1)#49452L]; Results [1]"
+      },
+      {
+        "id": "4",
+        "op": "HashAggregate",
+        "note": "Input: []; Keys: []; Functions [1]: [partial_count(1)]; Aggregate Attributes [1]: [count#49454L]; Results [1]: [count#49"
+      },
+      {
+        "id": "1",
+        "op": "Scan",
+        "note": "parquet TPCDS_DB.promotion; Output [1]: [p_channel_tv#49444]; Batched: true; Location: InMemoryFileIndex [s3a://zetaris-"
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "h1",
+        "source": "detector",
+        "plan_node_id": "6",
+        "claim": "No known pattern matched; the plan's most expensive operator is the candidate.",
+        "status": "falsified"
+      },
+      {
+        "id": "h2",
+        "source": "llm",
+        "plan_node_id": "1",
+        "claim": "The Parquet scan reads all row groups of p_channel_tv; if the table is large and the predicate selectivity is low, I/O dominates. Partitioning the table by p_channel_tv or using a bloom filter could prune row groups.",
+        "status": "falsified"
+      },
+      {
+        "id": "h3",
+        "source": "llm",
+        "plan_node_id": "2",
+        "claim": "The filter operator reapplies the same predicate after pushdown, suggesting incomplete pushdown or extra null checks; eliminating this filter via full pushdown would save CPU cycles.",
+        "status": "untested"
+      },
+      {
+        "id": "h4",
+        "source": "llm",
+        "plan_node_id": "4",
+        "claim": "Partial aggregation per partition and the subsequent single-partition shuffle (node 5) add overhead; if the number of partitions is high, reducing partitions or using a more efficient aggregation strategy could help.",
+        "status": "untested"
+      }
+    ],
+    "raw_refs": [],
+    "narrative": "llm"
+  },
+  "schema_fqn": "tpcds_db",
+  "finished_at": "2026-10-25T13:11:30.382Z",
+  "no_rewrite_reason": "attempts_exhausted",
+  "detail": "#1 REJECT NOT_FASTER, #2 REJECT ERROR, #3 REJECT NOT_FASTER",
+  "playbook_state": "empty"
+}

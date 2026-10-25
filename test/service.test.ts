@@ -17,6 +17,7 @@ let engine: DuckDbEngine;
 beforeAll(async () => {
   root = mkdtempSync(join(tmpdir(), "qd-svc-"));
   symlinkSync(join(ROOT, "evals"), join(root, "evals"));
+  symlinkSync(join(ROOT, "fixtures"), join(root, "fixtures"));
   symlinkSync(join(ROOT, "querydoc.config.json"), join(root, "querydoc.config.json"));
   engine = await DuckDbEngine.open();
   // keyless gateway over an empty cache dir; a service never reaches the network in these tests
@@ -40,7 +41,7 @@ describe("POST /run — validation (structured errors, nothing runs)", () => {
   });
 
   it("an unknown or purged run:<id> playbook is a recoverable InvalidOption, never a silent fall-back to the seed", async () => {
-    const r = await run({ ...example(2), options: { sample_mode: true, playbook: "run:does-not-exist" } });
+    const r = await run({ ...example(1), options: { sample_mode: true, playbook: "run:does-not-exist" } });
     expect(r.status).toBe(400);
     expect(r.json.error.type).toBe("InvalidOption");
     expect(r.json.error.message).toMatch(/no such earlier run/);
@@ -65,7 +66,7 @@ describe("POST /run — keyless sample mode", () => {
   });
 
   it("plain SQL with no key and no cache is a `partial` 200: deterministic diagnosis + SampleModeNoLLM, with the detector's pattern", async () => {
-    const r = await run(example(1));
+    const r = await run(example(2));
     expect(r.status).toBe(200);
     expect(r.json.status).toBe("partial");
     expect(r.json.error.type).toBe("SampleModeNoLLM");
@@ -73,8 +74,8 @@ describe("POST /run — keyless sample mode", () => {
     expect(r.json.agents.map((a: any) => a.name)).toEqual(expect.arrayContaining(["Orchestrator", "Verifier", "Diagnoser"]));
   });
 
-  it("example_2: the tempting T1 rewrite as candidate_sql gets a real Verifier refusal with the differing row, then ends llm_unavailable", async () => {
-    const r = await run(example(2));
+  it("example_1: the tempting T1 rewrite as candidate_sql gets a real Verifier refusal with the differing row, then ends llm_unavailable", async () => {
+    const r = await run(example(1));
     const c = r.json.output.case;
     expect(r.json.status).toBe("ok");
     expect(c.verdict).toBe("NO_SAFE_REWRITE");
@@ -88,9 +89,9 @@ describe("POST /run — keyless sample mode", () => {
   });
 
   it("an earlier run's refusal is reused from the ledger with options.playbook = run:<id>: same verdict, candidate not executed, no new entry", async () => {
-    const first = await run({ ...example(2), run_id: "svc-first" });
+    const first = await run({ ...example(1), run_id: "svc-first" });
     expect(first.json.run_id).toBe("svc-first");
-    const second = await run({ ...example(2), run_id: "svc-second", options: { sample_mode: true, playbook: "run:svc-first" } });
+    const second = await run({ ...example(1), run_id: "svc-second", options: { sample_mode: true, playbook: "run:svc-first" } });
     const a = second.json.output.case.attempts[0];
     expect(a.reused_from).toBe("mem-1");
     expect(a.fingerprint.rewrite).toBeNull();
@@ -173,5 +174,32 @@ describe("decision, playbook, runs, slow queries", () => {
     expect(h.status).toBe("ok");
     expect(h.engine.name).toBe("duckdb");
     expect(h.nim.configured).toBe(false);
+  });
+});
+
+describe("service robustness", () => {
+  it("a missing playbook seed is a structured SeedMissing error, never a silent empty store", async () => {
+    const bare = mkdtempSync(join(tmpdir(), "qd-bare-"));
+    symlinkSync(join(ROOT, "querydoc.config.json"), join(bare, "querydoc.config.json"));
+    const s = new QueryDocService({ root: bare, env: { SAMPLE_MODE: "true" }, llm: new LlmGateway({ client: null, cacheDir: join(bare, "llm-cache") }), engineFactory: async () => engine });
+    const r = (await s.run({ ...example(3), options: { sample_mode: true, playbook: "seed" } })) as { status: number; json: any };
+    expect(r.status).toBe(500);
+    expect(r.json.error.type).toBe("SeedMissing");
+    expect(((await s.health()).json as any).playbook_seed).toBe(false);
+    rmSync(bare, { recursive: true, force: true });
+  });
+
+  it("a refused run:<id> request leaves no run directory behind, so the id stays free", async () => {
+    const r = await run({ ...example(5), run_id: "svc-refused", options: { sample_mode: true, playbook: "run:nothing-here" } });
+    expect(r.status).toBe(400);
+    expect(existsSync(join(root, "data", "runs", "svc-refused"))).toBe(false);
+    const ok = await run({ ...example(5), run_id: "svc-refused" });
+    expect(ok.json.run_id).toBe("svc-refused");
+  });
+
+  it("concurrent requests are served one at a time and each gets its own run", async () => {
+    const [a, b, c] = await Promise.all([run({ ...example(5), run_id: "svc-par-1" }), run({ ...example(5), run_id: "svc-par-2" }), run({ ...example(5), run_id: "svc-par-3" })]);
+    expect([a.json.run_id, b.json.run_id, c.json.run_id]).toEqual(["svc-par-1", "svc-par-2", "svc-par-3"]);
+    expect([a, b, c].every((r) => r.json.verdict === "NOT_VERIFIABLE")).toBe(true);
   });
 });

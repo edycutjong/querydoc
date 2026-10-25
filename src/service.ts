@@ -136,8 +136,9 @@ export class QueryDocService {
       const engine = await this.engine(mode.engine);
       const cfg: VerifierConfig = loadConfig(this.p("querydoc.config.json"), mode.engine);
       const runDir = this.p("data", "runs", runId);
+      if (mode.engine === "zetaris" && pbOpt?.startsWith("run:")) throw new ApiError(400, "InvalidOption", 'options.playbook "run:<id>" is a sample-mode option (live runs share one persistent playbook)');
+      const playbook = this.openPlaybook(mode.engine, runDir, pbOpt ?? "seed"); // validates the source first: a refused request leaves no run directory
       mkdirSync(runDir, { recursive: true });
-      const playbook = this.openPlaybook(mode.engine, runDir, pbOpt ?? "seed");
       const ran = await runCase({ sql, ...(candidate ? { candidate_sql: candidate } : {}), source }, {
         engine, cfg, llm: this.llm, attemptCap: 3, logDir: runDir, playbook,
       }, { runId, ...(maxAttempts ? { maxAttempts } : {}) });
@@ -175,7 +176,8 @@ export class QueryDocService {
     if (option === "empty") return Playbook.open({ dir, fixedClock: true });
     if (option === "seed") {
       const seed = this.p("fixtures", "hmem-seed", "sample");
-      return Playbook.open({ dir, ...(existsSync(join(seed, "state.json")) ? { seedDir: seed } : {}), fixedClock: true });
+      if (!existsSync(join(seed, "state.json"))) throw new ApiError(500, "SeedMissing", "fixtures/hmem-seed/sample is missing: the committed playbook seed is part of the build (npm run record writes it)", false);
+      return Playbook.open({ dir, seedDir: seed, fixedClock: true });
     }
     const src = this.p("data", "runs", option.slice(4), "hmem");
     if (!existsSync(join(src, "state.json"))) throw new ApiError(400, "InvalidOption", `playbook "${option}": no such earlier run (unknown or purged), nothing was run`);
@@ -271,7 +273,7 @@ export class QueryDocService {
     } catch (e) {
       engine = { name: mode.engine, ok: false, error: (e as Error).message.slice(0, 200) };
     }
-    return { status: 200, json: { status: engine.ok ? "ok" : "degraded", engine, ...(mode.banner ? { banner: mode.banner } : {}), nim: { configured: this.llm.live, model: "nvidia/nemotron-3-ultra-550b-a55b" }, llm_cache: existsSync(this.p("llm-cache")) } };
+    return { status: 200, json: { status: engine.ok ? "ok" : "degraded", engine, ...(mode.banner ? { banner: mode.banner } : {}), nim: { configured: this.llm.live, model: "nvidia/nemotron-3-ultra-550b-a55b" }, llm_cache: existsSync(this.p("llm-cache")), playbook_seed: existsSync(this.p("fixtures", "hmem-seed", "sample", "state.json")) } };
   }
 }
 

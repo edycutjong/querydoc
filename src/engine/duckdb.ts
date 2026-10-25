@@ -44,6 +44,7 @@ export class DuckDbEngine implements QueryEngine {
     await conn.run(`CREATE TABLE ops.zones AS SELECT * FROM read_parquet('${q(zones)}')`);
     const scale = Math.max(1, Math.floor(o.scaleTrips ?? 1));
     if (scale > 1) await conn.run(`CREATE TABLE lake.trips_scaled AS SELECT t.* FROM lake.trips t, range(${scale}) r(k)`);
+    await conn.run("SET memory_limit = '2GB'");
     await conn.run("SET enable_external_access = false");
     await conn.run("SET lock_configuration = true");
     return new DuckDbEngine(db, conn, scale);

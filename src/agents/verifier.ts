@@ -218,7 +218,7 @@ export class Verifier {
     const att: Attempt = { ...input, sql, verdict: "REJECT", rows: { orig: pre.rows, rewrite: 0 }, fingerprint: { orig: pre.fingerprint, rewrite: null } };
     const label = `attempt ${input.n}`;
     const finish = (a: Attempt): Attempt => {
-      const target: AgentName = opts.lastAttempt ? "Orchestrator" : a.not_faster_detail === "no_gain" ? "Diagnoser" : "Rewriter";
+      const target: AgentName = opts.lastAttempt ? "Orchestrator" : a.not_faster_detail === "no_gain" && a.origin === "rewriter" ? "Diagnoser" : "Rewriter";
       const summary =
         a.verdict === "ACCEPT"
           ? `ACCEPT: same ${a.rows.orig} row(s), ${a.timing_ms!.median_speedup}× median over ${a.timing_ms!.orig.length} pairs`

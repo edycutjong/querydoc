@@ -4,14 +4,14 @@
   "source": "paste",
   "engine": "duckdb",
   "llm": "nim",
-  "started_at": "2026-10-25T11:19:02.634Z",
+  "started_at": "2026-10-25T12:25:14.587Z",
   "attempts": [
     {
       "n": 1,
       "origin": "rewriter",
       "hypothesis_id": "h1",
       "sql": "SELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 OR fare_amount > 100",
-      "change_summary": "Replaced UNION of two scans with a single scan using OR predicate to avoid duplicate scans and deduplication overhead.",
+      "change_summary": "Replace UNION (which requires a duplicate-eliminating hash aggregate over two full scans) with a single scan using a combined OR filter, eliminating the second scan and the dedup step.",
       "verdict": "REJECT",
       "rows": {
         "orig": 277,
@@ -37,8 +37,35 @@
       "n": 2,
       "origin": "rewriter",
       "hypothesis_id": "h1",
-      "sql": "SELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 OR fare_amount > 100",
-      "change_summary": "Replaced UNION of two scans with a single scan using OR predicate to avoid duplicate scans and deduplication overhead.",
+      "sql": "SELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 UNION ALL SELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE fare_amount > 100 AND trip_distance <= 30",
+      "change_summary": "Replace UNION with UNION ALL and add anti-filter to second scan to avoid duplicates, keeping two scans but removing hash aggregate deduplication.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 277,
+        "rewrite": 1437
+      },
+      "fingerprint": {
+        "orig": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441",
+        "rewrite": "fa82127317edb66eacfd49896fbe960f3bb150e4dbab6ae3da35bb4b583a4f65"
+      },
+      "fingerprint_kind": "rows",
+      "reason": "ROW_DIFF",
+      "first_diff": {
+        "side": "rewrite",
+        "row": [
+          "132",
+          "1",
+          "1"
+        ]
+      },
+      "detail": "rows differ (277 vs 1437 rows); first differing row [\"132\",\"1\",\"1\"] returned by the candidate, not by the original"
+    },
+    {
+      "n": 3,
+      "origin": "rewriter",
+      "hypothesis_id": "h2",
+      "sql": "SELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 UNION ALL SELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE fare_amount > 100 AND trip_distance <= 30",
+      "change_summary": "Replaced UNION with UNION ALL and added an anti-filter (trip_distance <= 30) to the second scan so rows satisfying both predicates are emitted only once, removing the HASH_GROUP_BY deduplication step while preserving the original distinct row set.",
       "verdict": "REJECT",
       "rows": {
         "orig": 277,
@@ -49,65 +76,22 @@
         "rewrite": null
       },
       "reason": "ROW_DIFF",
-      "reused_from": "mem-1",
+      "reused_from": "mem-2",
       "first_diff": {
         "side": "rewrite",
         "row": [
-          "142",
+          "132",
           "1",
           "1"
         ]
       },
-      "detail": "refusal reused from ledger mem-1 — same original-result fingerprint; the candidate was not executed (union_dedupe: rewrite changed the rows (ROW_DIFF). Replaced UNION of two scans with a single scan using OR predicate to avoid duplicate scans and deduplication overhead. Rows original 277, rewrite 143)"
-    },
-    {
-      "n": 3,
-      "origin": "rewriter",
-      "hypothesis_id": "h2",
-      "sql": "SELECT DISTINCT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 OR fare_amount > 100",
-      "change_summary": "Replaced UNION of two sequential scans with a single scan using OR predicate and explicit DISTINCT to preserve UNION's duplicate elimination semantics.",
-      "verdict": "REJECT",
-      "rows": {
-        "orig": 277,
-        "rewrite": 277
-      },
-      "fingerprint": {
-        "orig": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441",
-        "rewrite": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441"
-      },
-      "fingerprint_kind": "rows",
-      "timing_ms": {
-        "orig": [
-          5.8,
-          3.3,
-          2.5
-        ],
-        "rewrite": [
-          4.7,
-          4,
-          3.1
-        ],
-        "median_speedup": 0.83,
-        "median_saving_ms": -0.6,
-        "faster_pairs": 1,
-        "excluded_pairs": 0,
-        "timed_as": "plain",
-        "noise_floor_ms": 50,
-        "gates_missed": [
-          "ratio",
-          "floor",
-          "majority"
-        ],
-        "cap_ms": 150000
-      },
-      "reason": "NOT_FASTER",
-      "not_faster_detail": "no_gain",
-      "detail": "median 0.83×, saving -0.6 ms, 1/3 pairs faster — missed: ratio, floor, majority"
+      "detail": "refusal reused from ledger mem-2 — same original-result fingerprint; the candidate was not executed (union_dedupe: rewrite changed the rows (ROW_DIFF). Replace UNION with UNION ALL and add anti-filter to second scan to avoid duplicates, keeping two scans but removing hash aggregate deduplication. Row)"
     }
   ],
   "verdict": "NO_SAFE_REWRITE",
   "playbook_hits": [
-    "mem-1"
+    "mem-1",
+    "mem-2"
   ],
   "precheck": {
     "deterministic": true,
@@ -131,7 +115,7 @@
     ]
   },
   "diagnosis": {
-    "bottleneck": "The query scans the same table twice sequentially (99K rows each) and then performs a hash-based deduplication (HASH_GROUP_BY) on the combined ~198K rows, causing high I/O and CPU for duplicate elimination.",
+    "bottleneck": "The query performs two full sequential scans of the same 'trips' table (reading all columns to evaluate filters, though only three are projected) and then hash-deduplicates the combined ~198k rows via HASH_GROUP_BY.",
     "pattern_label": "union_dedupe",
     "plan_nodes": [
       {
@@ -151,31 +135,26 @@
       {
         "id": "h2",
         "source": "llm",
-        "plan_node_id": "1",
-        "claim": "The HASH_GROUP_BY (deduplication) processes nearly 200K input rows with high overlap, requiring hash table build/probe and memory; reducing input cardinality or avoiding the second scan would cut its cost.",
-        "status": "falsified"
+        "plan_node_id": "2",
+        "claim": "HASH_GROUP_BY deduplicates on all three columns; if the two result sets have little overlap, replacing UNION with UNION ALL (and accepting duplicates) would eliminate the hash aggregation entirely.",
+        "status": "unproven"
       },
       {
         "id": "h3",
         "source": "llm",
-        "plan_node_id": "2",
-        "claim": "The first SEQ_SCAN reads the entire trips table to filter trip_distance>30; an index on trip_distance could turn this into an index scan with far fewer rows read.",
-        "status": "untested"
-      },
-      {
-        "id": "h4",
-        "source": "llm",
-        "plan_node_id": "3",
-        "claim": "The second SEQ_SCAN reads the entire trips table again to filter fare_amount>100; an index on fare_amount or a single combined scan (trip_distance>30 OR fare_amount>100) would eliminate the double scan.",
+        "plan_node_id": "1",
+        "claim": "Each SEQ_SCAN reads full rows despite projecting only three columns; a covering index on (trip_distance, fare_amount) INCLUDE (PULocationID, payment_type, passenger_count) could enable index-only scans for both predicates.",
         "status": "untested"
       }
     ],
-    "raw_refs": [],
+    "raw_refs": [
+      "dropped hypothesis citing unknown plan node 0"
+    ],
     "narrative": "llm"
   },
   "schema_fqn": "lake",
-  "finished_at": "2026-10-25T11:19:34.347Z",
+  "finished_at": "2026-10-25T12:25:37.792Z",
   "no_rewrite_reason": "attempts_exhausted",
-  "detail": "#1 REJECT ROW_DIFF, #2 REJECT ROW_DIFF, #3 REJECT NOT_FASTER",
+  "detail": "#1 REJECT ROW_DIFF, #2 REJECT ROW_DIFF, #3 REJECT ROW_DIFF",
   "playbook_state": "empty"
 }

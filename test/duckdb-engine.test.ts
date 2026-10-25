@@ -74,3 +74,19 @@ describe("DuckDB sample engine (committed NYC TLC subset)", () => {
     expect((await e.run("SELECT COUNT(*) FROM lake.trips", { drain: true })).rows.length).toBe(1);
   });
 });
+
+describe("DuckDB engine limits and guard extras", () => {
+  it("interrupts a query that runs past its timeout and stays usable afterwards", async () => {
+    await expect(e.run("SELECT COUNT(*) FROM range(100000000000) a, range(1000) b", { timeoutSec: 1, drain: true })).rejects.toBeInstanceOf(EngineError);
+    expect(Number((await e.run("SELECT 1", { drain: true })).rows[0]![0])).toBe(1);
+  }, 20_000);
+
+  it("refuses quoted-path replacement scans (FROM 'file') at the guard, and the engine would refuse them anyway", async () => {
+    for (const sql of ["SELECT * FROM '/etc/hosts'", "SELECT * FROM 'data/sample/zones.parquet'", "SELECT * FROM lake.trips t JOIN 'https://x.example/a.csv' c ON true"]) {
+      expect(sqlGuard(sql, "postgresql").ok, sql).toBe(false);
+    }
+    expect(sqlGuard("SELECT * FROM lake.trips WHERE store_and_fwd_flag = 'N'", "postgresql").ok).toBe(true);
+    const conn = (e as unknown as { conn: { runAndReadAll(sql: string): Promise<unknown> } }).conn;
+    await expect(conn.runAndReadAll("SELECT * FROM '/etc/hosts'")).rejects.toThrow(/disabled|permission|external|does not exist/i); // with external access off the path is not even looked up as a file
+  });
+});

@@ -1,0 +1,35 @@
+{
+  "task": "diagnose",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b",
+  "key_fields": {
+    "template": "diagnoser@1",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "engine": "duckdb",
+    "schema": "lake+ops",
+    "sql": "select z.borough, count(*) as touches from lake.trips t join ops.zones z on z.locationid = t.pulocationid or z.locationid = t.dolocationid group by z.borough order by z.borough",
+    "pattern": "or_join_condition",
+    "nodes": [
+      "8"
+    ],
+    "facts": [
+      "ops.zones.locationid: 265 rows, 265 non-NULL, 265 distinct → UNIQUE"
+    ]
+  },
+  "value": {
+    "bottleneck": "The OR join condition (z.LocationID = t.PULocationID OR z.LocationID = t.DOLocationID) forces a blockwise nested loop join between 495K trips rows and 265 zones rows instead of a hash join, causing ~495K * 265 key comparisons with two equality checks per row.",
+    "hypotheses": [
+      {
+        "plan_node_id": "8",
+        "claim": "The BLOCKWISE_NL_JOIN is chosen because the OR predicate prevents hash join optimization; rewriting as a UNION ALL of two separate joins (one on PULocationID, one on DOLocationID) would enable hash joins and avoid the nested loop."
+      },
+      {
+        "plan_node_id": "8",
+        "claim": "The CAST(PULocationID AS BIGINT) and CAST(DOLocationID AS BIGINT) suggest possible type mismatch; ensuring LocationID, PULocationID, and DOLocationID share the same integer type could eliminate casts and improve predicate evaluation speed."
+      },
+      {
+        "plan_node_id": "5",
+        "claim": "The HASH_GROUP_BY operates on the join output which may duplicate trips rows matching both PU and DO zones; pre-aggregating trips by location before joining could reduce rows entering the join."
+      }
+    ]
+  }
+}

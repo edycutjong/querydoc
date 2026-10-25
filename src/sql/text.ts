@@ -54,3 +54,56 @@ export function maskSql(sql: string, keepIdents = false): string {
 }
 
 export const trimStatement = (sql: string): string => sql.trim().replace(/;\s*$/, "").trim();
+
+// Canonical text for hashing and cache keys: comments dropped, whitespace collapsed and everything lower-cased OUTSIDE quotes only, so
+// 'x--y' and 'Cash' vs 'cash' remain different statements. A trailing semicolon is dropped.
+export function canonicalSql(sql: string): string {
+  let out = "";
+  let space = false;
+  let i = 0;
+  const n = sql.length;
+  const push = (t: string) => {
+    if (space && out) out += " ";
+    space = false;
+    out += t;
+  };
+  while (i < n) {
+    const c = sql[i]!;
+    const next = sql[i + 1];
+    if (c === "-" && next === "-") {
+      const end = sql.indexOf("\n", i);
+      i = end === -1 ? n : end;
+      space = true;
+    } else if (c === "/" && next === "*") {
+      const end = sql.indexOf("*/", i + 2);
+      i = end === -1 ? n : end + 2;
+      space = true;
+    } else if (c === "'" || c === '"' || c === "`") {
+      let j = i + 1;
+      while (j < n) {
+        if (sql[j] === "\\" && c !== "`") {
+          j += 2;
+          continue;
+        }
+        if (sql[j] === c) {
+          if (sql[j + 1] === c) {
+            j += 2;
+            continue;
+          }
+          break;
+        }
+        j++;
+      }
+      const stop = Math.min(j + 1, n);
+      push(sql.slice(i, stop));
+      i = stop;
+    } else if (/\s/.test(c)) {
+      space = true;
+      i++;
+    } else {
+      push(c.toLowerCase());
+      i++;
+    }
+  }
+  return out.replace(/\s*;$/, "").trim();
+}

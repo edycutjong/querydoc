@@ -62,8 +62,8 @@ describe("keyless replay parity", () => {
     });
   }
 
-  it("example_2: the supplied rewrite is refused by the Verifier, then NO_SAFE_REWRITE with llm_unavailable and the refusal in the dossier", async () => {
-    const r = (await make({ SAMPLE_MODE: "true" }).run(example(2))) as { json: any };
+  it("example_1: the supplied rewrite is refused by the Verifier, then NO_SAFE_REWRITE with llm_unavailable and the refusal in the dossier", async () => {
+    const r = (await make({ SAMPLE_MODE: "true" }).run(example(1))) as { json: any };
     expect(key(r.json)).toBe("NO_SAFE_REWRITE/llm_unavailable");
     expect(r.json.llm_unavailable).toBe(true);
     expect(r.json.output.case.attempts).toHaveLength(1);
@@ -84,8 +84,8 @@ describe("keyless replay parity", () => {
     expect(r.json.output.case.playbook_hits).toContain(a.reused_from);
   });
 
-  it("example_1 without a key and with the cache is not an error: a verdict envelope (ok or partial), never a 5xx", async () => {
-    const r = (await make({ SAMPLE_MODE: "true" }).run(example(1))) as { status: number; json: any };
+  it("example_2 without a key and with the cache is not an error: a verdict envelope (ok or partial), never a 5xx", async () => {
+    const r = (await make({ SAMPLE_MODE: "true" }).run(example(2))) as { status: number; json: any };
     expect(r.status).toBe(200);
     expect(["ok", "partial"]).toContain(r.json.status);
   });

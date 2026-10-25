@@ -4,41 +4,14 @@
   "source": "paste",
   "engine": "duckdb",
   "llm": "nim",
-  "started_at": "2026-10-25T11:19:34.349Z",
+  "started_at": "2026-10-25T12:25:37.797Z",
   "attempts": [
     {
       "n": 1,
       "origin": "rewriter",
       "hypothesis_id": "h1",
-      "sql": "SELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 OR fare_amount > 100",
-      "change_summary": "Replaced UNION DISTINCT with a single scan using OR predicate to avoid duplicate scans and hash-based deduplication.",
-      "verdict": "REJECT",
-      "rows": {
-        "orig": 277,
-        "rewrite": 1437
-      },
-      "fingerprint": {
-        "orig": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441",
-        "rewrite": "fa82127317edb66eacfd49896fbe960f3bb150e4dbab6ae3da35bb4b583a4f65"
-      },
-      "fingerprint_kind": "rows",
-      "reason": "ROW_DIFF",
-      "first_diff": {
-        "side": "rewrite",
-        "row": [
-          "142",
-          "1",
-          "1"
-        ]
-      },
-      "detail": "rows differ (277 vs 1437 rows); first differing row [\"142\",\"1\",\"1\"] returned by the candidate, not by the original"
-    },
-    {
-      "n": 2,
-      "origin": "rewriter",
-      "hypothesis_id": "h1",
       "sql": "SELECT DISTINCT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 OR fare_amount > 100",
-      "change_summary": "Replaced UNION DISTINCT with a single scan using OR predicate plus explicit DISTINCT to preserve exact deduplication semantics while avoiding duplicate scans and separate hash aggregation.",
+      "change_summary": "Replaced UNION of two scans with a single scan using OR predicate and explicit DISTINCT to preserve set semantics.",
       "verdict": "REJECT",
       "rows": {
         "orig": 277,
@@ -51,61 +24,17 @@
       "fingerprint_kind": "rows",
       "timing_ms": {
         "orig": [
-          3.3,
-          2.9,
-          3.2
-        ],
-        "rewrite": [
           3.5,
-          3.4,
-          9
-        ],
-        "median_speedup": 0.85,
-        "median_saving_ms": -0.5,
-        "faster_pairs": 0,
-        "excluded_pairs": 0,
-        "timed_as": "plain",
-        "noise_floor_ms": 50,
-        "gates_missed": [
-          "ratio",
-          "floor",
-          "majority"
-        ],
-        "cap_ms": 150000
-      },
-      "reason": "NOT_FASTER",
-      "not_faster_detail": "no_gain",
-      "detail": "median 0.85×, saving -0.5 ms, 0/3 pairs faster — missed: ratio, floor, majority"
-    },
-    {
-      "n": 3,
-      "origin": "rewriter",
-      "hypothesis_id": "h2",
-      "sql": "SELECT DISTINCT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 OR fare_amount > 100",
-      "change_summary": "Replaced UNION DISTINCT (two scans + hash dedupe) with a single scan using OR predicate plus explicit DISTINCT to preserve exact deduplication semantics.",
-      "verdict": "REJECT",
-      "rows": {
-        "orig": 277,
-        "rewrite": 277
-      },
-      "fingerprint": {
-        "orig": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441",
-        "rewrite": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441"
-      },
-      "fingerprint_kind": "rows",
-      "timing_ms": {
-        "orig": [
-          2.9,
-          3.4,
-          3.5
+          3.6,
+          3.8
         ],
         "rewrite": [
-          3.7,
-          4,
-          3.4
+          3,
+          4.8,
+          5
         ],
-        "median_speedup": 0.85,
-        "median_saving_ms": -0.6,
+        "median_speedup": 0.76,
+        "median_saving_ms": -1.2,
         "faster_pairs": 1,
         "excluded_pairs": 0,
         "timed_as": "plain",
@@ -119,7 +48,95 @@
       },
       "reason": "NOT_FASTER",
       "not_faster_detail": "no_gain",
-      "detail": "median 0.85×, saving -0.6 ms, 1/3 pairs faster — missed: ratio, floor, majority"
+      "detail": "median 0.76×, saving -1.2 ms, 1/3 pairs faster — missed: ratio, floor, majority"
+    },
+    {
+      "n": 2,
+      "origin": "rewriter",
+      "hypothesis_id": "h2",
+      "sql": "SELECT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 OR fare_amount > 100 GROUP BY PULocationID, payment_type, passenger_count",
+      "change_summary": "Replaced UNION of two full table scans with a single scan using OR predicate and GROUP BY for deduplication instead of DISTINCT",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 277,
+        "rewrite": 277
+      },
+      "fingerprint": {
+        "orig": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441",
+        "rewrite": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          2.8,
+          2.7,
+          2.3
+        ],
+        "rewrite": [
+          2.6,
+          3.2,
+          2.5
+        ],
+        "median_speedup": 0.92,
+        "median_saving_ms": -0.2,
+        "faster_pairs": 1,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "ratio",
+          "floor",
+          "majority"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "no_gain",
+      "detail": "median 0.92×, saving -0.2 ms, 1/3 pairs faster — missed: ratio, floor, majority"
+    },
+    {
+      "n": 3,
+      "origin": "rewriter",
+      "hypothesis_id": "h3",
+      "sql": "SELECT DISTINCT PULocationID, payment_type, passenger_count FROM lake.trips WHERE trip_distance > 30 OR fare_amount > 100",
+      "change_summary": "Single scan with OR filter and DISTINCT deduplication instead of UNION with hash group by.",
+      "verdict": "REJECT",
+      "rows": {
+        "orig": 277,
+        "rewrite": 277
+      },
+      "fingerprint": {
+        "orig": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441",
+        "rewrite": "009bfc1f642ddfdebb43c606f78751cd64a37ce83b52e9209cf33473c8600441"
+      },
+      "fingerprint_kind": "rows",
+      "timing_ms": {
+        "orig": [
+          2.8,
+          3,
+          5.1
+        ],
+        "rewrite": [
+          3.2,
+          3.3,
+          3.2
+        ],
+        "median_speedup": 0.91,
+        "median_saving_ms": -0.3,
+        "faster_pairs": 1,
+        "excluded_pairs": 0,
+        "timed_as": "plain",
+        "noise_floor_ms": 50,
+        "gates_missed": [
+          "ratio",
+          "floor",
+          "majority"
+        ],
+        "cap_ms": 150000
+      },
+      "reason": "NOT_FASTER",
+      "not_faster_detail": "no_gain",
+      "detail": "median 0.91×, saving -0.3 ms, 1/3 pairs faster — missed: ratio, floor, majority"
     }
   ],
   "verdict": "NO_SAFE_REWRITE",
@@ -149,7 +166,7 @@
     ]
   },
   "diagnosis": {
-    "bottleneck": "The query executes two full sequential scans of the trips table (for trip_distance > 30 and fare_amount > 100) and then performs a hash-based duplicate elimination (HASH_GROUP_BY) to implement UNION DISTINCT. The majority of execution time is likely spent in the HASH_GROUP_BY deduplicating the combined ~200k rows and in the two scans reading the table twice.",
+    "bottleneck": "The query scans the same large table twice (two full sequential scans) and then performs a hash-based deduplication (HASH_GROUP_BY) on the combined ~200k rows, doubling I/O and CPU for scanning and adding a potentially expensive hash aggregation.",
     "pattern_label": "union_dedupe",
     "plan_nodes": [
       {
@@ -170,20 +187,25 @@
         "id": "h2",
         "source": "llm",
         "plan_node_id": "1",
-        "claim": "The UNION node can be eliminated by rewriting the query as a single scan with a combined predicate (trip_distance > 30 OR fare_amount > 100), reducing the number of sequential scans from two to one.",
+        "claim": "The UNION node concatenates two full table scans on the same table; a single scan with a combined filter (trip_distance > 30 OR fare_amount > 100) followed by a single distinct would read the table once and avoid duplicate work.",
+        "status": "falsified"
+      },
+      {
+        "id": "h3",
+        "source": "llm",
+        "plan_node_id": "2",
+        "claim": "Each SEQ_SCAN reads the entire table and applies a filter that returns ~99k rows; the filters are not selective enough to justify two separate scans, and the projected columns are the same in both scans.",
         "status": "falsified"
       }
     ],
     "raw_refs": [
-      "dropped hypothesis citing unknown plan node HASH_GROUP_BY",
-      "dropped hypothesis citing unknown plan node SEQ_SCAN (trip_distance>30)",
-      "dropped hypothesis citing unknown plan node SEQ_SCAN (fare_amount>100)"
+      "dropped hypothesis citing unknown plan node 0"
     ],
     "narrative": "llm"
   },
   "schema_fqn": "lake",
-  "finished_at": "2026-10-25T11:21:27.124Z",
+  "finished_at": "2026-10-25T12:28:07.414Z",
   "no_rewrite_reason": "attempts_exhausted",
-  "detail": "#1 REJECT ROW_DIFF, #2 REJECT NOT_FASTER, #3 REJECT NOT_FASTER",
+  "detail": "#1 REJECT NOT_FASTER, #2 REJECT NOT_FASTER, #3 REJECT NOT_FASTER",
   "playbook_state": "empty"
 }

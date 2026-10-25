@@ -1,0 +1,23 @@
+{
+  "task": "rewrite",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b",
+  "key_fields": {
+    "template": "rewriter@1",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "engine": "duckdb",
+    "schema": "lake+ops",
+    "sql": "select z.locationid, z.borough, z.zone, count(t.pulocationid) as cash_trips from ops.zones z left join lake.trips t on t.pulocationid = z.locationid and t.payment_type = 2 group by z.locationid, z.borough, z.zone order by z.locationid",
+    "pattern": "outer_join_predicate",
+    "hypothesis": "h2",
+    "claim": "The sequential scan on trips reads all rows to evaluate payment_type=2; creating an index on payment_type (if DuckDB supported secondary indexes) or partitioning the table by payment_type would avoid the full scan.",
+    "attempt": 2,
+    "carryover": "{\"ledger\":[[\"h1\",\"unproven\"],[\"h2\",\"untested\"],[\"h3\",\"untested\"],[\"h4\",\"untested\"]],\"rejected\":[[1,\"rewriter\",\"h1\",\"NOT_FASTER\",\"under_gate\",\"f58b28adc2d83fbaa28dc3ff163c3d0a13fb22c2db3a92a7e3b286e663aa96c8\",null]]}",
+    "playbook": []
+  },
+  "value": {
+    "hypothesis_id": "h2",
+    "sql": "SELECT z.LocationID, z.Borough, z.Zone, COUNT(t.PULocationID) AS cash_trips FROM ops.zones z LEFT JOIN lake.trips t ON t.PULocationID = z.LocationID AND t.payment_type = 2 GROUP BY z.LocationID, z.Borough, z.Zone ORDER BY z.LocationID",
+    "change_summary": "No rewrite possible without indexes; query already uses optimal hash join and grouping order for DuckDB columnar engine.",
+    "risk_notes": "Performance depends on DuckDB's internal optimizations; cannot force index usage as DuckDB lacks secondary indexes on Parquet tables."
+  }
+}

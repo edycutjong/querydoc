@@ -30,6 +30,7 @@ export interface RewriteContext {
   attemptNo: number;
   playbook?: PlaybookHit[]; // entries retrieved for this pattern and schema (refused = a trap, no_gain = already tried)
   engine?: string; // key field for the llm-cache
+  schema?: string; // schema fqn, key field for the llm-cache
 }
 
 export interface Rewrite {
@@ -64,7 +65,7 @@ export class Rewriter {
     const r = await this.llm.call(
       "rewrite",
       {
-        template: "rewriter@1", model: NIM_MODEL, engine: c.engine ?? "", sql: normaliseSql(c.sql), pattern: c.diagnosis.pattern_label, hypothesis: c.hypothesis.id,
+        template: "rewriter@1", model: NIM_MODEL, engine: c.engine ?? "", schema: c.schema ?? "", sql: normaliseSql(c.sql), pattern: c.diagnosis.pattern_label, hypothesis: c.hypothesis.id,
         claim: c.hypothesis.claim, attempt: c.attemptNo, carryover: c.carryoverKey, playbook: (c.playbook ?? []).map((h) => h.id).sort(),
       },
       { system: engineSystem(REWRITER_SYSTEM, c.engine ?? ""), user, reasoning: this.reasoning, maxTokens: 8000, temperature: 1.0 },

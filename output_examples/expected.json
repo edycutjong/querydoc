@@ -1,15 +1,15 @@
 {
   "example_1": {
-    "canonical": "NO_SAFE_REWRITE/attempts_exhausted",
+    "canonical": "NO_SAFE_REWRITE/llm_unavailable",
     "allowed": [
-      "NO_SAFE_REWRITE/attempts_exhausted",
-      "ACCEPTED",
       "NO_SAFE_REWRITE/llm_unavailable"
     ]
   },
   "example_2": {
-    "canonical": "NO_SAFE_REWRITE/llm_unavailable",
+    "canonical": "NO_SAFE_REWRITE/attempts_exhausted",
     "allowed": [
+      "NO_SAFE_REWRITE/attempts_exhausted",
+      "ACCEPTED",
       "NO_SAFE_REWRITE/llm_unavailable"
     ]
   },

@@ -32,18 +32,13 @@ jobs:
         run: |
           for i in $(seq 1 40); do curl -sf localhost:8000/health && exit 0; sleep 1; done
           docker logs querydoc; exit 1
-      - name: example_1 (the Hub step 9 request) — plain SQL, recorded model responses
+      - name: all six shipped examples (example_1 is the Hub step-9 request; 1 and 3 need no model, 2/4/6 replay recorded model responses)
         run: |
-          curl -sf -X POST localhost:8000/run -H 'Content-Type: application/json' -d @input_examples/example_1.json -o out1.json
-          node scripts/assert-verdict.mjs out1.json example_1
-      - name: example_2 (a supplied rewrite is refused by the Verifier, no model needed)
-        run: |
-          curl -sf -X POST localhost:8000/run -H 'Content-Type: application/json' -d @input_examples/example_2.json -o out2.json
-          node scripts/assert-verdict.mjs out2.json example_2
-      - name: example_3 (the refusal is reused from the playbook ledger)
-        run: |
-          curl -sf -X POST localhost:8000/run -H 'Content-Type: application/json' -d @input_examples/example_3.json -o out3.json
-          node scripts/assert-verdict.mjs out3.json example_3
-          node -e "const r=require('./out3.json'); const a=r.output.case.attempts[0]; if(!a.reused_from||a.fingerprint.rewrite!==null){console.error('ledger reuse missing');process.exit(1)}"
+          for n in 1 2 3 4 5 6; do
+            curl -sf -X POST localhost:8000/run -H 'Content-Type: application/json' -d @input_examples/example_$n.json -o out$n.json
+            node scripts/assert-verdict.mjs out$n.json example_$n
+          done
+      - name: example_3 reuses the refusal from the playbook ledger (candidate not executed)
+        run: node -e "const r=require('./out3.json'); const a=r.output.case.attempts[0]; if(!a.reused_from||a.fingerprint.rewrite!==null){console.error('ledger reuse missing');process.exit(1)}"
       - if: failure()
         run: docker logs querydoc | tail -50

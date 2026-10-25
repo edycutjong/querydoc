@@ -80,8 +80,10 @@ writeFileSync(join(PACK, "PRECONDITIONS.md"), lines.join("\n") + "\n");
 const body = (sql: string, playbook: "empty" | "seed", candidate?: string) =>
   JSON.stringify({ input: { sql: strip(sql), ...(candidate ? { candidate_sql: strip(candidate) } : {}), source: "paste" }, options: { sample_mode: true, playbook } }, null, 2) + "\n";
 const ex: [string, string][] = [
-  ["example_1", body(read("03-trap-left-join.sql"), "empty")],
-  ["example_2", body(read("03-trap-left-join.sql"), "empty", read("03-trap-left-join.rewrite.sql"))],
+  // Names follow the spec's swap rule: the canonical record pass showed the model avoiding T1 (0 of 5 first attempts refused), so the
+  // Hub step-9 example_1 is the deterministic refusal of the tempting rewrite and example_2 is the plain-SQL run.
+  ["example_1", body(read("03-trap-left-join.sql"), "empty", read("03-trap-left-join.rewrite.sql"))],
+  ["example_2", body(read("03-trap-left-join.sql"), "empty")],
   ["example_3", body(read("03-trap-left-join.sql"), "seed", read("03-trap-left-join.rewrite.sql"))],
   ["example_4", body(read("01-hero.sql"), "empty")],
   ["example_5", body(read("07-nondeterministic.sql"), "empty")],

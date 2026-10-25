@@ -126,7 +126,7 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
     }
 
     const rewriter = new Rewriter(deps.llm, trace, deps.reasoning?.rewriter ?? "off");
-    const chain = await runChain({ sql: input.sql, plan, diagnosis: c.diagnosis, facts, pre, rewriter, diagnoser, verifier, trace, maxAttempts, prior, engine: deps.engine.name, retrieve, ...(reuse ? { reuse } : {}), onAttempt });
+    const chain = await runChain({ sql: input.sql, plan, diagnosis: c.diagnosis, facts, pre, rewriter, diagnoser, verifier, trace, maxAttempts, prior, engine: deps.engine.name, schema: c.schema_fqn ?? "", retrieve, ...(reuse ? { reuse } : {}), onAttempt });
     c.attempts.push(...chain.attempts);
     syncHits();
     if (c.llm === "none" && chain.attempts.length) c.llm = deps.llm.live ? "nim" : "cache"; // a Rewriter attempt ran, so a model (or its cache) was used

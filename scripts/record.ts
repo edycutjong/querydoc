@@ -1,12 +1,12 @@
 // npm run record -- [--sample] [--live] [--traps N] [--fresh]
 // Re-records the evidence in one command (architecture §scripts/record.ts). Needs NVIDIA_API_KEY (~/.config/querydoc/nvidia.env).
-//  --sample : the canonical pass over input_examples/example_1,4,6 (the ONLY runs that write llm-cache/), example_2/3 with cache
-//             writes off (candidate-origin rule), the ledger-reuse seed, N repeats of each trap (03/04/05, cache writes off), then a
+//  --sample : the canonical pass over input_examples/example_2,4,6 (plain SQL: the ONLY runs that write llm-cache/), example_1/3 (a supplied
+//             candidate) with cache writes off (candidate-origin rule, also enforced inside the gateway), the ledger-reuse seed, N repeats of each trap (03/04/05, cache writes off), then a
 //             keyless replay of all six examples written to output_examples/ with the allowed-verdict sets.
 //  --live   : the Zetaris pack (input_examples/live/*) N times each into recorded/live/ — only when the platform answers.
 // Every run starts from a fresh playbook; nothing here writes a human decision (the builder approves through POST /runs/:id/decision).
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { LlmGateway, nimClientFromEnv } from "../src/adapters/nim.js";
 import { DIAGNOSER_SYSTEM, REVISE_SYSTEM } from "../src/agents/diagnoser.js";
@@ -71,19 +71,19 @@ async function samplePack() {
     return c;
   };
 
-  // 1. canonical pass: examples 1, 4, 6 write the cache
-  for (const n of [1, 4, 6]) runs[`example_${n}`] = summary(await runOne(canon, example(n), `canon-example_${n}`, join(recDir, `example_${n}`)));
-  // 2. example_2 (candidate-origin: cache writes off) → the seed holds that candidate's Verifier refusal
-  const c2 = await runOne(live, example(2), "canon-example_2", join(recDir, "example_2"));
-  runs.example_2 = summary(c2);
+  // 1. canonical pass: examples 2, 4, 6 (plain SQL) write the cache
+  for (const n of [2, 4, 6]) runs[`example_${n}`] = summary(await runOne(canon, example(n), `canon-example_${n}`, join(recDir, `example_${n}`)));
+  // 2. example_1 (candidate-origin: cache writes off) → the seed holds that candidate's Verifier refusal
+  const c2 = await runOne(live, example(1), "canon-example_1", join(recDir, "example_1"));
+  runs.example_1 = summary(c2);
   const refused = c2.attempts.find((a) => a.origin === "candidate_sql" && a.reason === "ROW_DIFF");
-  if (!refused) throw new Error("example_2: the candidate was not refused for ROW_DIFF — cannot build the ledger-reuse seed");
+  if (!refused) throw new Error("example_1: the candidate was not refused for ROW_DIFF — cannot build the ledger-reuse seed");
   const seedDir = join(ROOT, "fixtures", "hmem-seed", "sample");
   rmSync(seedDir, { recursive: true, force: true });
   const seed = Playbook.open({ dir: seedDir, fixedClock: true });
   seed.recordRejection(refused, { pattern: c2.diagnosis!.pattern_label, schema: c2.schema_fqn!, origSql: c2.sql, origFp: c2.precheck!.fingerprint });
   console.log(`seed: ${seed.size} entry in ${seedDir}`);
-  // 3. example_3 reuses it
+  // 3. example_3 reuses it (same candidate, playbook "seed")
   runs.example_3 = summary(await runOne(live, example(3), "canon-example_3", join(recDir, "example_3")));
   // 4. example_5 (deterministic, no model)
   runs.example_5 = summary(await runOne(live, example(5), "canon-example_5", join(recDir, "example_5")));
@@ -110,7 +110,8 @@ async function samplePack() {
 
   // 6. keyless replay of the recorded cache → output_examples/ + allowed verdict sets
   const keyless = new QueryDocService({ llm: new LlmGateway({ client: null, cacheDir: join(ROOT, "llm-cache") }), env: { SAMPLE_MODE: "true" } });
-  const out = join(ROOT, "output_examples");
+  const finalOut = join(ROOT, "output_examples");
+  const out = `${finalOut}.tmp`; // written aside and swapped in only after every assertion passes
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
   const expected: Record<string, { canonical: string; allowed: string[] }> = {};
@@ -122,15 +123,17 @@ async function samplePack() {
     const c = r.json.output.case as Case;
     writeFileSync(join(out, `example_${n}.dossier.json`), JSON.stringify({ example: `example_${n}`, request: example(n), response: { ...r.json, run_id: undefined, trace_id: undefined, log_file: undefined, execution_time_seconds: undefined, output: { dossier: r.json.output.dossier, case: c } } }, null, 2) + "\n");
     const canonical = runs[`example_${n}`] as ReturnType<typeof summary>;
-    // examples 2 and 3 are candidate-origin: with a key the loop continues live, keyless it ends after attempt 1 (llm_unavailable) by construction
-    const canonicalKey = [2, 3].includes(n) ? key(c) : key({ verdict: canonical.verdict, no_rewrite_reason: canonical.no_rewrite_reason });
-    const timingDerived = [1, 4, 6].includes(n);
+    // examples 1 and 3 are candidate-origin: with a key the loop continues live, keyless it ends after attempt 1 (llm_unavailable) by construction
+    const canonicalKey = [1, 3].includes(n) ? key(c) : key({ verdict: canonical.verdict, no_rewrite_reason: canonical.no_rewrite_reason });
+    const timingDerived = [2, 4, 6].includes(n);
     expected[`example_${n}`] = { canonical: canonicalKey, allowed: [...new Set([canonicalKey, ...(timingDerived ? ["ACCEPTED", "NO_SAFE_REWRITE/llm_unavailable"] : [])])] };
-    if ([2, 3].includes(n) && canonicalKey !== "NO_SAFE_REWRITE/llm_unavailable") throw new Error(`example_${n}: the keyless replay ended ${canonicalKey}, expected NO_SAFE_REWRITE/llm_unavailable`);
+    if ([1, 3].includes(n) && canonicalKey !== "NO_SAFE_REWRITE/llm_unavailable") throw new Error(`example_${n}: the keyless replay ended ${canonicalKey}, expected NO_SAFE_REWRITE/llm_unavailable`);
     console.log(`replay example_${n}: ${key(c)} (canonical ${canonicalKey})`);
   }
   writeFileSync(join(out, "expected.json"), JSON.stringify(expected, null, 2) + "\n");
   writeFileSync(join(out, "README.md"), "# output_examples\n\nWhat the code produced for each `input_examples/example_N.json` in a **keyless replay of the recorded `llm-cache/`** after the canonical pass (`npm run record`). Nothing in the pipeline or the server ever reads these files; `test/replay-parity.test.ts` re-runs the inputs offline and compares against `expected.json` (the canonical verdict and the explicit set of verdicts a timing-derived replay may end in).\n");
+  rmSync(finalOut, { recursive: true, force: true });
+  renameSync(out, finalOut);
   await canon.close();
   await live.close();
   await keyless.close();
