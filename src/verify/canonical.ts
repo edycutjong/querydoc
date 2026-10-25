@@ -4,8 +4,9 @@ import type { Cell, Column } from "../engine/types.js";
 // Canonical form of a result set, so two engines' (or two runs') rows compare by value, not by how the driver printed them.
 // Each cell becomes a string (or null) by its column's type class: integers through BigInt, DECIMALs with trailing zeros dropped,
 // floats rounded to N significant digits (relative tolerance — pre-aggregation and pushdown rewrites re-order sums, which moves
-// the last bits; rounding at a boundary can only cause a false refusal, never a false accept). Exact DECIMAL aggregates never take
-// the float path.
+// the last bits; measured live: SUM(double) re-ordered, largest relative difference 4.9e-15, docs/DX-REPORT.md). So float columns
+// are "identical" to N significant digits, by design: values that differ only past the Nth digit compare equal, and two near-equal
+// values on either side of a rounding boundary are refused (a false refusal). Exact DECIMAL aggregates never take the float path.
 
 export type TypeClass = "int" | "float" | "decimal" | "string" | "bool" | "date" | "timestamp" | "binary" | "other";
 export type CanonCell = string | null;
