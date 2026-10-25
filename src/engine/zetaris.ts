@@ -3,6 +3,7 @@ import { existsSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
+import { engineFingerprintSql } from "../verify/fingerprint.js";
 import { parseSparkPlan } from "./sparkPlan.js";
 import { EngineError, type Cell, type Column, type Plan, type QueryEngine, type RunOptions, type RunResult, type TableRef } from "./types.js";
 
@@ -67,6 +68,8 @@ function ensureCompiled(java: string) {
 
 export class ZetarisEngine implements QueryEngine {
   readonly name = "zetaris" as const;
+  // The sidecar reads one row past rowCap, so `truncated` is a real flag (no engine-side cap seen up to 200k rows on Day 1).
+  readonly reportsTruncation = true;
   private proc?: ChildProcessWithoutNullStreams;
   private ready?: Promise<void>;
   private waiting = new Map<string, (r: SidecarReply) => void>();
@@ -186,6 +189,10 @@ export class ZetarisEngine implements QueryEngine {
       cols.push({ name: String(name), type: String(type) });
     }
     return cols;
+  }
+
+  rowHashSql(innerSql: string, columns: Column[], floatSigDigits: number): string {
+    return engineFingerprintSql(innerSql, columns, "xxhash64", floatSigDigits);
   }
 
   async close() {

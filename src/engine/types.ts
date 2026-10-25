@@ -46,6 +46,11 @@ export interface TableRef {
 
 export interface QueryEngine {
   readonly name: "zetaris" | "duckdb";
+  // true when run() sets `truncated` reliably once a result passes rowCap; false means an unknown tool limit, so the Verifier
+  // adds a COUNT(*) check (architecture §Verifier order step 2).
+  readonly reportsTruncation: boolean;
+  // COUNT(*) + summed per-row hash over the canonicalised columns, in this engine's dialect.
+  rowHashSql(innerSql: string, columns: Column[], floatSigDigits: number): string;
   health(): Promise<{ ok: boolean; wallMs: number; error?: string }>;
   listTables(schema: string): Promise<TableRef[]>;
   tableInfo(table: TableRef): Promise<Column[]>;
