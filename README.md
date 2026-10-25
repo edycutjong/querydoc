@@ -91,12 +91,21 @@ the difference is that none of its changed-row rewrites shipped. The hero is the
 
 ## 🏗️ Architecture & Tech Stack
 
+<p align="center">
+  <img src="docs/assets/architecture.png" alt="Query Doctor architecture: slow SQL passes a code-only pre-check, then a Nemotron Diagnoser and Rewriter propose rewrites inside a Meterless Markovian chain of at most 3 attempts. A code-only Verifier executes both queries on Zetaris over JDBC and keeps a rewrite only if rows are identical and the median is at least 1.2× faster above the noise floor. A row difference loops back to the Rewriter with the first differing row; no gain loops back to Diagnoser.revise; otherwise it refuses with the reason. Outcomes are written to and retrieved from the H-MEM playbook. The model is Nemotron 3 Ultra via Meterless Nightshift by default, with direct NVIDIA NIM as the fallback used by all recorded runs; DuckDB plus llm-cache power keyless sample mode." width="100%">
+</p>
+
+<details>
+<summary>Text version of the flow</summary>
+
 ```
 SQL → guard → Verifier.precheck → EXPLAIN + pattern detector + key profile → Diagnoser
     → Markovian chain (≤ 3 attempts): H-MEM retrieve → Rewriter → Verifier ─┬ ACCEPT → ACCEPTED
                                                                               ├ ROW_DIFF → playbook write → retry
                                                                               └ no_gain → Diagnoser.revise
 ```
+
+</details>
 
 Full walk-through and file map: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
