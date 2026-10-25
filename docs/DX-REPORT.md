@@ -63,8 +63,8 @@ reads. Plain `EXPLAIN` (no ids) falls back to line numbering.
 aggregates. The hero is a `COUNT`, so it compares exactly.
 
 **SQL dialect for the guard.** `node-sql-parser` with `database: "hive"` parses the hero, its rewrite, the trap, the
-fingerprint SQL and TPC-H Q17. `trino`, `postgresql` and `mysql` fail on the fingerprint's `CAST(... AS STRING)` (run 07-39-14Z,
-call 13); `trino` also fails on Q17. `hive` and `bigquery` parse all five. We use `hive` because Zetaris runs Spark SQL.
+fingerprint SQL and TPC-H Q17. `trino`, `postgresql` and `mysql` fail on the fingerprint SQL — we read the cause as its `CAST(... AS STRING)`;
+the log does not name it (run 07-39-14Z, call 13); `trino` also fails on Q17. `hive` and `bigquery` parse all five. We use `hive` because Zetaris runs Spark SQL.
 
 **LLM.** `GET /v1/models` lists `nvidia/nemotron-3-ultra-550b-a55b`, and a chat call to it returned 200 in 0.9 s (calls 14–15).
 
@@ -84,6 +84,6 @@ unique key), re-expressed on `TPCDS_DB.store_sales` × `TPCDS_DB.promotion`. Run
 - **Trap sibling** (`01-hero-trap-dupkey.sql`): the same join on `p_item_sk`. Dropping it changes the count, **129,776 →
   129,752** (calls 26–27), so the Verifier must refuse that rewrite.
 
-Friction: the hero runs for about 36 s, well over the 5–12 s we planned for. One live verification (pre-check plus three timed
-pairs) will therefore take about three minutes (the six pair runs above sum to 167 s). The spike used a 300 s timeout per
-execution; the adapter's default is 120 s, so live verification must raise it.
+Friction: the hero runs for about 36 s, longer than we expected. One live verification (pre-check plus three timed pairs) will
+therefore take about three to three and a half minutes (the six pair runs alone sum to 167 s). The spike used a 300 s timeout
+for the hero, pair and trap executions; the adapter's default is 120 s, so live verification must raise it.
