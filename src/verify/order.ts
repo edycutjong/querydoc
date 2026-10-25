@@ -68,3 +68,17 @@ export function orderSpec(sql: string, outputColumns: string[], dialect = "hive"
   }
   return { kind: "ordered", keyIdx, limit };
 }
+
+// True when the statement has an ORDER BY outside every parenthesis — the one that orders the result. A subquery's ORDER BY or a
+// window's OVER (ORDER BY …) does not count. Text-level, so it also holds for a statement the parser cannot read.
+export function hasTopLevelOrderBy(sql: string): boolean {
+  const m = maskSql(sql);
+  let depth = 0;
+  for (let i = 0; i < m.length; i++) {
+    const c = m[i];
+    if (c === "(") depth++;
+    else if (c === ")") depth = Math.max(0, depth - 1);
+    else if (depth === 0 && (c === "o" || c === "O") && /^order\s+by\b/i.test(m.slice(i, i + 12)) && !/\w/.test(m[i - 1] ?? "")) return true;
+  }
+  return false;
+}

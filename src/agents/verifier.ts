@@ -7,7 +7,7 @@ import { canonRows, isVacuous, sameSchema, sha256Text, type CanonRow } from "../
 import { lintDeterminism, tieAtCut, tieProbeSql } from "../verify/determinism.js";
 import { diffRows, rowsFingerprint } from "../verify/diff.js";
 import { countStarSql } from "../verify/fingerprint.js";
-import { orderSpec, type OrderSpec } from "../verify/order.js";
+import { hasTopLevelOrderBy, orderSpec, type OrderSpec } from "../verify/order.js";
 import { decideTiming, median, timePairs, type Gate, type TimingPolicy } from "../verify/timing.js";
 
 // The Verifier agent: deterministic code only — the one place an ACCEPT can come from (architecture §Safety invariant 1). LLM
@@ -241,7 +241,7 @@ export class Verifier {
     const lint = lintDeterminism(sql, candSpec);
     // An ordered original's order is part of its answer. A candidate without a top-level ORDER BY may return the same sequence on
     // one run (a sorted subquery, a single-threaded scan) and another on the next: one positional match proves nothing.
-    if (pre.spec.kind !== "multiset" && candSpec.kind === "multiset") lint.push("no top-level ORDER BY, but the original's order is part of its result");
+    if (pre.spec.kind !== "multiset" && (candSpec.kind === "multiset" || !hasTopLevelOrderBy(sql))) lint.push("no top-level ORDER BY, but the original's order is part of its result");
     if (lint.length) return finish({ ...att, verdict: "REFUSED", reason: "GUARD", detail: `determinism lint: ${lint.join("; ")} — not executed` });
 
     // Ledger reuse (architecture §Verifier order step 1): a refusal recorded on this original, this candidate and this original-result

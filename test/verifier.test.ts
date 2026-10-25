@@ -186,6 +186,18 @@ describe("Verifier — timing table end to end (stub engine)", () => {
 });
 
 describe("Verifier — hardening", () => {
+  it("an ORDER BY only inside a subquery or a window does not count as the candidate's order", async () => {
+    const { hasTopLevelOrderBy } = await import("../src/verify/order.js");
+    expect(hasTopLevelOrderBy("SELECT k FROM t ORDER BY k")).toBe(true);
+    expect(hasTopLevelOrderBy("SELECT k FROM (SELECT k FROM t ORDER BY k) s")).toBe(false);
+    expect(hasTopLevelOrderBy("SELECT k, ROW_NUMBER() OVER (ORDER BY k) AS r FROM t")).toBe(false);
+    expect(hasTopLevelOrderBy("SELECT k FROM a UNION ALL SELECT k FROM b ORDER BY k")).toBe(true);
+    expect(hasTopLevelOrderBy("SELECT 'order by' AS x FROM t")).toBe(false);
+    const { v } = setup({ "SELECT k FROM t ORDER BY k": { columns: K, rows: range(5), wallMs: 1000 } });
+    const pre = await v.precheck("SELECT k FROM t ORDER BY k");
+    const a = await v.verify(attempt("SELECT k, ROW_NUMBER() OVER (ORDER BY k) AS r FROM t QUALIFY r > 0"), pre);
+    expect(a).toMatchObject({ verdict: "REFUSED", reason: "GUARD" });
+  });
   it("a tie at the cut is still seen when LIMIT k equals the row cap (the probe reads k+1 rows)", async () => {
     const tied = (n: number) => range(n, (i) => [i < 99 ? i : 99]); // rows 100 and 101 share the sort key 99
     const { v } = setup({
