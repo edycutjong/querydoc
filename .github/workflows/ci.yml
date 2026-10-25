@@ -54,8 +54,8 @@ jobs:
       name: ${{ github.event_name != 'pull_request' && 'production' || 'preview' }}
       url: ${{ steps.deploy.outputs.url }}
     env:
-      VERCEL_ORG_ID: team_RJcQx4a22v5LqjetHv8HhhLY
-      VERCEL_PROJECT_ID: prj_l5qTeeiZyVEjUQzipLlNguQ326yh
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

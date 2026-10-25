@@ -1,15 +1,15 @@
 <div align="center">
-  <img src="docs/assets/readme-hero-animated.svg" alt="Query Doctor — keeps a SQL rewrite only if executing it returns identical rows and runs faster. The original query's red runtime bar shrinks, and a green ROW-IDENTICAL stamp lands over the matching fingerprint." width="100%">
-</div>
-
-<div align="center">
+  <img src="docs/assets/icon-animated.svg" alt="Query Doctor icon — the Verifier's stamp bearing an equals sign" width="144">
   <h1>Query Doctor 🩺</h1>
   <p><em>Same rows. Faster. Or refused. A SQL rewrite is kept only when both queries, executed on Zetaris, return identical rows and the rewrite is measurably faster.</em></p>
+  <img src="docs/assets/readme-hero-animated.svg" alt="Query Doctor — keeps a SQL rewrite only if executing it returns identical rows and runs faster. The original query's red runtime bar shrinks, and a green ROW-IDENTICAL stamp lands over the matching fingerprint." width="100%">
 
   <br/>
 
+  [![Live Site](https://img.shields.io/badge/🚀_Live-Site-06b6d4?style=for-the-badge)](https://querydoc.edycu.dev/)
+  [![Pitch Deck](https://img.shields.io/badge/📊_Pitch-Deck-f59e0b?style=for-the-badge)](https://querydoc.edycu.dev/deck/)
   [![Hackathon](https://img.shields.io/badge/GenAI_Works-Open_Agent_Hackathon_2026-8b5cf6?style=for-the-badge)](https://hackathon.genai.works/event/open-agent-hackathon-2026)
-  [![Measured Proof](https://img.shields.io/badge/📊_Measured-Proof-f59e0b?style=for-the-badge)](DEMO.md)
+  [![Measured Proof](https://img.shields.io/badge/📏_Measured-Proof-10b981?style=for-the-badge)](DEMO.md)
   [![Failure Modes](https://img.shields.io/badge/⚠️_Failure-Modes-ef4444?style=for-the-badge)](FAILURE_MODES.md)
 
   <br/>
@@ -20,6 +20,8 @@
   ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)
   ![Tests](https://img.shields.io/badge/tests-286_passing-brightgreen?style=flat)
   [![License](https://img.shields.io/badge/License-Apache_2.0-yellow)](LICENSE)
+  [![CI](https://github.com/edycutjong/querydoc/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/querydoc/actions/workflows/ci.yml)
+  [![Release](https://img.shields.io/github/v/release/edycutjong/querydoc?sort=semver)](https://github.com/edycutjong/querydoc/releases/latest)
 
 </div>
 
