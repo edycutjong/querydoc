@@ -18,7 +18,7 @@
   ![Node](https://img.shields.io/badge/Node_22-339933?style=flat&logo=nodedotjs&logoColor=white)
   ![DuckDB](https://img.shields.io/badge/DuckDB-FFF000?style=flat&logo=duckdb&logoColor=black)
   ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)
-  ![Tests](https://img.shields.io/badge/tests-286_passing-brightgreen?style=flat)
+  ![Tests](https://img.shields.io/badge/tests-447_passing-brightgreen?style=flat)
   [![License](https://img.shields.io/badge/License-Apache_2.0-yellow)](LICENSE)
   [![CI](https://github.com/edycutjong/querydoc/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/querydoc/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/v/release/edycutjong/querydoc?sort=semver)](https://github.com/edycutjong/querydoc/releases/latest)
@@ -143,7 +143,8 @@ Dev environment: Cursor's agent wrote the scaffold commit only (`d3e823c`). Ever
 
 | Metric | Value | Source |
 |---|---|---|
-| Tests | **286 tests, 26 files** (vitest) | `npm test` |
+| Tests | **447 tests, 34 files** (vitest) | `npm test` |
+| Coverage | **98.0% lines · 89.1% branches** on `src/`; every file ≥ 80% on lines, branches, functions and statements, enforced per file in CI | `npm run test:coverage` |
 | Hero on Zetaris (TPCDS_DB, local JDBC) | 2.11× median, 10/10 pairs faster | [`DEMO.md`](DEMO.md) |
 | Live accepted runs | hero 2.1× and 2.15×; correlated-avg 1.44× (rows identical); 3 hero takes filmed for the video, 2.13× · 2.11× · 2.32× | [`recorded/live/README.md`](recorded/live/README.md), [`evidence/video/`](evidence/video/README.md) |
 | Rewrites shipped with changed rows | 0 | an ACCEPT requires an identical row fingerprint |
@@ -198,7 +199,8 @@ Live mode answers only on `localhost`, an IP address or `QUERYDOC_ALLOWED_HOSTS`
 ## 🧪 Testing & CI
 
 ```bash
-npm run typecheck && npm test        # 286 tests, no keys needed
+npm run typecheck && npm test        # 447 tests, no keys needed
+npm run test:coverage                # per-file ≥ 80% gate (CI runs this)
 npm run test:offline                 # replay parity of the recorded packs
 npm run bench                        # → DEMO.md        npm run eval   # → evals/results.md
 docker run --rm querydoc npm test    # the same suite in the image

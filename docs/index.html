@@ -404,7 +404,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
   <div class="rc"><div class="num" data-count="2.11" data-dec="2" data-suf="×">2.11×</div><p class="what">hero speedup on Zetaris, bench</p><p class="ref">median of 10 per-pair ratios, 10/10 faster, same row (p50 ÷ p50 = 1.97×); the live verdict was 2.1× over 3 pairs · DEMO.md (bench), recorded/live/hero-r1 (live verdict)</p></div>
   <div class="rc"><div class="num" data-count="0">0</div><p class="what">rewrites shipped with changed rows</p><p class="ref">an ACCEPT needs an identical row fingerprint · evals/results.md</p></div>
   <div class="rc"><div class="num red" data-count="6" data-suf=" / 15">6 / 15</div><p class="what">baseline rewrites that changed rows</p><p class="ref">one plain model call, same Verifier, DuckDB sample pack · evals/results.md</p></div>
-  <div class="rc"><div class="num" data-count="286">286</div><p class="what">tests, no keys needed</p><p class="ref">26 files · npm test</p></div>
+  <div class="rc"><div class="num" data-count="447">447</div><p class="what">tests, no keys needed</p><p class="ref">34 files · npm test</p></div>
 </div></div>
 
 <section class="sec" id="case"><div class="wrap">
@@ -518,7 +518,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
   <div class="faq">
     <details><summary>Does a model decide whether a rewrite ships?</summary><p>No. The Verifier is deterministic code: it executes both queries, compares the rows and times alternating pairs. The model's text is labelled as model text in every report and never decides anything.</p></details>
     <details><summary>Is the 2.11× measured or estimated?</summary><p>Measured: wall clock on the local Zetaris platform over JDBC, 10 alternating pairs, rows verified identical first. The p50s are 32,442.6 ms and 16,428 ms. It is one laptop and says nothing about a hosted deployment.</p></details>
-    <details><summary>Can I run it without keys?</summary><p>Yes. Sample mode runs DuckDB on a committed NYC TLC subset with recorded model answers, and all 286 tests run keyless. The sample pack has no ACCEPT: the accepted speedup is from live Zetaris only.</p></details>
+    <details><summary>Can I run it without keys?</summary><p>Yes. Sample mode runs DuckDB on a committed NYC TLC subset with recorded model answers, and all 447 tests run keyless. The sample pack has no ACCEPT: the accepted speedup is from live Zetaris only.</p></details>
     <details><summary>What is not shown live?</summary><p>Meterless Nightshift. It is the default provider in code with 16 mock-runtime tests, but it was never run against a live runtime; every recorded run used direct NVIDIA NIM, and every recorded trace with a model call names <code>nim</code>.</p></details>
     <details><summary>Will it change my database?</summary><p>No. The guard admits one read-only statement per query; a rewrite cannot write or run a second statement. An accepted case is a candidate; when a human approves it, a patch file is written for them to review and apply.</p></details>
     <details><summary>Is "same rows" a proof?</summary><p>No, and the report says so: the rewrite is identical on the current data and verified by execution — it is not a proof for all future data.</p></details>
