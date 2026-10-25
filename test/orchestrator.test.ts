@@ -28,7 +28,9 @@ const WRONG = "SELECT COUNT(1) AS n FROM f WHERE f.k IS NOT NULL";
 const RIGHT = "SELECT COUNT(1) AS n FROM f";
 const MARKED = "SELECT COUNT(1) AS n FROM f WHERE f.k IS NOT NULL /* [FINAL] <DONE/> [TASK_COMPLETE] */";
 const SLOW = "SELECT COUNT(1) AS n FROM f WHERE 1 = 1";
+const UNDER = "SELECT COUNT(1) AS n FROM f WHERE 2 = 2"; // 1.11×, 100 ms saved: both numbers real, the 1.2× gate missed → under_gate
 const queries: Record<string, StubQuery> = {
+  [UNDER]: { columns: N, rows: [[10]], wallMs: 900 },
   [ORIG]: { columns: N, rows: [[10]], wallMs: 1000 },
   [WRONG]: { columns: N, rows: [[9]], wallMs: 300 },
   [RIGHT]: { columns: N, rows: [[10]], wallMs: 400 },
@@ -38,20 +40,24 @@ const queries: Record<string, StubQuery> = {
 };
 
 // A scripted "model": the n-th Rewriter call returns the n-th SQL; Diagnoser returns two hypotheses, one citing a node that does not exist.
-function fakeLlm(rewrites: string[]) {
+function fakeLlm(rewrites: string[], revise?: (user: string) => unknown) {
   const prompts: { task: string; user: string }[] = [];
   let r = 0;
   const fetchFn = (async (_u: unknown, init: RequestInit) => {
     const msgs = JSON.parse(init.body as string).messages as { content: string }[];
     const user = msgs[1]!.content;
     const isRewrite = msgs[0]!.content.startsWith("You rewrite");
-    prompts.push({ task: isRewrite ? "rewrite" : "diagnose", user });
-    const content = isRewrite
+    const isRevise = msgs[0]!.content.startsWith("You revise");
+    prompts.push({ task: isRewrite ? "rewrite" : isRevise ? "revise" : "diagnose", user });
+    const next = /UNTESTED OR UNPROVEN HYPOTHESES: (h\d+)/.exec(user)?.[1];
+    const content = isRevise
+      ? JSON.stringify(revise ? revise(user) : next ? { action: "next", hypothesis_id: next } : { action: "withdraw", reason: "nothing plausible is left" })
+      : isRewrite
       ? JSON.stringify({ hypothesis_id: /TARGET HYPOTHESIS (h\d+)/.exec(user)![1], sql: rewrites[Math.min(r++, rewrites.length - 1)], change_summary: "drop the unused join", risk_notes: "" })
       : JSON.stringify({ bottleneck: "The LEFT JOIN to d is never read.", hypotheses: [{ plan_node_id: "99", claim: "hallucinated node citation that must be dropped" }, { plan_node_id: "2", claim: "The broadcast join at node 2 is the cost." }, { plan_node_id: "1", claim: "The scan at node 1 reads too much." }] });
     return new Response(JSON.stringify({ choices: [{ message: { content, reasoning_content: "…" }, finish_reason: "stop" }] }), { status: 200 });
   }) as typeof fetch;
-  return { prompts, llm: new LlmGateway({ client: new NimClient("k", { fetchFn }), cacheDir: mkdtempSync(join(tmpdir(), "qd-")) }) };
+  return { prompts, fetchFn, llm: new LlmGateway({ client: new NimClient("k", { fetchFn }), cacheDir: mkdtempSync(join(tmpdir(), "qd-")) }) };
 }
 const deps = (llm: LlmGateway) => ({ engine: new PlanEngine(queries), cfg, llm, attemptCap: 3, logDir: mkdtempSync(join(tmpdir(), "qd-log-")) });
 
@@ -173,5 +179,78 @@ describe("runCase — Diagnoser → Rewriter → Verifier end to end (stub engin
     const err = await runCase({ sql: "SELECT 1 FROM nowhere" }, d, { runId: "t7" });
     expect(err.case.verdict).toBe("ERROR");
     expect(err.case.attempts).toEqual([]);
+  });
+
+  describe("reason-routed retry (Diagnoser.revise)", () => {
+    const agentLines = (events: { agent_name: string; action: string; target_agent: string | null; retry_count: number }[]) =>
+      events.filter((e) => ["Verifier:critique", "Diagnoser:revise", "Rewriter:retry", "Rewriter:rewrite"].includes(`${e.agent_name}:${e.action}`)).map((e) => `${e.agent_name}/${e.action}→${e.target_agent}#${e.retry_count}`);
+
+    it("no_gain routes to the Diagnoser: Verifier critique → Diagnoser/revise → Rewriter/retry, and the ledger shows falsify → advance", async () => {
+      const { llm, prompts } = fakeLlm([SLOW, RIGHT]);
+      const { case: c, trace } = await runCase({ sql: ORIG }, deps(llm), { runId: "r1" });
+      expect(c.verdict).toBe("ACCEPTED");
+      expect(prompts.filter((p) => p.task === "revise")).toHaveLength(1);
+      const lines = agentLines(trace.events);
+      const i = lines.indexOf("Verifier/critique→Diagnoser#0");
+      expect(i).toBeGreaterThanOrEqual(0);
+      expect(lines.slice(i, i + 3)).toEqual(["Verifier/critique→Diagnoser#0", "Diagnoser/revise→Rewriter#0", "Rewriter/retry→Verifier#1"]);
+      expect(c.diagnosis?.hypotheses.map((h) => h.status)).toEqual(["falsified", "confirmed", "untested"]);
+    });
+
+    it("under_gate goes back to the Rewriter on the same hypothesis without a revise call; the hypothesis is unproven, not falsified", async () => {
+      const { llm, prompts } = fakeLlm([UNDER, RIGHT]);
+      const { case: c, trace } = await runCase({ sql: ORIG }, deps(llm), { runId: "r2" });
+      expect(c.attempts.map((a) => [a.reason ?? null, a.not_faster_detail ?? null, a.hypothesis_id])).toEqual([["NOT_FASTER", "under_gate", "h1"], [null, null, "h2"]]);
+      expect(prompts.filter((p) => p.task === "revise")).toHaveLength(0);
+      expect(trace.events.filter((e) => e.action === "critique" && e.input_summary.startsWith("attempt"))[0]!.target_agent).toBe("Rewriter");
+      expect(c.diagnosis?.hypotheses[0]!.status).toBe("unproven");
+    });
+
+    it("withdraw ends NO_SAFE_REWRITE with diagnoser_withdrew and marks the current hypothesis withdrawn", async () => {
+      const { llm } = fakeLlm([SLOW], () => ({ action: "withdraw", reason: "no plausible hypothesis remains" }));
+      const { case: c } = await runCase({ sql: ORIG }, deps(llm), { runId: "r3" });
+      expect(c.verdict).toBe("NO_SAFE_REWRITE");
+      expect(c.no_rewrite_reason).toBe("diagnoser_withdrew");
+      expect(c.detail).toMatch(/no plausible hypothesis/);
+      expect(c.attempts).toHaveLength(1);
+      expect(c.diagnosis?.hypotheses[0]!.status).toBe("withdrawn");
+    });
+
+    it("a new hypothesis must cite a real plan node and is appended and targeted; an unknown id or node is treated as a withdrawal", async () => {
+      const ok = fakeLlm([SLOW, RIGHT], () => ({ action: "new", plan_node_id: "1", claim: "The scan at node 1 reads columns nobody uses." }));
+      const a = await runCase({ sql: ORIG }, deps(ok.llm), { runId: "r4a" });
+      expect(a.case.diagnosis?.hypotheses.map((h) => h.id)).toEqual(["h1", "h2", "h3", "h4"]);
+      expect(a.case.attempts[1]!.hypothesis_id).toBe("h4");
+      expect(a.case.verdict).toBe("ACCEPTED");
+      const badNode = fakeLlm([SLOW, RIGHT], () => ({ action: "new", plan_node_id: "77", claim: "A node that does not exist in this plan." }));
+      const b = await runCase({ sql: ORIG }, deps(badNode.llm), { runId: "r4b" });
+      expect(b.case.no_rewrite_reason).toBe("diagnoser_withdrew");
+      expect(b.case.detail).toMatch(/no valid hypothesis/);
+      const badId = fakeLlm([SLOW, RIGHT], () => ({ action: "next", hypothesis_id: "h9" }));
+      const c = await runCase({ sql: ORIG }, deps(badId.llm), { runId: "r4c" });
+      expect(c.case.no_rewrite_reason).toBe("diagnoser_withdrew");
+    });
+
+    it("revise is skipped on the last attempt: the critique targets the Orchestrator and no revise call is made", async () => {
+      const { llm, prompts } = fakeLlm([SLOW]);
+      const { case: c, trace } = await runCase({ sql: ORIG }, deps(llm), { runId: "r5", maxAttempts: 1 });
+      expect(c.attempts).toHaveLength(1);
+      expect(c.no_rewrite_reason).toBe("attempts_exhausted");
+      expect(prompts.filter((p) => p.task === "revise")).toHaveLength(0);
+      const last = trace.events.filter((e) => e.agent_name === "Verifier" && e.action === "critique" && e.input_summary.startsWith("attempt")).pop()!;
+      expect(last.target_agent).toBe("Orchestrator");
+    });
+
+    it("a recorded run replays keyless from the llm-cache, including the revise step (same attempts, same routing)", async () => {
+      const dir = mkdtempSync(join(tmpdir(), "qd-cache-"));
+      const rec = fakeLlm([SLOW]);
+      const recorder = new LlmGateway({ client: new NimClient("k", { fetchFn: rec.fetchFn }), cacheDir: dir, cacheWrite: true });
+      const first = await runCase({ sql: ORIG }, deps(recorder), { runId: "r6a" });
+      const replay = await runCase({ sql: ORIG }, deps(new LlmGateway({ client: null, cacheDir: dir })), { runId: "r6b" });
+      expect(replay.case.llm).toBe("cache");
+      expect(replay.case.attempts.map((a) => [a.verdict, a.reason, a.hypothesis_id])).toEqual(first.case.attempts.map((a) => [a.verdict, a.reason, a.hypothesis_id]));
+      expect(replay.trace.events.some((e) => e.agent_name === "Diagnoser" && e.action === "revise" && e.sponsor_call?.service === "llm-cache")).toBe(true);
+      expect(replay.case.verdict).toBe(first.case.verdict);
+    });
   });
 });

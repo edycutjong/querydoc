@@ -42,4 +42,14 @@ describe("carryover block (the Markovian state between attempts)", () => {
     expect(carryoverKey(l, [a])).not.toBe(carryoverKey(l, [att({ ...a, sql: "SELECT 2" })]));
     expect(carryoverKey(l, [a])).not.toBe(carryoverKey([H("h1", "unproven"), H("h2", "untested")], [a]));
   });
+
+  it("the state key separates a rejected attempt by origin and by first differing row (candidate-origin rule)", () => {
+    const l = [H("h1", "untested")];
+    const fromRewriter = att({ origin: "rewriter", hypothesis_id: "h1" });
+    const fromCandidate = att({ ...fromRewriter, origin: "candidate_sql", hypothesis_id: "h1" });
+    expect(carryoverKey(l, [fromRewriter])).not.toBe(carryoverKey(l, [fromCandidate]));
+    const withDiff = att({ ...fromRewriter, first_diff: { side: "orig", row: ["1"] } });
+    expect(carryoverKey(l, [withDiff])).not.toBe(carryoverKey(l, [att({ ...fromRewriter, first_diff: { side: "orig", row: ["2"] } })]));
+    expect(carryoverKey(l, [withDiff])).toBe(carryoverKey(l, [att({ ...withDiff, detail: "different text" })]));
+  });
 });

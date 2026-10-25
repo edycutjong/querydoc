@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { LlmGateway, NIM_MODEL, SampleModeNoLLM } from "../adapters/nim.js";
 import type { Plan } from "../engine/types.js";
+import type { Attempt } from "./verifier.js";
 import type { Trace } from "../trace.js";
 import type { Diagnosis, Hypothesis } from "../types.js";
 import { keyFactLine, type KeyFact } from "./profile.js";
@@ -22,6 +23,24 @@ export const DIAGNOSER_SYSTEM =
 
 export const engineSystem = (system: string, engine: string): string =>
   engine === "duckdb" ? system.replace("a Spark-based query engine (Hive dialect)", "DuckDB (PostgreSQL-like dialect)").replace("a Spark-based engine (Hive dialect)", "DuckDB (PostgreSQL-like dialect)") : system;
+
+// Diagnoser.revise: after a NOT_FASTER(no_gain) verdict (rows identical, no time saved) the ledger is updated by the orchestrator and the
+// Diagnoser decides what to try next. Its answer is a pick among the untested hypotheses, one new hypothesis citing a real plan node,
+// or a withdrawal. It reads the Verifier's numbers; it never produces one.
+export const REVISE_SYSTEM =
+  "You revise a SQL performance diagnosis. A rewrite was verified to return the same rows but was not faster, so the hypothesis it " +
+  "tested is falsified. Decide what to try next: pick one of the untested hypotheses, propose ONE new falsifiable hypothesis that cites " +
+  "a node of the physical plan, or withdraw if nothing plausible is left. You never claim a speed-up number. Reply with ONLY a JSON object.";
+
+export const ReviseReply = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("next"), hypothesis_id: z.string().min(2).max(8) }),
+  z.object({ action: z.literal("new"), plan_node_id: z.union([z.string(), z.number()]).transform(String), claim: z.string().min(10).max(500) }),
+  z.object({ action: z.literal("withdraw"), reason: z.string().min(3).max(300) }),
+]);
+export type ReviseOutcome =
+  | { action: "next"; hypothesis_id: string; source: "nim" | "llm-cache" }
+  | { action: "new"; plan_node_id: string; claim: string; source: "nim" | "llm-cache" }
+  | { action: "withdraw"; reason: string; source: "nim" | "llm-cache" };
 
 export const planExcerpt = (plan: Plan | null, max = 5000): string => (plan ? plan.text.slice(0, max) : "(no plan available)");
 
@@ -107,6 +126,44 @@ export class Diagnoser {
       });
     }
     return diagnosis;
+  }
+
+  // Called by the chain after NOT_FASTER(no_gain), with the ledger already updated (current → falsified). Throws SampleModeNoLLM
+  // when there is no key and no cache entry; an answer that cites an unknown id or plan node is returned as a withdrawal.
+  async revise(a: { sql: string; plan: Plan | null; diagnosis: Diagnosis; attempt: Attempt; carryoverKey: string; attemptNo: number }): Promise<ReviseOutcome> {
+    const untested = a.diagnosis.hypotheses.filter((h) => h.status === "untested" || h.status === "unproven");
+    const nodes = new Set([...a.diagnosis.plan_nodes.map((n) => n.id), ...(a.plan?.nodes.map((n) => String(n.id)) ?? [])]);
+    const t = a.attempt.timing_ms;
+    const user = [
+      "SQL:", a.sql.trim(), "",
+      "Physical plan (node ids in parentheses):", planExcerpt(a.plan), "",
+      "HYPOTHESIS LEDGER:", ...a.diagnosis.hypotheses.map((h) => `- ${h.id} [${h.status}] (plan node ${h.plan_node_id}) ${h.claim}`), "",
+      `LAST ATTEMPT (${a.attempt.origin}) on ${a.attempt.hypothesis_id ?? "a supplied candidate"}: rows identical, NOT FASTER — ${t ? `median ${t.median_speedup}×, saving ${t.median_saving_ms} ms, ${t.faster_pairs}/${t.orig.length} pairs faster` : "no timing"}.`,
+      `UNTESTED OR UNPROVEN HYPOTHESES: ${untested.map((h) => h.id).join(", ") || "none"}.`, "",
+      'Reply with ONE of: {"action":"next","hypothesis_id":"<an untested id>"} | {"action":"new","plan_node_id":"<a plan node id>","claim":"<falsifiable claim>"} | {"action":"withdraw","reason":"<why nothing plausible is left>"}.',
+    ].join("\n");
+    const t0 = performance.now();
+    const r = await this.llm.call(
+      "diagnose_revise",
+      { template: "diagnoser.revise@1", model: NIM_MODEL, engine: this.engine, sql: normaliseSql(a.sql), pattern: a.diagnosis.pattern_label, attempt: a.attemptNo, carryover: a.carryoverKey },
+      { system: engineSystem(REVISE_SYSTEM, this.engine), user, reasoning: this.reasoning, maxTokens: 4000, temperature: 1.0 },
+      (raw) => ReviseReply.parse(raw),
+    );
+    let out: ReviseOutcome;
+    const o = r.out;
+    if (o.action === "next") {
+      const id = o.hypothesis_id;
+      out = untested.some((h) => h.id === id) ? { action: "next", hypothesis_id: id, source: r.source } : { action: "withdraw", reason: `no valid hypothesis (named ${id})`, source: r.source };
+    } else if (o.action === "new") {
+      out = nodes.has(o.plan_node_id) ? { action: "new", plan_node_id: o.plan_node_id, claim: o.claim, source: r.source } : { action: "withdraw", reason: `no valid hypothesis (unknown plan node ${o.plan_node_id})`, source: r.source };
+    } else out = { action: "withdraw", reason: o.reason, source: r.source };
+    this.trace.emit({
+      agent_name: "Diagnoser", action: "revise", input_summary: `ledger after ${a.attempt.hypothesis_id ?? "candidate"} falsified; ${untested.length} untested`,
+      output_summary: out.action === "next" ? `try ${out.hypothesis_id}` : out.action === "new" ? `new hypothesis on node ${out.plan_node_id}: ${out.claim.slice(0, 100)}` : `withdraw: ${out.reason}`,
+      target_agent: out.action === "withdraw" ? "Orchestrator" : "Rewriter",
+      sponsor_call: { service: r.source === "nim" ? "nim" : "llm-cache", name: "chat_completions", latency_ms: Math.round(performance.now() - t0) }, retry_count: a.attemptNo - 1, status: "ok",
+    });
+    return out;
   }
 }
 

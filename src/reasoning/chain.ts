@@ -2,6 +2,7 @@ import { Markovian, canonicalBlock } from "../../vendor/meterless/markovian/src/
 import { SampleModeNoLLM } from "../adapters/nim.js";
 import type { Attempt, Precheck, ReuseLookup, Verifier } from "../agents/verifier.js";
 import type { PlaybookHit } from "../memory/playbook.js";
+import type { Diagnoser } from "../agents/diagnoser.js";
 import type { Rewriter } from "../agents/rewriter.js";
 import type { KeyFact } from "../agents/profile.js";
 import type { Plan } from "../engine/types.js";
@@ -26,6 +27,7 @@ export interface ChainArgs {
   facts: KeyFact[];
   pre: Precheck;
   rewriter: Rewriter;
+  diagnoser?: Diagnoser; // present = NOT_FASTER(no_gain) routes to Diagnoser.revise; absent = the next untested hypothesis, no model call
   verifier: Verifier;
   trace: Trace;
   maxAttempts: number;
@@ -43,6 +45,7 @@ export interface ChainResult {
   accepted: Attempt | null;
   llmError: { unavailable: boolean; message: string } | null;
   upstreamError: string | null; // the vendored engine swallows a step's exception into run.error; surfaced here, never dropped
+  withdrew: string | null; // Diagnoser.revise withdrew: the reason (the case ends diagnoser_withdrew)
   playbookHitIds: string[]; // every playbook entry reinjected into a Rewriter prompt during the chain, in first-seen order
   markovian: { chunks: number; carryover_present: boolean[]; status: string; carryovers: string[]; out_of_hypotheses: boolean };
 }
@@ -94,6 +97,8 @@ export async function runChain(a: ChainArgs): Promise<ChainResult> {
   let current: Hypothesis | undefined;
   let finished = false;
   let outOfHypotheses = false;
+  let withdrew: string | null = null;
+  let preferred: string | undefined; // set by Diagnoser.revise: the hypothesis the next attempt targets
   const seenHits: string[] = [];
 
   // ROW_DIFF / GUARD / ERROR / REFUSED retry the same hypothesis (<= 2 tries); otherwise the next untested hypothesis, then any
@@ -102,6 +107,11 @@ export async function runChain(a: ChainArgs): Promise<ChainResult> {
   const pick = (): Hypothesis | undefined => {
     const last = attempts[attempts.length - 1];
     const sameKind = last && (last.reason === "ROW_DIFF" || last.reason === "GUARD" || last.reason === "ERROR" || last.verdict === "REFUSED");
+    if (preferred) {
+      const p = ledger.find((h) => h.id === preferred);
+      preferred = undefined;
+      if (p && eligible(p)) return p;
+    }
     if (current && sameKind && eligible(current)) return current;
     return ledger.find((h) => h.status === "untested") ?? ledger.find(eligible);
   };
@@ -158,13 +168,34 @@ export async function runChain(a: ChainArgs): Promise<ChainResult> {
       rejected.push(att);
       if (att.reason === "NOT_FASTER") current.status = att.not_faster_detail === "no_gain" ? "falsified" : "unproven";
       else current.status = "unproven";
+      // NOT_FASTER(no_gain), attempts left: the ledger is updated (falsified), then the Diagnoser revises — pick, new hypothesis or withdraw.
+      if (a.diagnoser && att.reason === "NOT_FASTER" && att.not_faster_detail === "no_gain" && n < a.maxAttempts) {
+        try {
+          const rv = await a.diagnoser.revise({ sql: a.sql, plan: a.plan, diagnosis: a.diagnosis, attempt: att, carryoverKey: carryoverKey(ledger, rejected), attemptNo: n });
+          if (rv.action === "next") preferred = rv.hypothesis_id;
+          else if (rv.action === "new") {
+            const id = `h${ledger.length + 1}`;
+            ledger.push({ id, source: "llm", plan_node_id: rv.plan_node_id, claim: rv.claim, status: "untested" });
+            preferred = id;
+          } else {
+            current.status = "withdrawn";
+            current.evidence = rv.reason;
+            withdrew = rv.reason;
+            finished = true;
+          }
+        } catch (e) {
+          llmError = { unavailable: e instanceof SampleModeNoLLM, message: (e as Error).message.slice(0, 300) };
+          a.trace.emit({ agent_name: "Diagnoser", action: "revise", input_summary: `hypothesis ${current.id} falsified`, output_summary: llmError.message, target_agent: "Orchestrator", retry_count: n - 1, status: llmError.unavailable ? "skipped" : "error" });
+          finished = true;
+        }
+      }
       const block = carryoverBlock(ledger, rejected);
       carryovers.push(block);
       return { content: `Attempt ${n} rejected for ${current.id}: ${att.reason}.\n[STATE_CHECKPOINT]\n${block}` };
     },
   });
   return {
-    attempts, accepted, llmError, playbookHitIds: seenHits, upstreamError: run.status === "errored" ? (run.error ?? "chain errored") : null,
+    attempts, accepted, llmError, withdrew, playbookHitIds: seenHits, upstreamError: run.status === "errored" ? (run.error ?? "chain errored") : null,
     markovian: { chunks: run.chunks.length, carryover_present: run.chunks.map((c) => c.carryover !== ""), status: run.status, carryovers, out_of_hypotheses: outOfHypotheses },
   };
 }

@@ -126,7 +126,7 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
     }
 
     const rewriter = new Rewriter(deps.llm, trace, deps.reasoning?.rewriter ?? "off");
-    const chain = await runChain({ sql: input.sql, plan, diagnosis: c.diagnosis, facts, pre, rewriter, verifier, trace, maxAttempts, prior, engine: deps.engine.name, retrieve, ...(reuse ? { reuse } : {}), onAttempt });
+    const chain = await runChain({ sql: input.sql, plan, diagnosis: c.diagnosis, facts, pre, rewriter, diagnoser, verifier, trace, maxAttempts, prior, engine: deps.engine.name, retrieve, ...(reuse ? { reuse } : {}), onAttempt });
     c.attempts.push(...chain.attempts);
     syncHits();
     if (c.llm === "none" && chain.attempts.length) c.llm = deps.llm.live ? "nim" : "cache"; // a Rewriter attempt ran, so a model (or its cache) was used
@@ -141,6 +141,7 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
 
   function finalise(accepted: Attempt | null, attempts: Attempt[], chain: ChainResult | null, fin: typeof finish): CaseRun {
     if (accepted) return fin("ACCEPTED", {}, chain?.markovian);
+    if (chain?.withdrew) return fin("NO_SAFE_REWRITE", { no_rewrite_reason: "diagnoser_withdrew", detail: chain.withdrew }, chain.markovian);
     if (chain?.llmError) {
       return fin("NO_SAFE_REWRITE", { no_rewrite_reason: chain.llmError.unavailable ? "llm_unavailable" : "upstream", detail: chain.llmError.message }, chain.markovian);
     }
