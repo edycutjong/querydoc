@@ -55,6 +55,7 @@ export class QueryDocService {
   private readonly env: NodeJS.ProcessEnv;
   private readonly engines = new Map<string, Promise<QueryEngine>>();
   private queue: Promise<unknown> = Promise.resolve();
+  private inflight = 0; // POST /run requests queued or running
   private readonly llm: LlmGateway;
 
   constructor(private readonly o: ServiceOptions = {}) {
@@ -91,13 +92,14 @@ export class QueryDocService {
   }
 
   async close(): Promise<void> {
-    for (const e of this.engines.values()) await (await e).close().catch(() => undefined);
+    for (const e of this.engines.values()) await e.then((engine) => engine.close()).catch(() => undefined); // an engine that never opened has nothing to close
     this.engines.clear();
   }
 
   // --- POST /run ------------------------------------------------------------------------------------------------------------
   run(body: unknown): Promise<Reply> {
-    const job = this.queue.then(() => this.runNow(body));
+    this.inflight++;
+    const job = this.queue.then(() => this.runNow(body)).finally(() => this.inflight--);
     this.queue = job.catch(() => undefined);
     return job;
   }
@@ -289,12 +291,17 @@ export class QueryDocService {
   // --- GET /health ----------------------------------------------------------------------------------------------------------
   async health(): Promise<Reply> {
     const mode = this.resolveMode(undefined);
-    let engine: { name: string; ok: boolean; error?: string };
-    try {
-      const h = await (await this.engine(mode.engine)).health();
-      engine = { name: mode.engine, ok: h.ok, ...(h.error ? { error: h.error } : {}) };
-    } catch (e) {
-      engine = { name: mode.engine, ok: false, error: (e as Error).message.slice(0, 200) };
+    let engine: { name: string; ok: boolean; busy?: true; error?: string };
+    // While a case runs, the engine is not probed: a live probe would queue behind the case's statements on the one sidecar
+    // (minutes), and the UI renders nothing until /health answers.
+    if (this.inflight > 0) engine = { name: mode.engine, ok: true, busy: true };
+    else {
+      try {
+        const h = await (await this.engine(mode.engine)).health();
+        engine = { name: mode.engine, ok: h.ok, ...(h.error ? { error: h.error } : {}) };
+      } catch (e) {
+        engine = { name: mode.engine, ok: false, error: (e as Error).message.slice(0, 200) };
+      }
     }
     return { status: 200, json: { status: engine.ok ? "ok" : "degraded", engine, ...(mode.banner ? { banner: mode.banner } : {}), llm: { provider: this.llm.provider ?? "none", configured: this.llm.live }, llm_cache: existsSync(this.p("llm-cache")), calibration: this.calibration(), playbook_seed: existsSync(this.p("fixtures", "hmem-seed", "sample", "state.json")) } };
   }
