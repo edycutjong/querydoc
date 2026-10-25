@@ -43,6 +43,7 @@ describe("Verifier — hero and trap shapes", () => {
     const pre = await v.precheck("SELECT n FROM trap");
     const a = await v.verify(attempt("SELECT n FROM rewrite"), pre, { lastAttempt: true });
     expect(a).toMatchObject({ verdict: "REJECT", reason: "ROW_DIFF", first_diff: { side: "rewrite", row: ["129752"] } });
+    expect(a.detail).toBe('rows differ (1 vs 1 rows); first differing row ["129752"] returned by the candidate, not by the original');
     expect(a.timing_ms).toBeUndefined();
     expect(engine.calls.filter((s) => s === "SELECT n FROM rewrite")).toHaveLength(1);
   });

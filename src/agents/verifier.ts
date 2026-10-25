@@ -241,7 +241,10 @@ export class Verifier {
       att.fingerprint.rewrite = rowsFingerprint(cand.canon, pre.spec);
       att.fingerprint_kind = "rows";
       if (!d.equal) {
-        return finish({ ...att, reason: "ROW_DIFF", detail: `rows differ (${att.rows.orig} vs ${att.rows.rewrite})`, first_diff: d.firstDiff! });
+        const fd = d.firstDiff!;
+        const where = fd.side === "rewrite" ? "returned by the candidate, not by the original" : "returned by the original, missing from the candidate";
+        return finish({ ...att, reason: "ROW_DIFF", first_diff: fd,
+          detail: `rows differ (${att.rows.orig} vs ${att.rows.rewrite} rows); first differing row ${JSON.stringify(fd.row)} ${where}` });
       }
       timedAs = "plain";
     } else {
