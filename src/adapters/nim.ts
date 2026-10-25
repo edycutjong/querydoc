@@ -59,6 +59,9 @@ export class LlmError extends Error {
   }
 }
 
+// The provider cannot be used at all (not running, or rejecting our credentials), as opposed to a bad answer or a slow one.
+export const providerUnreachable = (e: unknown): boolean => (e as { unreachable?: boolean } | null)?.unreachable === true;
+
 export class NimError extends LlmError {
   constructor(message: string, status: number | null = null, timedOut = false) {
     super(message, status, timedOut);
@@ -235,12 +238,19 @@ export class LlmGateway {
     }
     let user = req.user;
     let reasoning = req.reasoning;
+    // Sample-mode promise (Hub: "runs without Zetaris, Nightshift or live credentials"): a provider that is down or rejects its token
+    // degrades to the recorded cache; the outcome says llm-cache, never live. No cache entry = SampleModeNoLLM, as keyless.
+    const unreachable = (): { out: T } & Omit<LlmOutcome, "value"> => {
+      if (!existsSync(file)) throw new SampleModeNoLLM(task);
+      return { out: parse(JSON.parse(readFileSync(file, "utf8")).value), source: "llm-cache", latencyMs: 0, reasoningChars: 0, provider: null, requestedModel: null, handledModel: null };
+    };
     let lastErr = "";
     for (let tryN = 0; tryN < 2; tryN++) {
       let r: ChatResult;
       try {
         r = await client.chat({ ...req, user, reasoning, timeoutMs: reasoning === "on" ? (req.timeoutMs ?? 90_000) : Math.min(req.timeoutMs ?? 90_000, 60_000) });
       } catch (e) {
+        if (providerUnreachable(e)) return unreachable();
         if (e instanceof LlmError && e.timedOut) dumpCall(task, req, reasoning, user, null);
         if (!(e instanceof LlmError && e.timedOut) || tryN > 0 || reasoning === "off") throw e; // already off: nothing cheaper to try
         lastErr = e.message;

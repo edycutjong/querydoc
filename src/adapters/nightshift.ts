@@ -17,6 +17,10 @@ export class NightshiftError extends LlmError {
     super(message, status, timedOut);
     this.name = "NightshiftError";
   }
+
+  get unreachable(): boolean {
+    return this.state === "offline" || this.state === "unauthorized";
+  }
 }
 
 export type RuntimeState = "online" | "unauthorized" | "offline";
@@ -207,7 +211,7 @@ export class NightshiftClient implements LlmClient {
         lastErr = e as Error; // network error: retry
       }
     }
-    throw lastErr instanceof NightshiftError ? lastErr : new NightshiftError(`Nightshift request failed after ${retries + 1} attempts: ${lastErr.message}`);
+    throw lastErr instanceof NightshiftError ? lastErr : new NightshiftError(`Nightshift request failed after ${retries + 1} attempts: ${lastErr.message}`, null, false, "offline");
   }
 }
 

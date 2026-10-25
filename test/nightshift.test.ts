@@ -167,3 +167,20 @@ describe("gateway through Nightshift", () => {
     expect(llmSponsorCall(hit, 0).service).toBe("llm-cache");
   });
 });
+
+describe("gateway degrades to the cache when Nightshift is down or rejects the token", () => {
+  const seed = async () => {
+    const dir = mkdtempSync(join(tmpdir(), "qd-ns-"));
+    await new LlmGateway({ client: new NightshiftClient("tok", { fetchFn: runtime().fetchFn, model: "meterless/deep" }), cacheDir: dir, cacheWrite: true }).call("t", { k: 1 }, REQ, (raw) => raw as { a: number });
+    return dir;
+  };
+  it("offline and unauthorized serve the recorded entry as llm-cache, and a miss is SampleModeNoLLM (never a live label)", async () => {
+    const dir = await seed();
+    const dead = (async () => { throw new TypeError("fetch failed"); }) as typeof fetch;
+    for (const fetchFn of [dead, runtime({ token: "other" }).fetchFn]) {
+      const gw = new LlmGateway({ client: new NightshiftClient("tok", { fetchFn, model: "meterless/deep", retries: 0 }), cacheDir: dir });
+      expect(await gw.call("t", { k: 1 }, REQ, (raw) => raw as { a: number })).toMatchObject({ out: { a: 1 }, source: "llm-cache", provider: null });
+      await expect(gw.call("t", { k: 2 }, REQ, (raw) => raw)).rejects.toThrow(/needs a live model/);
+    }
+  });
+});
