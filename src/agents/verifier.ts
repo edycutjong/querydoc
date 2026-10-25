@@ -300,9 +300,23 @@ export class Verifier {
     const stmt = (s: string, cols: Column[]) => (timedAs === "plain" ? s : this.engine.rowHashSql(s, cols, this.cfg.floatSigDigits));
     const cap = timedAs === "plain" ? this.cfg.rowCap : 1;
     const capMs = Math.max(this.cfg.timingCapMinMs, this.cfg.minPairs * 2 * median(pre.origRunMs));
+    // Every timing run re-executes both statements, so each result is checked against the fingerprint already verified: a result
+    // that changes between runs (non-determinism the lint cannot see, e.g. an unordered LIMIT inside a subquery) voids the equality.
+    let changed: "original" | "candidate" | null = null;
+    const timed = async (side: "original" | "candidate", s: string, cols: Column[], expected: string | null): Promise<number> => {
+      const r = await this.exec(`${label} timing: ${side}`, stmt(s, cols), cap);
+      const fp = timedAs === "plain"
+        ? rowsFingerprint(canonRows(r.rows, r.columns, this.cfg.floatSigDigits), pre.spec)
+        : sha256Text(`${Number(r.rows[0]?.[0])}|${String(r.rows[0]?.[1])}`);
+      if (fp !== expected) {
+        changed = side;
+        throw new EngineError(`the ${side}'s result changed between runs (fingerprint ${String(expected).slice(0, 8)} → ${fp.slice(0, 8)})`);
+      }
+      return r.wallMs;
+    };
     const { pairs, cappedAt } = await timePairs(
-      async () => (await this.exec(`${label} timing: original`, stmt(pre.sql, pre.columns), cap)).wallMs,
-      async () => (await this.exec(`${label} timing: candidate`, stmt(sql, cand.res.columns), cap)).wallMs,
+      () => timed("original", pre.sql, pre.columns, att.fingerprint.orig),
+      () => timed("candidate", sql, cand.res.columns, att.fingerprint.rewrite),
       this.policy,
       capMs,
     );
@@ -323,7 +337,8 @@ export class Verifier {
       ...(cappedAt !== undefined ? { capped_at_ms: cappedAt } : {}),
       ...(dec.note ? { note: dec.note } : {}),
     };
-    if (dec.verdict === "ERROR") return finish({ ...att, reason: "ERROR", detail: `engine error during timing: ${dec.note}` });
+    if (changed === "candidate") return finish({ ...att, reason: "ROW_DIFF", detail: `non-deterministic candidate: ${dec.note}` });
+    if (dec.verdict === "ERROR") return finish({ ...att, reason: "ERROR", detail: `${changed ? "" : "engine error "}during timing: ${dec.note}` });
     if (dec.verdict === "ACCEPT") return finish({ ...att, verdict: "ACCEPT" });
     const gates = dec.missed.join(", ");
     return finish({ ...att, reason: "NOT_FASTER", not_faster_detail: dec.notFasterDetail!,

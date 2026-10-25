@@ -186,6 +186,17 @@ describe("Verifier — timing table end to end (stub engine)", () => {
 });
 
 describe("Verifier — hardening", () => {
+  it("a candidate whose result changes during timing is refused (ROW_DIFF), not timed into an ACCEPT", async () => {
+    const { v } = setup({
+      "SELECT k FROM t": { columns: K, rows: range(5), wallMs: 1000 },
+      // equal on the diff run (call 1), different from the second timing run on: an unordered LIMIT in a subquery would do this
+      "SELECT k FROM (SELECT k FROM t) s": { columns: K, rows: (n: number) => (n >= 3 ? range(5, (i) => [i + 1]) : range(5)), wallMs: 500 },
+    });
+    const pre = await v.precheck("SELECT k FROM t");
+    const a = await v.verify(attempt("SELECT k FROM (SELECT k FROM t) s"), pre);
+    expect(a).toMatchObject({ verdict: "REJECT", reason: "ROW_DIFF" });
+    expect(a.detail).toMatch(/non-deterministic candidate: the candidate's result changed between runs/);
+  });
   it("a candidate that fails the determinism lint is refused before it runs (one equal diff run is not equivalence)", async () => {
     const { v, engine } = setup({ "SELECT k FROM t WHERE d < DATE '2026-10-25'": { columns: K, rows: range(5) } });
     const pre = await v.precheck("SELECT k FROM t WHERE d < DATE '2026-10-25'");
