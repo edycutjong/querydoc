@@ -189,7 +189,18 @@ export class QueryDocService {
     if (!RUN_ID_RE.test(id)) return fail(new ApiError(400, "InvalidInput", "bad run id"));
     const f = this.p("data", "runs", id, "case.json");
     if (!existsSync(f)) return fail(new ApiError(404, "NotFound", `no run ${id}`));
-    return { status: 200, json: { status: "ok", run_id: id, case: JSON.parse(readFileSync(f, "utf8")) as Case } };
+    const md = this.p("data", "runs", id, "dossier.md");
+    return { status: 200, json: { status: "ok", run_id: id, case: JSON.parse(readFileSync(f, "utf8")) as Case, ...(existsSync(md) ? { dossier: readFileSync(md, "utf8") } : {}) } };
+  }
+
+  // --- GET /runs/:id/trace --------------------------------------------------------------------------------------------------
+  // The live trace of a run, readable while the run is still going (the Report UI polls it); `done` flips when case.json lands.
+  runTrace(id: string): Reply {
+    if (!RUN_ID_RE.test(id)) return fail(new ApiError(400, "InvalidInput", "bad run id"));
+    const dir = this.p("data", "runs", id);
+    const f = join(dir, `trace-${id}.jsonl`);
+    const events = existsSync(f) ? readFileSync(f, "utf8").split("\n").filter(Boolean).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } }) : [];
+    return { status: 200, json: { status: "ok", run_id: id, done: existsSync(join(dir, "case.json")), events } };
   }
 
   // --- POST /runs/:id/decision ----------------------------------------------------------------------------------------------
@@ -216,7 +227,8 @@ export class QueryDocService {
       writeFileSync(this.p("data", "patches", `${id}.sql`), `-- Query Doctor patch for run ${id}, approved by ${actor}\n-- verified by execution on ${c.engine}: same rows, ${acc.timing_ms?.median_speedup}× median\n${acc.sql.trim()};\n`);
       writeFileSync(this.p("data", "patches", `${id}.md`), `### Query Doctor — suggested rewrite (approved by ${actor})\n\n${caseMarkdown(c)}`);
     }
-    return { status: 200, json: { status: "ok", memory_id: m.id, ledger_entries: decision.ledger_entries, decision } };
+    const patch = b.decision === "approve" ? { sql: readFileSync(this.p("data", "patches", `${id}.sql`), "utf8"), markdown: readFileSync(this.p("data", "patches", `${id}.md`), "utf8") } : undefined;
+    return { status: 200, json: { status: "ok", memory_id: m.id, ledger_entries: decision.ledger_entries, decision, ...(patch ? { patch } : {}) } };
   }
 
   // --- GET /slow-queries ----------------------------------------------------------------------------------------------------
@@ -263,6 +275,16 @@ export class QueryDocService {
     return { status: 200, json: { status: "ok", label: "recorded live run", runs } };
   }
 
+  // The measured SELECT 1 baseline and noise floor the Report shows in its table caption (querydoc.config.json, with its source run).
+  private calibration() {
+    try {
+      const n = (JSON.parse(readFileSync(this.p("querydoc.config.json"), "utf8")) as { noise?: { select1MedianMs?: number; select1SpreadMs?: number; noiseFloorMs?: number } }).noise ?? {};
+      return { select1_median_ms: n.select1MedianMs ?? null, select1_spread_ms: n.select1SpreadMs ?? null, zetaris_noise_floor_ms: n.noiseFloorMs ?? null };
+    } catch {
+      return null;
+    }
+  }
+
   // --- GET /health ----------------------------------------------------------------------------------------------------------
   async health(): Promise<Reply> {
     const mode = this.resolveMode(undefined);
@@ -273,7 +295,7 @@ export class QueryDocService {
     } catch (e) {
       engine = { name: mode.engine, ok: false, error: (e as Error).message.slice(0, 200) };
     }
-    return { status: 200, json: { status: engine.ok ? "ok" : "degraded", engine, ...(mode.banner ? { banner: mode.banner } : {}), nim: { configured: this.llm.live, model: "nvidia/nemotron-3-ultra-550b-a55b" }, llm_cache: existsSync(this.p("llm-cache")), playbook_seed: existsSync(this.p("fixtures", "hmem-seed", "sample", "state.json")) } };
+    return { status: 200, json: { status: engine.ok ? "ok" : "degraded", engine, ...(mode.banner ? { banner: mode.banner } : {}), nim: { configured: this.llm.live, model: "nvidia/nemotron-3-ultra-550b-a55b" }, llm_cache: existsSync(this.p("llm-cache")), calibration: this.calibration(), playbook_seed: existsSync(this.p("fixtures", "hmem-seed", "sample", "state.json")) } };
   }
 }
 

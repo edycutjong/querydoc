@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Query Doctor — case report</title>
+<meta name="description" content="Query Doctor rewrites a slow SQL query and ships it only when a verifier confirms by execution that the rows are identical and it is faster.">
+<link rel="stylesheet" href="/web/app.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the report</a>
+<header class="masthead">
+  <a class="brand" href="#/" aria-label="Query Doctor, home"><span class="brand-name">Query Doctor</span><span class="brand-sub">verified SQL rewrites</span></a>
+  <nav class="topnav" aria-label="Main">
+    <a href="#/new" id="nav-new">New case</a>
+  </nav>
+  <div class="badges" id="badges" aria-live="polite"></div>
+</header>
+<div id="banner" class="banner" hidden></div>
+<div class="layout">
+  <main id="main" tabindex="-1"></main>
+  <aside class="rail" id="rail" aria-label="Agent trace" hidden></aside>
+</div>
+<footer class="foot">Verdicts come from deterministic code that executes both queries. Model text is labelled as such and never decides anything.</footer>
+<script type="module" src="/web/app.js"></script>
+</body>
+</html>

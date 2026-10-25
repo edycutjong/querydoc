@@ -38,7 +38,7 @@ const send = (res: ServerResponse, r: Reply) => {
   res.end(body);
 };
 
-export function createApp(svc: QueryDocService, serveStatic?: (url: URL, res: ServerResponse) => boolean): Server {
+export function createApp(svc: QueryDocService, serveStatic?: (url: URL, res: ServerResponse, accept: string) => boolean): Server {
   return createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", "http://localhost");
@@ -50,6 +50,7 @@ export function createApp(svc: QueryDocService, serveStatic?: (url: URL, res: Se
         return send(res, b.ok ? await svc.run(b.json) : b.reply);
       }
       if (m === "GET" && (m2 = path.match(/^\/runs\/([^/]+)$/))) return send(res, svc.getRun(m2[1]!));
+      if (m === "GET" && (m2 = path.match(/^\/runs\/([^/]+)\/trace$/))) return send(res, svc.runTrace(m2[1]!));
       if (m === "POST" && (m2 = path.match(/^\/runs\/([^/]+)\/decision$/))) {
         const b = await readBody(req);
         return send(res, b.ok ? svc.decide(m2[1]!, b.json) : b.reply);
@@ -59,9 +60,9 @@ export function createApp(svc: QueryDocService, serveStatic?: (url: URL, res: Se
       if (m === "GET" && path === "/traces/recorded") return send(res, svc.recorded(null));
       if (m === "GET" && (m2 = path.match(/^\/traces\/recorded\/([^/]+)$/))) return send(res, svc.recorded(m2[1]!));
       if (m === "GET" && path === "/health") return send(res, await svc.health());
-      if (m === "GET" && serveStatic?.(url, res)) return;
+      if (m === "GET" && serveStatic?.(url, res, req.headers.accept ?? "")) return;
       if (m === "GET" && path === "/") {
-        return send(res, { status: 200, json: { name: "querydoc", endpoints: ["POST /run", "GET /runs/:id", "POST /runs/:id/decision", "GET /slow-queries", "GET /playbook", "GET /traces/recorded", "GET /health"] } });
+        return send(res, { status: 200, json: { name: "querydoc", ui: "open this address in a browser", endpoints: ["POST /run", "GET /runs/:id", "GET /runs/:id/trace", "POST /runs/:id/decision", "GET /slow-queries", "GET /playbook", "GET /traces/recorded", "GET /health"] } });
       }
       send(res, { status: 404, json: { status: "error", error: { type: "NotFound", message: `${m} ${path}`, recoverable: true } } });
     } catch (e) {
