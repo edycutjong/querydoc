@@ -50,8 +50,15 @@ export function decideTiming(pairs: Pair[], p: TimingPolicy): TimingDecision {
   const fasterPairs = valid.filter((x) => x.rewrite < x.orig).length;
   const base = { medianSpeedup, medianSavingMs, fasterPairs, validPairs: valid.length, excludedPairs };
   if (errored) return { verdict: "ERROR", missed: [], note: errored.error, ...base };
-  if (valid.length < p.minPairs)
+  if (valid.length < p.minPairs) {
+    // The time cap stopped timing early because the candidate is far slower: slower in every pair it ran is no gain (→ Diagnoser),
+    // not "timing unreliable" (→ Rewriter on the same hypothesis). Still never an ACCEPT.
+    if (valid.length > 0 && fasterPairs === 0 && medianSpeedup < p.noGainSpeedup) {
+      const missed: Gate[] = ["pairs", "ratio", ...(medianSavingMs >= p.noiseFloorMs ? [] : (["floor"] as Gate[]))];
+      return { verdict: "NOT_FASTER", notFasterDetail: "no_gain", missed, note: `slower in all ${valid.length} pair(s) timed before the cap`, ...base };
+    }
     return { verdict: "NOT_FASTER", notFasterDetail: "under_gate", missed: ["pairs"], note: `timing unreliable: ${valid.length} valid pairs < ${p.minPairs}`, ...base };
+  }
 
   const missed: Gate[] = [];
   if (!(medianSpeedup >= p.speedupMin)) missed.push("ratio");

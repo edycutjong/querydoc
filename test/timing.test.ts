@@ -15,6 +15,8 @@ describe("decideTiming (table)", () => {
     ["even count → majority undecided", [P(1000, 500), P(1000, 500), P(1000, 500), P(1000, 500)], "NOT_FASTER", "under_gate", ["majority"]],
     ["exclusion leaves 2 valid → timing unreliable", [P(1000, 500), P(1000, 500), P(1000, 500, { excluded: "cache hit" })], "NOT_FASTER", "under_gate", ["pairs"]],
     ["cap leaves 2 pairs → timing unreliable", [P(1000, 500), P(1000, 500)], "NOT_FASTER", "under_gate", ["pairs"]],
+    ["cap after 1 pair, candidate 5× slower → no_gain, not unreliable", [P(1000, 5000)], "NOT_FASTER", "no_gain", ["pairs", "ratio", "floor"]],
+    ["cap after 2 pairs, one faster → still timing unreliable", [P(1000, 5000), P(1000, 500)], "NOT_FASTER", "under_gate", ["pairs"]],
     ["error pair → ERROR", [P(1000, 500), { orig: 1000, rewrite: null, first: "orig", error: "timeout" }], "ERROR", undefined, []],
   ];
   for (const [name, pairs, verdict, detail, missed] of rows) {
