@@ -39,6 +39,19 @@ export function readBody(req: IncomingMessage): Promise<{ ok: true; json: unknow
   });
 }
 
+// Another site's page can POST here from the judge's browser (a text/plain body needs no CORS preflight) and start live queries on
+// their Zetaris or record a human decision in the playbook. Browsers send Origin on every cross-site POST; curl and scripts send
+// none. A POST whose Origin is not this server is refused before its body is read.
+export function crossSite(req: IncomingMessage): boolean {
+  const origin = req.headers.origin;
+  if (origin === undefined) return false;
+  try {
+    return new URL(origin).host !== req.headers.host;
+  } catch {
+    return true; // "null" (sandboxed frame, file://) or garbage
+  }
+}
+
 const send = (res: ServerResponse, r: Reply) => {
   if (res.headersSent || res.destroyed) return;
   const body = JSON.stringify(r.json);
@@ -53,6 +66,9 @@ export function createApp(svc: QueryDocService, serveStatic?: (url: URL, res: Se
       const path = url.pathname.replace(/\/+$/, "") || "/";
       const m = req.method ?? "GET";
       let m2: RegExpMatchArray | null;
+      if (m === "POST" && crossSite(req)) {
+        return send(res, { status: 403, json: { status: "error", error: { type: "CrossOrigin", message: "POST from another origin refused", recoverable: false } } });
+      }
       if (m === "POST" && path === "/run") {
         const b = await readBody(req);
         return send(res, b.ok ? await svc.run(b.json) : b.reply);

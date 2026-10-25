@@ -23,3 +23,22 @@ describe("readBody", () => {
     expect(r !== "pending" && r.reply?.status).toBe(400);
   });
 });
+
+describe("POST from another origin", () => {
+  it("is refused before the service runs; same-origin and Origin-less POSTs pass", async () => {
+    const { createApp } = await import("../src/server.js");
+    let runs = 0;
+    const svc = { run: async () => (runs++, { status: 200, json: { status: "ok" } }) } as unknown as Parameters<typeof createApp>[0];
+    const server = createApp(svc);
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const post = (headers: Record<string, string>) => fetch(`${base}/run`, { method: "POST", headers, body: "{}" });
+    expect((await post({ "content-type": "text/plain", origin: "https://evil.example" })).status).toBe(403);
+    expect((await post({ origin: "null" })).status).toBe(403);
+    expect(runs).toBe(0);
+    expect((await post({ "content-type": "application/json", origin: base })).status).toBe(200);
+    expect((await post({ "content-type": "application/json" })).status).toBe(200);
+    expect(runs).toBe(2);
+    server.close();
+  });
+});
