@@ -186,6 +186,26 @@ describe("Verifier — timing table end to end (stub engine)", () => {
 });
 
 describe("Verifier — hardening", () => {
+  it("a candidate that fails the determinism lint is refused before it runs (one equal diff run is not equivalence)", async () => {
+    const { v, engine } = setup({ "SELECT k FROM t WHERE d < DATE '2026-10-25'": { columns: K, rows: range(5) } });
+    const pre = await v.precheck("SELECT k FROM t WHERE d < DATE '2026-10-25'");
+    const before = engine.calls.length;
+    const a = await v.verify(attempt("SELECT k FROM t WHERE d < current_date"), pre);
+    expect(a).toMatchObject({ verdict: "REFUSED", reason: "GUARD" });
+    expect(a.detail).toMatch(/determinism lint: non-deterministic function\(s\): current_date/);
+    expect(engine.calls.length).toBe(before);
+  });
+  it("exactly rowCap rows from an engine that flags truncation is a complete result: full row diff, plain timing", async () => {
+    const { v } = setup({
+      "SELECT k FROM big": { columns: K, rows: range(100), wallMs: 1000 },
+      "SELECT k FROM big2": { columns: K, rows: range(100), wallMs: 500 },
+    });
+    const pre = await v.precheck("SELECT k FROM big");
+    expect(pre).toMatchObject({ ok: true, overCap: false, fingerprint_kind: "rows", rows: 100 });
+    const a = await v.verify(attempt("SELECT k FROM big2"), pre);
+    expect(a).toMatchObject({ verdict: "ACCEPT", fingerprint_kind: "rows" });
+    expect(a.timing_ms?.timed_as).toBe("plain");
+  });
   it("a NULL/empty row-hash result is an engine error, never a shared fingerprint", async () => {
     const { v } = setup({ "SELECT k FROM big": { columns: K, rows: range(150) } }, true, Infinity, {}, true);
     await expect(v.precheck("SELECT k FROM big")).rejects.toThrow(/no usable \(count, sum\)/);

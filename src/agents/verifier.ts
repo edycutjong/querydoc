@@ -118,7 +118,9 @@ export class Verifier {
 
   private async side(label: string, sql: string, countCheck = true): Promise<Side> {
     const res = await this.exec(label, sql, this.cfg.rowCap);
-    let overCap = res.truncated || res.rows.length >= this.cfg.rowCap;
+    // An engine that reads one row past the cap reports `truncated` itself: exactly rowCap rows is then a complete result and keeps
+    // the full row diff. Without that flag, reaching the cap is treated as incomplete (and the COUNT(*) check below decides).
+    let overCap = res.truncated || (!this.engine.reportsTruncation && res.rows.length >= this.cfg.rowCap);
     let countStar: number | undefined;
     if (!this.engine.reportsTruncation && countCheck) {
       // Unknown tool limit: COUNT(*) above the transferred rows is treated exactly like reaching the cap.
