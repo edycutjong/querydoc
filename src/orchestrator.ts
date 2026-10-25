@@ -42,6 +42,7 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
   mkdirSync(logDir, { recursive: true });
   const trace = new Trace(runId, join(logDir, `trace-${runId}.jsonl`));
   const maxAttempts = Math.max(1, Math.min(opts.maxAttempts ?? deps.attemptCap, 3));
+  deps.llm.resetServed();
   const c: Case = {
     run_id: runId, sql: input.sql, source: input.source ?? "paste", engine: deps.engine.name, llm: "none",
     started_at: new Date().toISOString(), attempts: [], verdict: "ERROR", playbook_hits: [],
@@ -109,8 +110,6 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
       if (m) trace.emit({ agent_name: "Orchestrator", action: "playbook_write", input_summary: `attempt ${att.n} ${att.reason}${att.not_faster_detail ? "/" + att.not_faster_detail : ""}`, output_summary: `${m.id} ${m.tags.find((t2) => t2.startsWith("outcome:"))}`, target_agent: null, sponsor_call: { service: "hmem", name: "add", latency_ms: Math.round((performance.now() - t) * 10) / 10 }, retry_count: att.n - 1, status: "ok" });
     };
     const syncHits = () => { c.playbook_hits = [...hitSet]; };
-    if (c.diagnosis.narrative === "llm") c.llm = deps.llm.lastServed && deps.llm.lastServed !== "cache" ? deps.llm.lastServed : "cache";
-    else if (c.diagnosis.narrative === "llm-cache") c.llm = "cache";
 
     // Own-candidate path: the human supplied a rewrite as attempt 1 and the Verifier judges it. An accepted candidate ends the case;
     // a rejected one continues into the Rewriter chain when attempts remain (its rejection is in the carryover). With no model
@@ -129,8 +128,7 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
     const chain = await runChain({ sql: input.sql, plan, diagnosis: c.diagnosis, facts, pre, rewriter, diagnoser, verifier, trace, maxAttempts, prior, engine: deps.engine.name, schema: c.schema_fqn ?? "", retrieve, ...(reuse ? { reuse } : {}), onAttempt });
     c.attempts.push(...chain.attempts);
     syncHits();
-    if (c.llm === "none" && chain.attempts.length) c.llm = deps.llm.lastServed ?? "cache"; // a Rewriter attempt ran, so a model (or its cache) was used
-    if (chain.llmError && !chain.llmError.unavailable && c.llm === "none") c.llm = deps.llm.lastServed ?? "cache"; // a live call was made and failed
+    c.llm = deps.llm.servedLabel(); // what actually served this case's model calls: the live provider, the recorded cache, or both
     if (chain.upstreamError) throw new Error(chain.upstreamError);
     return finalise(chain.accepted, chain.attempts, chain, finish);
   } catch (e) {

@@ -229,12 +229,30 @@ export class LlmGateway {
   // What served the most recent call: the live provider, or "cache" (keyless, or a provider that was down). The case-level label
   // comes from here, so a cache answer is never reported as live.
   lastServed: LlmProvider | "cache" | null = null;
+  // Everything that served calls since resetServed(): the case label is built from this (a live provider, the cache, or both).
+  private served = new Set<LlmProvider | "cache">();
+  resetServed(): void {
+    this.served = new Set();
+  }
+  servedLabel(): "nightshift" | "nim" | "cache" | "mixed" | "none" {
+    const live = [...this.served].filter((s): s is LlmProvider => s !== "cache");
+    if (live.length && this.served.has("cache")) return "mixed";
+    if (live.length) return live[0]!;
+    return this.served.has("cache") ? "cache" : "none";
+  }
 
   // Run one structured call. `parse` validates (zod); a validation failure is retried once with the error appended (the model
   // sees what was wrong), then rethrown. Keyless: cache lookup, else SampleModeNoLLM.
   async call<T>(task: string, keyFields: Record<string, unknown>, req: ChatRequest, parse: (raw: unknown) => T): Promise<{ out: T } & Omit<LlmOutcome, "value">> {
-    const out = await this.callInner(task, keyFields, req, parse);
+    let out: { out: T } & Omit<LlmOutcome, "value">;
+    try {
+      out = await this.callInner(task, keyFields, req, parse);
+    } catch (e) {
+      if (this.o.client && !(e instanceof SampleModeNoLLM)) this.served.add(this.o.client.provider); // a live call was made and failed
+      throw e;
+    }
     this.lastServed = out.source === "live" ? (out.provider ?? "cache") : "cache";
+    this.served.add(this.lastServed);
     return out;
   }
 

@@ -27,7 +27,7 @@ async function loadHealth() {
   $("#badges").innerHTML =
     `<span class="badge ${live ? "live" : ""}" title="${live ? "queries run on the Zetaris platform" : "queries run on DuckDB over committed public sample data"}">${live ? "LIVE · Zetaris" : "SAMPLE · DuckDB (public sample data)"}</span>` +
     (state.health.llm_cache ? `<span class="badge" title="model responses may be replayed from llm-cache/">llm-cache</span>` : "") +
-    (state.health.llm?.configured ? "" : `<span class="badge" title="no Nightshift runtime token: cached model responses only">no model key</span>`);
+    (state.health.llm?.configured ? "" : `<span class="badge" title="no model credentials: cached model responses only">no model key</span>`);
   const b = $("#banner");
   if (state.health.banner) { b.hidden = false; b.textContent = state.health.banner; } else b.hidden = true;
 }
@@ -57,6 +57,7 @@ async function route() {
     showRail(false);
   } finally {
     main.removeAttribute("aria-busy");
+    main.focus({ preventScroll: true }); // a route change must not drop keyboard focus to <body>
   }
 }
 

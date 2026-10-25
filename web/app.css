@@ -25,7 +25,8 @@ a{color:var(--ink);text-underline-offset:3px}
 .skip:focus{left:8px;top:8px}
 
 /* masthead */
-.masthead{display:flex;align-items:center;gap:28px;max-width:1240px;margin:0 auto;padding:18px 24px 12px;border-bottom:2px solid var(--ink)}
+[hidden]{display:none!important}
+.masthead{flex-wrap:wrap;display:flex;align-items:center;gap:28px;max-width:1240px;margin:0 auto;padding:18px 24px 12px;border-bottom:2px solid var(--ink)}
 .brand{display:flex;flex-direction:column;text-decoration:none;line-height:1}
 .brand-name{font:italic 34px/1 var(--font-display);letter-spacing:-.01em}
 .brand-sub{font:500 12px var(--font-data);color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:5px}
@@ -169,3 +170,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .assay .bar.anim,.stamp.anim,.status .dots::after{animation:none}
   *{transition:none!important}
 }
+@media (max-width:700px){
+  table{display:block;max-width:100%;overflow-x:auto}
+  .stamp{position:static;display:inline-block;margin:6px 0}
+  .badges{flex-basis:100%}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
