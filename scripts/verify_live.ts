@@ -78,7 +78,7 @@ try {
     cases.push(c);
   }
   // canon rows are internal; keep the dossier small
-  results.cases = cases.map(({ name, pre, attempt }) => ({ name, precheck: { ...pre, canon: undefined, spec: pre.spec }, attempt }));
+  results.cases = cases.map(({ name, pre, attempt }) => ({ name, precheck: { ...pre, canon: undefined, firstRows: pre.canon.slice(0, 5) }, attempt }));
 
   // 3. Live float-tolerance calibration.
   say("calibration: SUM(double) direct vs pre-aggregated per store");
@@ -129,9 +129,10 @@ try {
       engineMs: r1(heroMedian - select1Median), noiseFloorMs: cfg.noiseFloorMs, need: r1(6 * cfg.noiseFloorMs),
       pass: heroMedian - select1Median >= 6 * cfg.noiseFloorMs,
     },
-    select1SpreadRecorded: { spreadMs: r1(Math.max(...s1m) - Math.min(...s1m)), pass: true },
+    select1SpreadRecorded: { spreadMs: r1(Math.max(...s1m) - Math.min(...s1m)), pass: s1m.length === 9 && s1m.every(Number.isFinite) },
+    // P21 exit: a live Verifier verdict on the hero — ACCEPT on the hero, REJECT(ROW_DIFF) on its trap.
     heroLiveVerdict: { hero: hero.attempt?.verdict ?? hero.pre.verdict ?? null, trap: trap.attempt?.verdict ?? trap.pre.verdict ?? null,
-      trapReason: trap.attempt?.reason ?? null, pass: hero.attempt?.verdict !== undefined },
+      trapReason: trap.attempt?.reason ?? null, pass: hero.attempt?.verdict === "ACCEPT" && trap.attempt?.verdict === "REJECT" && trap.attempt.reason === "ROW_DIFF" },
   };
   const yes = kill.comparableQueries.pass && kill.engineTime.pass && kill.select1SpreadRecorded.pass && kill.heroLiveVerdict.pass;
   results.killRule = { ...kill, outcome: yes ? "YES" : "NO" };
