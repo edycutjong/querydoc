@@ -230,7 +230,8 @@ recorded/ evals/ evidence/ logs/      input_examples/ output_examples/      data
 - [ ] Write-back of an approved rewrite to the source (today a human applies the patch)
 
 ## 📽️ Demo Materials
-Measured numbers and how to reproduce them: [`DEMO.md`](DEMO.md). The demo video and pitch deck are linked in the submission form.
+Measured numbers and how to reproduce them: [`DEMO.md`](DEMO.md).
+Landing page: https://querydoc-flax.vercel.app/ · pitch deck: https://querydoc-flax.vercel.app/deck/ ([PDF](https://querydoc-flax.vercel.app/deck/querydoc-deck.pdf)) — both are static pages in [`docs/`](docs/). The demo video is linked in the submission form.
 
 ## 📄 License
 Apache-2.0, see [`LICENSE`](LICENSE). `vendor/meterless/` keeps its upstream LICENSE and NOTICE. Security: [`SECURITY.md`](SECURITY.md).
