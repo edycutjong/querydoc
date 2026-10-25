@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { LlmGateway } from "../adapters/nim.js";
+import { LlmGateway, NIM_MODEL } from "../adapters/nim.js";
 import type { Plan } from "../engine/types.js";
 import type { Trace } from "../trace.js";
 import type { Diagnosis, Hypothesis } from "../types.js";
-import { normaliseSql, planExcerpt } from "./diagnoser.js";
+import { engineSystem, normaliseSql, planExcerpt } from "./diagnoser.js";
+import type { PlaybookHit } from "../memory/playbook.js";
 import { keyFactLine, type KeyFact } from "./profile.js";
 
 // Rewriter: one attempt = one LLM call returning {hypothesis_id, sql, change_summary, risk_notes}. hypothesis_id is a one-element
@@ -27,6 +28,8 @@ export interface RewriteContext {
   carryover: string; // Markovian carryover text, "" on the first attempt
   carryoverKey: string; // timing-free description of the same state, for the llm-cache key
   attemptNo: number;
+  playbook?: PlaybookHit[]; // entries retrieved for this pattern and schema (refused = a trap, no_gain = already tried)
+  engine?: string; // key field for the llm-cache
 }
 
 export interface Rewrite {
@@ -52,6 +55,7 @@ export class Rewriter {
       `DIAGNOSIS: ${c.diagnosis.bottleneck}`,
       `TARGET HYPOTHESIS ${c.hypothesis.id} (plan node ${c.hypothesis.plan_node_id}): ${c.hypothesis.claim}`, "",
       c.facts.length ? `MEASURED KEY FACTS:\n${c.facts.map(keyFactLine).join("\n")}` : "MEASURED KEY FACTS: none (no joins).", "",
+      c.playbook?.length ? `PLAYBOOK (what the Verifier recorded earlier for this pattern on this schema):\n${c.playbook.map((h) => `- [${h.outcome === "refused" ? "REFUSED — a trap, do not repeat" : h.outcome === "no_gain" ? "already tried, no gain" : "verified earlier"}] ${h.text}`).join("\n")}` : "PLAYBOOK: no earlier entries for this pattern.", "",
       c.carryover ? `CARRYOVER STATE FROM EARLIER ATTEMPTS:\n${c.carryover}` : "This is the first attempt.", "",
       `Write rewrite attempt ${c.attemptNo} for hypothesis ${c.hypothesis.id}.`,
       `Reply with JSON: {"hypothesis_id": "${c.hypothesis.id}", "sql": "<the rewritten single SELECT>", "change_summary": "<one sentence: what changed>", "risk_notes": "<what could make it differ on the data, or empty>"}`,
@@ -59,8 +63,11 @@ export class Rewriter {
     const t0 = performance.now();
     const r = await this.llm.call(
       "rewrite",
-      { sql: normaliseSql(c.sql), hypothesis: c.hypothesis.id, claim: c.hypothesis.claim, attempt: c.attemptNo, carryover: c.carryoverKey },
-      { system: REWRITER_SYSTEM, user, reasoning: this.reasoning, maxTokens: 8000, temperature: 1.0 },
+      {
+        template: "rewriter@1", model: NIM_MODEL, engine: c.engine ?? "", sql: normaliseSql(c.sql), pattern: c.diagnosis.pattern_label, hypothesis: c.hypothesis.id,
+        claim: c.hypothesis.claim, attempt: c.attemptNo, carryover: c.carryoverKey, playbook: (c.playbook ?? []).map((h) => h.id).sort(),
+      },
+      { system: engineSystem(REWRITER_SYSTEM, c.engine ?? ""), user, reasoning: this.reasoning, maxTokens: 8000, temperature: 1.0 },
       (raw) => Reply.parse(raw),
     );
     this.trace.emit({

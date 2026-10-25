@@ -1,6 +1,7 @@
 import { Markovian, canonicalBlock } from "../../vendor/meterless/markovian/src/index.ts";
 import { SampleModeNoLLM } from "../adapters/nim.js";
-import type { Attempt, Precheck, Verifier } from "../agents/verifier.js";
+import type { Attempt, Precheck, ReuseLookup, Verifier } from "../agents/verifier.js";
+import type { PlaybookHit } from "../memory/playbook.js";
 import type { Rewriter } from "../agents/rewriter.js";
 import type { KeyFact } from "../agents/profile.js";
 import type { Plan } from "../engine/types.js";
@@ -28,6 +29,13 @@ export interface ChainArgs {
   verifier: Verifier;
   trace: Trace;
   maxAttempts: number;
+  prior?: Attempt[]; // attempts made before the chain started (a rejected candidate_sql): numbering continues, the rejection is in the carryover
+  engine?: string;
+  // Playbook hooks (all optional): hits retrieved before each Rewriter call, a ledger-reuse lookup for each attempt, and a callback
+  // for every finished attempt so the orchestrator can write the Verifier's outcome to the playbook.
+  retrieve?: () => PlaybookHit[];
+  reuse?: ReuseLookup;
+  onAttempt?: (att: Attempt) => void;
 }
 
 export interface ChainResult {
@@ -35,6 +43,7 @@ export interface ChainResult {
   accepted: Attempt | null;
   llmError: { unavailable: boolean; message: string } | null;
   upstreamError: string | null; // the vendored engine swallows a step's exception into run.error; surfaced here, never dropped
+  playbookHitIds: string[]; // every playbook entry reinjected into a Rewriter prompt during the chain, in first-seen order
   markovian: { chunks: number; carryover_present: boolean[]; status: string; carryovers: string[]; out_of_hypotheses: boolean };
 }
 
@@ -49,7 +58,7 @@ export const neutralise = (s: string): string => s.replace(MARKERS, "(marker rem
 export function carryoverKey(ledger: Hypothesis[], rejected: Attempt[]): string {
   return JSON.stringify({
     ledger: ledger.map((h) => [h.id, h.status]),
-    rejected: rejected.map((a) => [a.n, a.hypothesis_id, a.reason ?? a.verdict, a.not_faster_detail ?? null, sha256Text(a.sql.replace(/\s+/g, " ").trim().toLowerCase())]),
+    rejected: rejected.map((a) => [a.n, a.origin, a.hypothesis_id, a.reason ?? a.verdict, a.not_faster_detail ?? null, sha256Text(a.sql.replace(/\s+/g, " ").trim().toLowerCase()), a.first_diff ? sha256Text(JSON.stringify(a.first_diff)) : null]),
   });
 }
 
@@ -77,13 +86,15 @@ export function carryoverBlock(ledger: Hypothesis[], rejected: Attempt[]): strin
 export async function runChain(a: ChainArgs): Promise<ChainResult> {
   const ledger = a.diagnosis.hypotheses;
   const attempts: Attempt[] = [];
-  const rejected: Attempt[] = [];
+  const prior = a.prior ?? [];
+  const rejected: Attempt[] = [...prior];
   const tries = new Map<string, number>();
   let accepted: Attempt | null = null;
   let llmError: ChainResult["llmError"] = null;
   let current: Hypothesis | undefined;
   let finished = false;
   let outOfHypotheses = false;
+  const seenHits: string[] = [];
 
   // ROW_DIFF / GUARD / ERROR / REFUSED retry the same hypothesis (<= 2 tries); otherwise the next untested hypothesis, then any
   // unproven one with a try left. A falsified or confirmed hypothesis is never picked again; none eligible → the chain ends.
@@ -95,14 +106,14 @@ export async function runChain(a: ChainArgs): Promise<ChainResult> {
     return ledger.find((h) => h.status === "untested") ?? ledger.find(eligible);
   };
 
-  const mk = new Markovian({ chunkConfig: { ...CHUNK_CONFIG, maxChunks: a.maxAttempts } });
+  const mk = new Markovian({ chunkConfig: { ...CHUNK_CONFIG, maxChunks: Math.max(1, a.maxAttempts - prior.length) } });
   const carryovers: string[] = [];
   const run = await mk.run({
     goal: "Find a faster rewrite that the Verifier proves returns the same rows",
     reflect: false,
     stopWhen: () => finished,
     stepFn: async ({ carryover }) => {
-      const n = attempts.length + 1;
+      const n = prior.length + attempts.length + 1;
       const next = pick();
       if (!next) {
         finished = true;
@@ -113,8 +124,10 @@ export async function runChain(a: ChainArgs): Promise<ChainResult> {
       tries.set(current.id, (tries.get(current.id) ?? 0) + 1);
       const t0 = performance.now();
       let rw;
+      const hits = a.retrieve?.() ?? [];
+      for (const h of hits) if (!seenHits.includes(h.id)) seenHits.push(h.id);
       try {
-        rw = await a.rewriter.rewrite({ sql: a.sql, plan: a.plan, diagnosis: a.diagnosis, hypothesis: current, facts: a.facts, carryover, carryoverKey: carryoverKey(ledger, rejected), attemptNo: n });
+        rw = await a.rewriter.rewrite({ sql: a.sql, plan: a.plan, diagnosis: a.diagnosis, hypothesis: current, facts: a.facts, carryover, carryoverKey: carryoverKey(ledger, rejected), attemptNo: n, playbook: hits, engine: a.engine });
       } catch (e) {
         llmError = { unavailable: e instanceof SampleModeNoLLM, message: (e as Error).message.slice(0, 300) };
         a.trace.emit({
@@ -131,9 +144,10 @@ export async function runChain(a: ChainArgs): Promise<ChainResult> {
       const att = await a.verifier.verify(
         { n, origin: "rewriter", hypothesis_id: current.id, sql: rw.sql, change_summary: rw.change_summary },
         a.pre,
-        { lastAttempt: n >= a.maxAttempts },
+        { lastAttempt: n >= a.maxAttempts, ...(a.reuse ? { reuse: a.reuse } : {}) },
       );
       attempts.push(att);
+      a.onAttempt?.(att);
       if (att.verdict === "ACCEPT") {
         current.status = "confirmed";
         current.evidence = att.timing_ms ? `${att.timing_ms.median_speedup}× median, ${att.timing_ms.faster_pairs}/${att.timing_ms.orig.length} pairs faster` : undefined;
@@ -150,7 +164,7 @@ export async function runChain(a: ChainArgs): Promise<ChainResult> {
     },
   });
   return {
-    attempts, accepted, llmError, upstreamError: run.status === "errored" ? (run.error ?? "chain errored") : null,
+    attempts, accepted, llmError, playbookHitIds: seenHits, upstreamError: run.status === "errored" ? (run.error ?? "chain errored") : null,
     markovian: { chunks: run.chunks.length, carryover_present: run.chunks.map((c) => c.carryover !== ""), status: run.status, carryovers, out_of_hypotheses: outOfHypotheses },
   };
 }

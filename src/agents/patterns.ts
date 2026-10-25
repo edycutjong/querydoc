@@ -16,6 +16,7 @@ export const PATTERN_LABELS = [
   "not_in_nullable",
   "correlated_subquery",
   "union_dedupe",
+  "or_join_condition",
   "non_sargable_predicate",
   "distinct_over_fanout",
   "cross_source_join_no_pushdown",
@@ -152,6 +153,14 @@ export function detectPatterns(sql: string, plan?: Plan | null): Detection {
   const un = /\bunion\b(?!\s+all\b)/.exec(m);
   if (un) hits.push({ label: "union_dedupe", evidence: trim(m.slice(Math.max(0, un.index - 30), un.index + 40)) });
 
+  // or_join_condition: an OR inside a JOIN ... ON condition (two equalities on different columns of the same row) defeats a hash join.
+  for (const j of joins) {
+    if (/\bor\b/.test(j.on)) {
+      hits.push({ label: "or_join_condition", evidence: trim(`${j.kind || "inner"} join ${j.table} ${j.alias} on ${j.on}`) });
+      break;
+    }
+  }
+
   const nonSarg = /\b(year|month|day|date|upper|lower|substr|substring|cast|coalesce|trim|to_date|date_format)\s*\(\s*[\w.`]+[^()]*\)\s*(?:=|<>|!=|<=|>=|<|>|\blike\b)/.exec(m.slice(Math.max(0, m.search(/\bwhere\b/))));
   if (nonSarg && /\bwhere\b/.test(m)) hits.push({ label: "non_sargable_predicate", evidence: trim(nonSarg[0]) });
 
@@ -174,6 +183,7 @@ const NODE_OPS: Record<PatternLabel, RegExp> = {
   not_in_nullable: /Join|Subquery|Filter/i,
   correlated_subquery: /Join|Subquery|Aggregate/i,
   union_dedupe: /Union|Aggregate|Distinct/i,
+  or_join_condition: /Join/i,
   non_sargable_predicate: /Filter|Scan/i,
   distinct_over_fanout: /Aggregate|Distinct|Join/i,
   cross_source_join_no_pushdown: /Join|Scan/i,

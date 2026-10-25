@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LlmGateway, SampleModeNoLLM } from "../adapters/nim.js";
+import { LlmGateway, NIM_MODEL, SampleModeNoLLM } from "../adapters/nim.js";
 import type { Plan } from "../engine/types.js";
 import type { Trace } from "../trace.js";
 import type { Diagnosis, Hypothesis } from "../types.js";
@@ -20,6 +20,9 @@ export const DIAGNOSER_SYSTEM =
   "facts about the join keys, and say where the time goes and why. You never claim a speed-up number and never claim a rewrite is " +
   "correct: a separate verifier executes candidate rewrites on the real data. Reply with ONLY a JSON object.";
 
+export const engineSystem = (system: string, engine: string): string =>
+  engine === "duckdb" ? system.replace("a Spark-based query engine (Hive dialect)", "DuckDB (PostgreSQL-like dialect)").replace("a Spark-based engine (Hive dialect)", "DuckDB (PostgreSQL-like dialect)") : system;
+
 export const planExcerpt = (plan: Plan | null, max = 5000): string => (plan ? plan.text.slice(0, max) : "(no plan available)");
 
 function detectorHypothesis(d: Detection): Hypothesis {
@@ -30,6 +33,7 @@ function detectorHypothesis(d: Detection): Hypothesis {
     outer_join_predicate: "A filter on the joined side sits in the ON clause of a LEFT JOIN; the join dominates the cost.",
     not_in_nullable: "NOT IN over a subquery forces a null-aware anti join, which is expensive.",
     correlated_subquery: "A correlated subquery is re-evaluated per outer row (or decorrelated into a costly join).",
+    or_join_condition: "An OR inside the JOIN condition cannot use a hash join; the engine falls back to a nested-loop style join, which is far more expensive than two equi-joins.",
     union_dedupe: "UNION forces a deduplicating aggregate over both inputs.",
     non_sargable_predicate: "A function on a column in the predicate blocks pushdown and pruning.",
     distinct_over_fanout: "DISTINCT after a fan-out join deduplicates rows the join multiplied.",
@@ -43,7 +47,7 @@ function detectorHypothesis(d: Detection): Hypothesis {
 }
 
 export class Diagnoser {
-  constructor(private readonly llm: LlmGateway, private readonly trace: Trace, private readonly reasoning: "on" | "off" = "on") {}
+  constructor(private readonly llm: LlmGateway, private readonly trace: Trace, private readonly reasoning: "on" | "off" = "on", private readonly engine = "") {}
 
   async diagnose(sql: string, plan: Plan | null, d: Detection, facts: KeyFact[]): Promise<Diagnosis> {
     const diagnosis: Diagnosis = {
@@ -74,8 +78,8 @@ export class Diagnoser {
     try {
       const r = await this.llm.call(
         "diagnose",
-        { sql: normaliseSql(sql), pattern: d.label, nodes: [...cited], facts: facts.map(keyFactLine) },
-        { system: DIAGNOSER_SYSTEM, user, reasoning: this.reasoning, maxTokens: 6000, temperature: 1.0 },
+        { template: "diagnoser@1", model: NIM_MODEL, engine: this.engine, sql: normaliseSql(sql), pattern: d.label, nodes: [...cited], facts: facts.map(keyFactLine) },
+        { system: engineSystem(DIAGNOSER_SYSTEM, this.engine), user, reasoning: this.reasoning, maxTokens: 6000, temperature: 1.0 },
         (raw) => Reply.parse(raw),
       );
       diagnosis.bottleneck = r.out.bottleneck;
@@ -106,4 +110,4 @@ export class Diagnoser {
   }
 }
 
-export const normaliseSql = (sql: string): string => sql.replace(/--[^\n]*/g, " ").replace(/\s+/g, " ").trim().replace(/;$/, "").toLowerCase();
+export const normaliseSql = (sql: string): string => sql.replace(/--[^\n]*/g, " ").replace(/\s+/g, " ").trim().replace(/\s*;$/, "").toLowerCase();

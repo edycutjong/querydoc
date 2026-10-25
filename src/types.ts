@@ -37,10 +37,19 @@ export interface RunOptions {
   maxAttempts?: number;
 }
 
+export interface Decision {
+  decision: "approve" | "reject";
+  actor: string;
+  at: string;
+  memory_id: string;
+  ledger_entries: number;
+}
+
 export interface Case {
   run_id: string;
   sql: string;
   source: string;
+  schema_fqn?: string;
   engine: "zetaris" | "duckdb";
   llm: "nim" | "cache" | "none";
   started_at: string;
@@ -52,4 +61,6 @@ export interface Case {
   no_rewrite_reason?: NoRewriteReason;
   detail?: string;
   playbook_hits: string[];
+  decision?: Decision;
+  playbook_state?: string; // sample mode: the options.playbook value this run started from
 }

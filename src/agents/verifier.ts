@@ -35,6 +35,8 @@ export interface Precheck {
   warnings: string[];
 }
 
+export type ReuseLookup = (candidateSql: string) => { id: string; rows: { orig: number; rewrite: number } | null; first_diff: { side: "orig" | "rewrite"; row: unknown[] } | null; text: string } | null;
+
 export interface AttemptInput {
   n: number;
   origin: "rewriter" | "candidate_sql";
@@ -52,6 +54,7 @@ export interface Attempt extends AttemptInput {
   rows: { orig: number; rewrite: number };
   fingerprint: { orig: string; rewrite: string | null };
   fingerprint_kind?: "rows" | "engine";
+  reused_from?: string; // H-MEM id when a refusal was reused from the ledger: the candidate was not executed
   timing_ms?: {
     orig: number[];
     rewrite: number[];
@@ -209,7 +212,7 @@ export class Verifier {
     return ok;
   }
 
-  async verify(input: AttemptInput, pre: Precheck, opts: { lastAttempt?: boolean } = {}): Promise<Attempt> {
+  async verify(input: AttemptInput, pre: Precheck, opts: { lastAttempt?: boolean; reuse?: ReuseLookup } = {}): Promise<Attempt> {
     if (!pre.ok) throw new Error("verify() needs a passing pre-check");
     const sql = trimStatement(input.sql);
     const att: Attempt = { ...input, sql, verdict: "REJECT", rows: { orig: pre.rows, rewrite: 0 }, fingerprint: { orig: pre.fingerprint, rewrite: null } };
@@ -226,6 +229,17 @@ export class Verifier {
 
     const g = sqlGuard(sql, this.cfg.dialect);
     if (!g.ok) return finish({ ...att, verdict: "REFUSED", reason: "GUARD", detail: `read-only guard: ${g.reason}` });
+
+    // Ledger reuse (architecture §Verifier order step 1): a refusal recorded on this original, this candidate and this original-result
+    // fingerprint is repeated without executing the candidate. Only refusals are ever reused.
+    const hit = opts.reuse?.(sql);
+    if (hit) {
+      const fd = hit.first_diff ?? undefined;
+      return finish({
+        ...att, reason: "ROW_DIFF", reused_from: hit.id, rows: hit.rows ?? att.rows, ...(fd ? { first_diff: fd } : {}),
+        detail: `refusal reused from ledger ${hit.id} — same original-result fingerprint; the candidate was not executed (${hit.text.slice(0, 200)})`,
+      });
+    }
 
     let cand: Side;
     try {

@@ -10,6 +10,7 @@ import { Verifier, type Attempt } from "./agents/verifier.js";
 import type { VerifierConfig } from "./config.js";
 import { ROOT } from "./config.js";
 import type { Plan, QueryEngine } from "./engine/types.js";
+import { schemaFqn, type Playbook, type PlaybookCtx } from "./memory/playbook.js";
 import { runChain, type ChainResult } from "./reasoning/chain.js";
 import { Trace } from "./trace.js";
 import type { Case, RunInput, RunOptions } from "./types.js";
@@ -26,6 +27,7 @@ export interface Deps {
   logDir?: string; // JSONL traces go to <logDir>/trace-<run_id>.jsonl
   // Chosen from the Day-3 latency probe (docs/DX-REPORT.md): the Diagnoser reasons once per case; the Rewriter answers directly.
   reasoning?: { diagnoser: "on" | "off"; rewriter: "on" | "off" };
+  playbook?: Playbook; // H-MEM playbook for this run; absent = no memory (unit tests)
 }
 
 export interface CaseRun {
@@ -77,21 +79,56 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
     }
     const detection = detectPatterns(input.sql, plan);
     const facts = await profileJoinKeys(deps.engine, input.sql, deps.cfg.dialect, trace);
-    const diagnoser = new Diagnoser(deps.llm, trace, deps.reasoning?.diagnoser ?? "on");
+    const diagnoser = new Diagnoser(deps.llm, trace, deps.reasoning?.diagnoser ?? "on", deps.engine.name);
     c.diagnosis = await diagnoser.diagnose(input.sql, plan, detection, facts);
+    c.schema_fqn = schemaFqn(detection.tables);
+
+    // Playbook plumbing: retrieval before each Rewriter call, ledger-reuse lookup and the write of every rejection (Verifier outcomes only).
+    const pb = deps.playbook;
+    const pctx: PlaybookCtx = { pattern: c.diagnosis.pattern_label, schema: c.schema_fqn, origSql: input.sql, origFp: pre.fingerprint };
+    const hitSet = new Set<string>();
+    if (pb) trace.emit({ agent_name: "Orchestrator", action: "playbook_open", input_summary: `store ${pb.storeHash()}`, output_summary: `${pb.size} entr${pb.size === 1 ? "y" : "ies"}; pattern ${pctx.pattern}; schema ${pctx.schema}`, target_agent: "Rewriter", sponsor_call: { service: "hmem", name: "open", latency_ms: 0 }, retry_count: 0, status: "ok" });
+    const retrieve = () => {
+      if (!pb) return [];
+      const t = performance.now();
+      const hits = pb.retrieve(pctx.pattern, pctx.schema);
+      for (const h of hits) hitSet.add(h.id);
+      trace.emit({
+        agent_name: "Orchestrator", action: "playbook_query", input_summary: `${pctx.pattern} ${pctx.schema}`,
+        output_summary: hits.length ? hits.map((h) => `${h.id} ${h.outcome} (${h.score})`).join(", ") : "no entries for this pattern and schema", target_agent: "Rewriter",
+        sponsor_call: { service: "hmem", name: "query", latency_ms: Math.round((performance.now() - t) * 10) / 10 }, retry_count: 0, status: "ok",
+      });
+      return hits;
+    };
+    const reuse = pb ? (cand: string) => pb.findRefusal(input.sql, cand, pre.fingerprint) : undefined;
+    const onAttempt = (att: Attempt) => {
+      if (!pb) return;
+      if (att.reused_from) hitSet.add(att.reused_from);
+      const t = performance.now();
+      const m = pb.recordRejection(att, pctx);
+      if (m) trace.emit({ agent_name: "Orchestrator", action: "playbook_write", input_summary: `attempt ${att.n} ${att.reason}${att.not_faster_detail ? "/" + att.not_faster_detail : ""}`, output_summary: `${m.id} ${m.tags.find((t2) => t2.startsWith("outcome:"))}`, target_agent: null, sponsor_call: { service: "hmem", name: "add", latency_ms: Math.round((performance.now() - t) * 10) / 10 }, retry_count: att.n - 1, status: "ok" });
+    };
+    const syncHits = () => { c.playbook_hits = [...hitSet]; };
     if (c.diagnosis.narrative === "llm") c.llm = "nim";
     else if (c.diagnosis.narrative === "llm-cache") c.llm = "cache";
 
-    // Own-candidate path: the human supplied the rewrite; the Verifier judges it, no Rewriter runs.
+    // Own-candidate path: the human supplied a rewrite as attempt 1 and the Verifier judges it. An accepted candidate ends the case;
+    // a rejected one continues into the Rewriter chain when attempts remain (its rejection is in the carryover). With no model
+    // available the chain ends at once as NO_SAFE_REWRITE + llm_unavailable, with the candidate's refusal in the dossier.
+    const prior: Attempt[] = [];
     if (input.candidate_sql) {
-      const att = await verifier.verify({ n: 1, origin: "candidate_sql", hypothesis_id: null, sql: input.candidate_sql, change_summary: "candidate supplied with the request" }, pre, { lastAttempt: true });
+      const att = await verifier.verify({ n: 1, origin: "candidate_sql", hypothesis_id: null, sql: input.candidate_sql, change_summary: "candidate supplied with the request" }, pre, { lastAttempt: maxAttempts <= 1, ...(reuse ? { reuse } : {}) });
       c.attempts.push(att);
-      return finalise(att.verdict === "ACCEPT" ? att : null, c.attempts, null, finish);
+      onAttempt(att);
+      syncHits();
+      if (att.verdict === "ACCEPT" || maxAttempts <= 1) return finalise(att.verdict === "ACCEPT" ? att : null, c.attempts, null, finish);
+      prior.push(att);
     }
 
     const rewriter = new Rewriter(deps.llm, trace, deps.reasoning?.rewriter ?? "off");
-    const chain = await runChain({ sql: input.sql, plan, diagnosis: c.diagnosis, facts, pre, rewriter, verifier, trace, maxAttempts });
+    const chain = await runChain({ sql: input.sql, plan, diagnosis: c.diagnosis, facts, pre, rewriter, verifier, trace, maxAttempts, prior, engine: deps.engine.name, retrieve, ...(reuse ? { reuse } : {}), onAttempt });
     c.attempts.push(...chain.attempts);
+    syncHits();
     if (c.llm === "none" && chain.attempts.length) c.llm = deps.llm.live ? "nim" : "cache"; // a Rewriter attempt ran, so a model (or its cache) was used
     if (chain.llmError && !chain.llmError.unavailable && c.llm === "none") c.llm = deps.llm.live ? "nim" : "cache"; // a live call was made and failed
     if (chain.upstreamError) throw new Error(chain.upstreamError);
