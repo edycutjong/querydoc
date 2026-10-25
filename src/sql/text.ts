@@ -1,7 +1,9 @@
 // Literal-aware SQL text helpers. `maskSql` blanks out comments, string literals and quoted identifiers (same length, so offsets
 // still line up), leaving only the SQL a keyword scan should see: `SELECT 'DROP TABLE x'` or a `-- DELETE` comment is not DDL.
 
-export function maskSql(sql: string): string {
+// keepIdents: leave backtick-quoted identifiers intact (only comments and string literals are blanked) — for scans that must see
+// a quoted name, e.g. `parquet`.`s3a://…` or `reflect`(…).
+export function maskSql(sql: string, keepIdents = false): string {
   let out = "";
   let i = 0;
   const n = sql.length;
@@ -17,6 +19,11 @@ export function maskSql(sql: string): string {
       const end = sql.indexOf("*/", i + 2);
       const stop = end === -1 ? n : end + 2;
       out += sql.slice(i, stop).replace(/[^\n]/g, " ");
+      i = stop;
+    } else if (keepIdents && c === "`") {
+      const end = sql.indexOf("`", i + 1);
+      const stop = end === -1 ? n : end + 1;
+      out += sql.slice(i, stop);
       i = stop;
     } else if (c === "'" || c === '"' || c === "`") {
       let j = i + 1;

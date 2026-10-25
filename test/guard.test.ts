@@ -11,6 +11,8 @@ describe("sqlGuard (Zetaris side, hive dialect)", () => {
     "SELECT /* INSERT INTO t */ a FROM t ORDER BY a DESC",
     "SELECT date_add(d, 1), replace(s, 'a', 'b') FROM t;",
     "(SELECT 1)",
+    "SELECT `parquet_files`.a FROM t `parquet_files`",
+    "SELECT 'parquet.`x`' AS s",
   ];
   for (const sql of passes) it(`passes: ${sql.slice(0, 60)}`, () => expect(sqlGuard(sql)).toMatchObject({ ok: true }));
 
@@ -24,6 +26,10 @@ describe("sqlGuard (Zetaris side, hive dialect)", () => {
     ["WITH x AS (SELECT 1) INSERT INTO t SELECT * FROM x", /INSERT/],
     ["SELECT * FROM parquet.`s3a://bucket/path`", /file/],
     ["SELECT reflect('java.lang.Runtime', 'getRuntime')", /JVM/],
+    ["SELECT * FROM `parquet`.`s3a://bucket/path`", /file/],
+    ["SELECT * FROM csv . `/etc/passwd`", /file/],
+    ["SELECT `reflect`('java.lang.Runtime', 'getRuntime')", /JVM/],
+    ["SELECT java_method ('java.lang.System', 'getenv')", /JVM/],
     ["/* hi */ DELETE FROM t", /not a SELECT/],
     ["", /empty/],
   ];

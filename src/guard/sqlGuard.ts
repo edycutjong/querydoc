@@ -9,6 +9,8 @@ const parser = new Parser();
 // Zetaris side: a literal-aware keyword scan (decisive) plus node-sql-parser in the Day-1 dialect (`hive`, querydoc.config.json).
 // A single statement the parser cannot read but the scan passes is a WARN, not a refusal; more than one statement, a DDL/DML
 // keyword outside literals, a direct file read (`parquet.\`s3a://…\``) or a JVM call (`reflect`, `java_method`) is REFUSED.
+// The scan is deliberately blunt: an unquoted column named like a keyword (`comment`, `set`, `lock`) is refused too — a false
+// refusal, never a false pass; quote such a name with backticks.
 
 export interface GuardResult {
   ok: boolean;
@@ -23,8 +25,9 @@ const WRITE_KEYWORDS = [
   "UNLOCK", "KILL", "SHUTDOWN", "ADD", "RENAME", "OVERWRITE", "DIRECTORY", "SHOW", "DESCRIBE", "EXPLAIN",
 ];
 const WRITE_RE = new RegExp(`\\b(${WRITE_KEYWORDS.join("|")})\\b`, "i");
-const FILE_READ_RE = /\b(parquet|csv|json|orc|text|avro|binaryfile|delta|jdbc|hive)\s*\.\s*`/i;
-const JVM_CALL_RE = /\b(reflect|java_method|try_reflect)\s*\(/i;
+// Both run on a mask that keeps backtick identifiers, so `parquet`.`s3a://…` and `reflect`(…) are seen too.
+const FILE_READ_RE = /`?\b(parquet|csv|json|orc|text|avro|binaryfile|delta|jdbc|hive)`?\s*\.\s*`/i;
+const JVM_CALL_RE = /\b(reflect|java_method|try_reflect)`?\s*\(/i;
 
 export function sqlGuard(sql: string, dialect = "hive"): GuardResult {
   const warnings: string[] = [];
@@ -37,8 +40,9 @@ export function sqlGuard(sql: string, dialect = "hive"): GuardResult {
 
   const hit = WRITE_RE.exec(masked);
   if (hit) return { ok: false, reason: `keyword ${hit[1]!.toUpperCase()} outside literals`, warnings };
-  if (FILE_READ_RE.test(masked)) return { ok: false, reason: "direct file/source read", warnings };
-  if (JVM_CALL_RE.test(masked)) return { ok: false, reason: "JVM reflection call", warnings };
+  const withIdents = maskSql(stmt, true);
+  if (FILE_READ_RE.test(withIdents)) return { ok: false, reason: "direct file/source read", warnings };
+  if (JVM_CALL_RE.test(withIdents)) return { ok: false, reason: "JVM reflection call", warnings };
 
   try {
     const ast = parser.astify(stmt, { database: dialect });
