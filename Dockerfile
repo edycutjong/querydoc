@@ -11,6 +11,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 ENV PORT=8000
+# inside the container the API must listen on every interface for -p to reach it (outside Docker it defaults to 127.0.0.1)
+ENV HOST=0.0.0.0
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD node -e "fetch('http://127.0.0.1:8000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["npm", "start"]
