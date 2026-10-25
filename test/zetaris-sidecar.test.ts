@@ -29,6 +29,12 @@ describe("ZetarisEngine ↔ sidecar", () => {
     expect(r.rows).toEqual([[1]]);
   });
 
+  it("a sidecar that never becomes ready is killed at the startup bound and the statement fails", async () => {
+    const e = new ZetarisEngine({ jdbcUrl: "jdbc:fake", jdbcJar: "/nonexistent.jar", user: "u", password: "p", sidecarCmd: [process.execPath, fake, "--never-ready"], startupSec: 0.3 });
+    engines.push(e);
+    await expect(e.run("SELECT 1", { rowCap: 1, timeoutSec: 5 })).rejects.toThrow(/no ready line within 0.3 s/);
+  });
+
   it("close() fails a statement still waiting instead of leaving it pending", async () => {
     const e = open(60);
     const pending = e.run("SELECT 'hang'", { rowCap: 1, timeoutSec: 60 });

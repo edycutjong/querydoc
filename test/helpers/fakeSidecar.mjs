@@ -1,10 +1,10 @@
 // A stand-in for QuerySidecar.java speaking the same line protocol (id \t op \t maxRows \t drain \t timeoutSec \t base64 sql).
 // It writes one non-protocol line first (as a JVM banner would), never answers a statement containing "hang", and answers
-// everything else with one row: [1].
+// everything else with one row: [1]. With --never-ready it never announces itself (a JVM stuck at startup).
 import { createInterface } from "node:readline";
 
 process.stdout.write("Picked up a non-JSON banner line\n");
-process.stdout.write('{"ready":true}\n');
+if (!process.argv.includes("--never-ready")) process.stdout.write('{"ready":true}\n');
 createInterface({ input: process.stdin }).on("line", (line) => {
   const [id, , , , , b64] = line.split("\t");
   const sql = Buffer.from(b64 ?? "", "base64").toString("utf8");

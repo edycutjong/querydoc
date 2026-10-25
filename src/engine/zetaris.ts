@@ -21,6 +21,7 @@ const DEFAULT_TIMEOUT_SEC = 120;
 // The sidecar asks the driver for a query timeout, but the driver may ignore it (QuerySidecar.java). Past timeoutSec + this grace
 // with no reply, the sidecar is killed and the request fails: one stuck statement must not hold the service's queue for ever.
 export const SIDECAR_GRACE_SEC = 30;
+export const SIDECAR_STARTUP_SEC = 60; // JVM start + driver class load; the JDBC connection itself opens on the first statement
 
 interface SidecarOk {
   id: string;
@@ -50,6 +51,7 @@ export interface ZetarisConfig {
   java?: string;
   sidecarCmd?: string[]; // test seam: a stand-in sidecar speaking the same line protocol (skips javac)
   graceSec?: number; // default SIDECAR_GRACE_SEC
+  startupSec?: number; // default SIDECAR_STARTUP_SEC
 }
 
 export function zetarisConfigFromEnv(env: NodeJS.ProcessEnv = process.env): ZetarisConfig | null {
@@ -108,6 +110,10 @@ export class ZetarisEngine implements QueryEngine {
       if (this.stderrTail.length > 20) this.stderrTail.shift();
     });
     this.ready = new Promise((resolveReady, reject) => {
+      const startup = setTimeout(() => {
+        this.stderrTail.push(`[startup] no ready line within ${this.cfg.startupSec ?? SIDECAR_STARTUP_SEC} s; sidecar killed\n`);
+        proc.kill("SIGKILL"); // the exit handler below rejects this promise
+      }, (this.cfg.startupSec ?? SIDECAR_STARTUP_SEC) * 1000);
       const rl = createInterface({ input: proc.stdout });
       rl.on("line", (line) => {
         let msg: SidecarReply | { ready: true };
@@ -121,7 +127,10 @@ export class ZetarisEngine implements QueryEngine {
           return;
         }
         if (!msg || typeof msg !== "object") return;
-        if ("ready" in msg) return resolveReady();
+        if ("ready" in msg) {
+          clearTimeout(startup);
+          return resolveReady();
+        }
         const done = msg.id !== null ? this.waiting.get(msg.id) : undefined;
         if (done && msg.id !== null) {
           this.waiting.delete(msg.id);
@@ -129,6 +138,7 @@ export class ZetarisEngine implements QueryEngine {
         }
       });
       const gone = (why: string) => {
+        clearTimeout(startup);
         const err: SidecarErr = { id: null, ok: false, error: `sidecar ${why}: ${this.stderrTail.join("").slice(-500)}`, sqlState: null, elapsedMs: 0 };
         if (this.proc === proc) {
           // A sidecar already replaced (killed at a deadline, or closed) must not touch its successor's state.
