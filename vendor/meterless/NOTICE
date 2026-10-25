@@ -1,0 +1,5 @@
+Meterless reference implementations (H-MEM, Markovian)
+Copyright Meterless contributors. Licensed under the Apache License, Version 2.0 (see LICENSE).
+Source: https://github.com/Meterless/Meterless @ 0aa7417ba5c826396d91e891328be78c45e6fbf6
+Vendored UNMODIFIED: engines/hmem/reference/src -> hmem/src, engines/markovian/reference/src -> markovian/src.
+The upstream smoke tests are copied to test/vendor/ with only the import paths changed.
