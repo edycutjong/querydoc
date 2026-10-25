@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Query Doctor — same rows, faster, or it won't sign</title>
+<meta name="description" content="Query Doctor rewrites a slow Zetaris query and keeps the rewrite only after executing both versions returns identical rows and a measured speedup. Hero: 2.11× over 10 paired runs; the duplicated-key twin was refused.">
+<meta name="theme-color" content="#F3F0E8">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Query Doctor">
+<meta property="og:title" content="Query Doctor — same rows, faster, or it won't sign">
+<meta property="og:description" content="An agent that executes the original and the rewrite on Zetaris and signs only when the rows match. 2.11× on the hero; the duplicated-key twin refused.">
+<meta property="og:image" content="https://querydoc.vercel.app/assets/og.png?v=56e6e5d968">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:url" content="https://querydoc.vercel.app/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="assets/fonts/instrument-serif-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/instrument-serif-latin-400-italic.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face{font-family:"Instrument Serif";font-style:normal;font-weight:400;font-display:swap;src:url(assets/fonts/instrument-serif-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Instrument Serif";font-style:italic;font-weight:400;font-display:swap;src:url(assets/fonts/instrument-serif-latin-400-italic.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-weight:400;font-display:swap;src:url(assets/fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-weight:600;font-display:swap;src:url(assets/fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;font-display:swap;src:url(assets/fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-weight:600;font-display:swap;src:url(assets/fonts/ibm-plex-mono-latin-600-normal.woff2) format("woff2")}
+:root{
+  --bg:#F3F0E8; --panel:#FBFAF6; --ink:#1A1C1E; --muted:#6B6A64; --before:#B03A2E; --after:#1E6B52; --rule:#CFC8B8;
+  --font-display:"Instrument Serif","Iowan Old Style",Georgia,serif;
+  --font-body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  --font-data:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --pad:clamp(20px,4vw,56px);
+}
+*{box-sizing:border-box}
+html{overflow-x:clip;scroll-behavior:smooth;scrollbar-color:var(--rule) var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--font-body);-webkit-font-smoothing:antialiased}
+::selection{background:var(--ink);color:var(--panel)}
+:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+a{color:inherit}
+p{margin:0}
+.data{font-family:var(--font-data);font-variant-numeric:tabular-nums}
+.paper{background-color:var(--bg);background-image:
+  repeating-linear-gradient(0deg,transparent 0 31px,rgba(207,200,184,.32) 31px 32px),
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .1 0 0 0 0 .1 0 0 0 0 .1 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+.wrap{max-width:1328px;margin:0 auto;padding:0 var(--pad)}
+.lbl{font:12px/1.4 var(--font-data);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+/* letterhead */
+.band{border-bottom:1px solid var(--ink);font:12px/1.4 var(--font-data);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.band .wrap{display:flex;justify-content:space-between;gap:16px;padding-top:9px;padding-bottom:9px}
+.band b{color:var(--ink);font-weight:600}
+nav{border-bottom:3px double var(--ink);background:var(--bg);position:sticky;top:0;z-index:5}
+nav .wrap{display:flex;align-items:center;gap:28px;padding-top:12px;padding-bottom:12px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font:italic 30px/1 var(--font-display)}
+.brand img{width:30px;height:30px}
+nav .sp{flex:1}
+nav .links a{font-size:14px;text-decoration:none;padding:6px 2px;border-bottom:1px solid transparent;transition:border-color .2s}
+nav .links a:hover{border-bottom-color:var(--ink)}
+nav .links{display:flex;gap:22px}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--ink);padding:10px 16px;font:600 14px/1.2 var(--font-body);color:var(--ink);text-decoration:none;background:var(--panel);cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,background .15s}
+.btn:hover{transform:translate(-2px,-2px);box-shadow:3px 3px 0 var(--ink)}
+.btn:active{transform:translate(0,0);box-shadow:none}
+.btn.pri{background:var(--ink);color:var(--panel)}
+.btn.pri:hover{box-shadow:3px 3px 0 var(--muted)}
+
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,1fr);gap:clamp(28px,4.5vw,64px);align-items:start;padding-top:clamp(36px,6vh,72px);padding-bottom:clamp(40px,7vh,80px)}
+.copy{min-width:0}
+h1{font:400 clamp(52px,6.6vw,96px)/.97 var(--font-display);letter-spacing:-.012em;margin:16px 0 26px}
+h1 .pen{position:relative;white-space:nowrap;font-style:italic}
+h1 .pen svg{position:absolute;left:-3%;bottom:-.14em;width:106%;height:.32em;overflow:visible;pointer-events:none}
+h1 .pen path{fill:none;stroke:var(--before);stroke-width:3.4;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.js h1 .pen path{stroke-dasharray:1;stroke-dashoffset:1;animation:pen .75s 1s cubic-bezier(.5,0,.2,1) forwards}
+@keyframes pen{to{stroke-dashoffset:0}}
+.sub{max-width:33em;font-size:clamp(16px,1.25vw,18px);color:var(--ink)}
+.sub b{font:600 .94em var(--font-data)}
+.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.run{margin-top:18px;display:flex;align-items:stretch;max-width:36em;border:1px dashed var(--muted);background:rgba(251,250,246,.6)}
+.run code{flex:1;min-width:0;padding:10px 12px;font:13px/1.5 var(--font-data);color:var(--ink);overflow-wrap:anywhere}
+.run button{border:0;border-left:1px dashed var(--muted);background:none;font:600 12px var(--font-data);letter-spacing:.08em;text-transform:uppercase;padding:0 14px;cursor:pointer;color:var(--ink);transition:background .15s}
+.run button:hover{background:var(--panel)}
+.strip{margin-top:16px;display:flex;flex-wrap:wrap;gap:6px 18px;font:12px var(--font-data);color:var(--muted)}
+.strip span::before{content:"— ";color:var(--rule)}
+.js .copy>*{animation:rise .7s cubic-bezier(.2,.7,.2,1) both}
+.js .copy>:nth-child(2){animation-delay:.08s}.js .copy>:nth-child(3){animation-delay:.18s}.js .copy>:nth-child(4){animation-delay:.28s}.js .copy>:nth-child(n+5){animation-delay:.36s}
+@keyframes rise{from{opacity:.001;transform:translateY(14px)}}
+
+/* the assay sheet — the signature */
+.sheet{position:relative;background:var(--panel);border:1px solid var(--rule);padding:20px clamp(16px,2vw,28px) 22px;box-shadow:0 1px 0 var(--rule),0 30px 50px -36px rgba(26,28,30,.45);transform:rotate(.35deg)}
+.sheet::before{content:"";position:absolute;inset:-7px 9px auto auto;width:64px;height:18px;background:rgba(207,200,184,.55);transform:rotate(4deg)}
+.sheet header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-bottom:1px solid var(--ink);padding-bottom:7px}
+.sheet h2{margin:0;font:italic 27px/1.1 var(--font-display)}
+.sheet h2 .data{font:400 .62em var(--font-data);font-style:normal;letter-spacing:.02em}
+.switch{display:grid;grid-template-columns:1fr 1fr;margin:14px 0 4px;border:1px solid var(--ink)}
+.switch button{appearance:none;border:0;background:none;padding:9px 10px;text-align:left;cursor:pointer;font:13px/1.35 var(--font-data);color:var(--muted);transition:background .2s,color .2s}
+.switch button+button{border-left:1px solid var(--ink)}
+.switch button b{display:block;color:var(--ink);font-weight:600}
+.switch button[aria-checked=true]{background:var(--ink);color:var(--rule)}
+.switch button[aria-checked=true] b{color:var(--panel)}
+.switch button:not([aria-checked=true]):hover{background:var(--bg)}
+.sheet .lbl{margin:15px 0 6px;font-size:11px}
+.spec{margin:0;font:13px/1.7 var(--font-data);white-space:pre-wrap;overflow-wrap:anywhere}
+.spec .cut{color:var(--muted);background:linear-gradient(var(--before),var(--before)) no-repeat 0 56%/100% 2px;-webkit-box-decoration-break:clone;box-decoration-break:clone;transition:background-size .55s cubic-bezier(.6,0,.2,1)}
+.spec .cut.arm{background-size:0% 2px;transition:none}
+.spec .key{border-bottom:2px solid var(--ink)}
+.margin{font:italic 19px/1.3 var(--font-display);color:var(--muted);margin-top:6px}
+.margin.red{color:var(--before)}
+.res{display:grid;grid-template-columns:70px minmax(0,1fr) 64px;gap:8px 10px;align-items:center;font:13px var(--font-data)}
+.bar{height:16px;position:relative;background:var(--before);transform-origin:left;transition:width 1.1s cubic-bezier(.6,0,.2,1),background-color .5s .5s}
+.bar i{position:absolute;right:5px;top:0;font:600 12px/16px var(--font-data);font-style:normal;color:var(--panel)}
+.bar.rw{background:var(--after)}
+.res .t{text-align:right}
+.untimed{grid-column:2/4;color:var(--muted)}
+.fp{display:grid;grid-template-columns:70px minmax(0,1fr);gap:4px 10px;font:13px var(--font-data);margin-top:10px}
+.fp .hex span{transition:color .2s}
+.fp .hex .x{color:var(--before);font-weight:600}
+.fp .hex .eq{color:var(--after);font-weight:600}
+.verdict{position:relative}
+.stamp{position:absolute;right:4px;top:2px;transform-origin:85% 50%;border:3px solid currentColor;padding:6px 12px;font:600 17px/1.2 var(--font-data);letter-spacing:.06em;background:rgba(251,250,246,.82);color:var(--after);transform:rotate(-7deg);pointer-events:none;box-shadow:inset 0 0 0 2px rgba(251,250,246,.8),inset 0 0 0 4px currentColor}
+.stamp.no{color:var(--before);transform:rotate(5deg)}
+.stamp.hide{opacity:0;transform:rotate(-12deg) scale(1.5)}
+.stamp.land{animation:land .38s cubic-bezier(.3,1.6,.5,1) both}
+.stamp.no.land{animation-name:land-no}
+@keyframes land{from{opacity:0;transform:rotate(-12deg) scale(1.5)}to{opacity:1;transform:rotate(-7deg) scale(1)}}
+@keyframes land-no{from{opacity:0;transform:rotate(11deg) scale(1.5)}to{opacity:1;transform:rotate(5deg) scale(1)}}
+.sheet.thud{animation:thud .25s .1s}
+@keyframes thud{50%{transform:rotate(.35deg) translateY(2px)}}
+.signed{margin-top:16px;border-top:1px solid var(--rule);padding-top:9px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.signed b{color:var(--ink)}
+.replay{border:0;background:none;font:12px var(--font-data);color:var(--ink);text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:0}
+.replay:hover{color:var(--before)}
+.src{font:11px var(--font-data);color:var(--muted);margin-top:6px}
+
+/* receipts — a results table with reference ranges */
+.receipts{border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);background:var(--panel)}
+.receipts .wrap{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.rc{padding:22px 20px 20px;border-left:1px solid var(--rule)}
+.rc:first-child{border-left:0;padding-left:0}
+.rc .num{font:400 clamp(44px,4.6vw,64px)/1 var(--font-display);font-variant-numeric:tabular-nums}
+.rc .num.red{color:var(--before)}
+.rc .what{margin-top:8px;font-weight:600;font-size:15px}
+.rc .ref{margin-top:4px;font:12px/1.5 var(--font-data);color:var(--muted)}
+
+/* sections */
+section.sec{padding:clamp(64px,10vh,112px) 0}
+.sec h2.t{font:400 clamp(38px,4.2vw,60px)/1.02 var(--font-display);margin:10px 0 16px;max-width:15em}
+.sec h2.t em{font-style:italic}
+.lede{max-width:40em;color:var(--ink);font-size:17px}
+.lede code,.card code,.faq code,.inst code{font:.9em var(--font-data);background:rgba(207,200,184,.35);padding:1px 4px}
+
+/* demo pair */
+.pair{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:28px;margin-top:36px;align-items:start}
+.frame{border:1px solid var(--ink);background:var(--panel);box-shadow:6px 6px 0 var(--rule)}
+.frame .bar0{display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--ink);padding:7px 12px;font:12px var(--font-data);color:var(--muted)}
+.frame .bar0 i{width:9px;height:9px;border:1px solid var(--muted);border-radius:50%;display:inline-block}
+.frame img{display:block;width:100%;height:auto}
+.cap{font:12px/1.5 var(--font-data);color:var(--muted);margin-top:12px}
+.tape{position:relative;background:var(--panel);border-left:1px dashed var(--rule);border-right:1px dashed var(--rule);padding:16px 26px 18px;max-height:640px;overflow:auto;box-shadow:0 24px 40px -32px rgba(26,28,30,.4);
+  -webkit-mask:radial-gradient(circle 4px at 9px 12px,#0000 98%,#000) 0 0/100% 24px,linear-gradient(#000,#000);mask:none}
+.tape::before,.tape::after{content:"";position:absolute;top:0;bottom:0;width:8px;background:radial-gradient(circle at 4px 12px,var(--bg) 3px,transparent 3.5px) 0 0/8px 24px}
+.tape::before{left:4px}.tape::after{right:4px}
+.tape .hd{font:12px/1.5 var(--font-data);color:var(--muted);border-bottom:1px solid var(--rule);padding-bottom:8px;margin-bottom:8px}
+.tape ol{list-style:none;margin:0;padding:0;font:12px/1.5 var(--font-data)}
+.tape li{display:grid;grid-template-columns:64px 92px minmax(0,1fr);gap:0 8px;padding:4px 0;border-bottom:1px dotted var(--rule)}
+.tape li .a{font-weight:600}
+.tape li .o{grid-column:3;color:var(--ink);overflow-wrap:anywhere}
+.tape li .s{grid-column:3;color:var(--muted);font-size:11px}
+.tape li.cr .a,.tape li.cr .o{color:var(--before)}
+.tape li.ok .a,.tape li.ok .o{color:var(--after)}
+.tape li.hidden{display:none}
+.tape li.new{animation:feed .3s ease-out}
+@keyframes feed{from{opacity:0;transform:translateY(-6px)}}
+
+/* bento */
+.bento{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:minmax(0,auto);gap:16px;margin-top:40px}
+.card{background:var(--panel);border:1px solid var(--rule);padding:22px 22px 20px;position:relative;transition:border-color .2s,transform .2s}
+.card:hover{border-color:var(--ink);transform:translateY(-2px)}
+.card h3{font:italic 28px/1.1 var(--font-display);margin:10px 0 8px}
+.card p{font-size:15px;color:var(--ink)}
+.card .chip{display:inline-block;margin-top:14px;font:12px var(--font-data);border:1px solid var(--ink);padding:3px 8px}
+.card .chip.det{border-color:var(--after);color:var(--after)}
+.card svg.g{width:34px;height:34px;stroke:var(--ink);fill:none;stroke-width:1.5}
+.c-ver{grid-column:span 3;grid-row:span 2}
+.c-dia{grid-column:span 3}
+.c-rew,.c-mem{grid-column:span 3}
+.c-mem{grid-column:4/span 3}
+.c-chn{grid-column:span 6;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:20px;align-items:center}
+.c-chn h3{margin:0}
+.gate{list-style:none;padding:0;margin:16px 0 0;font:13px/1.5 var(--font-data);counter-reset:g}
+.gate li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;padding:9px 0;border-top:1px solid var(--rule);counter-increment:g}
+.gate li::before{content:counter(g);color:var(--muted)}
+.gate li span:last-child{color:var(--muted);text-align:right}
+.pairs{margin:22px 0 0}
+.pairs .lbl{font-size:11px;margin-bottom:8px}
+.pairs ol{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.pairs li{display:grid;grid-template-columns:52px minmax(0,1fr);gap:2px 10px;font:12px var(--font-data);align-items:center}
+.pairs li>span{grid-row:span 2;color:var(--muted)}
+.pairs .pb{display:flex;align-items:center;gap:8px;min-width:0}
+.pairs .pb i{display:block;height:10px;background:var(--before);flex:none}
+.pairs .pb.c i{background:var(--after)}
+.pairs .pb b{font-weight:400;white-space:nowrap}
+
+/* trap band */
+.band2{background:var(--panel);border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);background-image:repeating-linear-gradient(90deg,transparent 0 79px,rgba(207,200,184,.25) 79px 80px)}
+.trap{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:40px;margin-top:36px;align-items:start}
+.facts{border-top:1px solid var(--ink);font:13px/1.5 var(--font-data)}
+.facts div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--rule)}
+.facts .flag{color:var(--before);font-weight:600}
+.shot{border:1px solid var(--rule);display:block;width:100%;height:auto;background:var(--panel)}
+.dots{margin-top:46px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px}
+.dots h3{font:italic 26px/1.15 var(--font-display);margin:0 0 6px}
+.dots .row{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0 10px}
+.dots .d{width:26px;height:26px;border:1.5px solid var(--muted);display:grid;place-items:center;font:600 11px var(--font-data);color:var(--muted)}
+.dots .d.chg{background:var(--before);border-color:var(--before);color:var(--panel)}
+.dots .d.ref{border-color:var(--before);color:var(--before);background:repeating-linear-gradient(135deg,transparent 0 4px,rgba(176,58,46,.16) 4px 6px)}
+.dots .d.err{border-style:dashed}
+.dots .key{font:12px/1.6 var(--font-data);color:var(--muted)}
+
+/* instruments */
+.inst{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--ink);margin-top:36px}
+.inst div{padding:18px 18px 18px 0;border-bottom:1px solid var(--rule)}
+.inst div+div{padding-left:18px;border-left:1px solid var(--rule)}
+.inst h3{font:italic 26px/1.1 var(--font-display);margin:0 0 6px}
+.inst p{font-size:14.5px;color:var(--ink)}
+
+/* honest — pathologist's comments */
+.honest{background:color-mix(in srgb,var(--rule) 34%,var(--bg));border-top:1px solid var(--ink)}
+.comments{margin-top:34px;display:grid;gap:0;border-top:1px solid var(--ink)}
+.comments blockquote{margin:0;display:grid;grid-template-columns:110px minmax(0,1fr);gap:18px;padding:22px 0;border-bottom:1px solid var(--rule)}
+.comments blockquote p{font:italic clamp(21px,2vw,27px)/1.3 var(--font-display);max-width:44em}
+.comments cite{grid-column:2;font:12px var(--font-data);font-style:normal;color:var(--muted)}
+.comments .n{font:12px var(--font-data);color:var(--before);letter-spacing:.1em}
+
+/* faq */
+.faq{margin-top:30px;border-top:1px solid var(--ink);max-width:58em}
+.faq details{border-bottom:1px solid var(--rule)}
+.faq summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:16px;padding:18px 0;font:italic 24px/1.25 var(--font-display);transition:color .15s}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";font:400 22px var(--font-data);color:var(--muted);transition:transform .2s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq summary:hover{color:var(--before)}
+.faq details p{padding:0 0 20px;max-width:46em;color:var(--ink)}
+
+footer{border-top:3px double var(--ink);padding:34px 0 46px;font-size:14px}
+footer .wrap{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px}
+footer .sig{font:italic 30px/1.1 var(--font-display)}
+footer .sig small{display:block;font:12px var(--font-data);font-style:normal;color:var(--muted);margin-top:8px}
+footer ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px 22px;align-content:start}
+footer ul a{text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--rule)}
+footer ul a:hover{text-decoration-color:var(--ink)}
+.ver{grid-column:1/-1;font:12px var(--font-data);color:var(--muted);border-top:1px solid var(--rule);padding-top:12px}
+
+@media (max-width:1100px){
+  nav .links{display:none}
+  .hero{grid-template-columns:minmax(0,1fr)}
+  .copy{display:contents}
+  .hero>.copy>.lbl{order:1}.hero h1{order:2}.sheet{order:3}.sub{order:4}.cta{order:5}.run{order:6}.strip{order:7}
+  .sheet{transform:none;margin-bottom:8px}
+  .sheet.thud{animation:none}
+  .pair,.trap,.dots{grid-template-columns:minmax(0,1fr)}
+  .receipts .wrap{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .rc:nth-child(3){border-left:0;padding-left:0}
+  .rc:nth-child(n+3){border-top:1px solid var(--rule)}
+  .bento{grid-template-columns:minmax(0,1fr)}
+  .bento .card{grid-column:auto;grid-row:auto}
+  .c-chn{grid-template-columns:minmax(0,1fr)}
+  .inst{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .inst div:nth-child(3){border-left:0;padding-left:0}
+  footer .wrap{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:600px){
+  .band .wrap span:last-child{display:none}
+  nav .btn:not(.pri){display:none}
+  h1{margin:10px 0 18px}
+  .sheet{padding:16px 14px 18px}
+  .switch button{font-size:12px;padding:8px}
+  .stamp{position:relative;display:inline-block;top:auto;margin:12px 0 0 2px;font-size:14px;padding:5px 9px}
+  .res{grid-template-columns:62px minmax(0,1fr) 54px;font-size:12px}
+  .fp{grid-template-columns:62px minmax(0,1fr);font-size:12px}
+  .tape{padding:14px 18px}
+  .tape li{grid-template-columns:58px minmax(0,1fr)}
+  .tape li .a{grid-column:2}
+  .tape li .o,.tape li .s{grid-column:1/-1}
+  .inst{grid-template-columns:minmax(0,1fr)}
+  .inst div,.inst div+div{padding:16px 0;border-left:0}
+  .comments blockquote{grid-template-columns:minmax(0,1fr);gap:8px}
+  .comments cite{grid-column:1}
+  .rc{padding:18px 12px 16px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+@media print{
+  nav{position:static}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .run button,.replay,.switch{display:none}
+  .faq details>p{display:block}
+  .paper,.band2{background-image:none}
+  .stamp.hide{opacity:1;transform:rotate(-7deg)}
+}
+</style>
+</head>
+<body class="paper">
+<div class="band"><div class="wrap"><span><b>Specimen QD-2939</b> · recorded live 2026-10-25 12:58 UTC · Zetaris TPCDS_DB</span><span>Open Agent Hackathon 2026 · Reasoning Architecture</span></div></div>
+<nav aria-label="Primary"><div class="wrap">
+  <a class="brand" href="#top" aria-label="Query Doctor, top of page"><img src="assets/icon.svg" alt="" width="30" height="30">Query Doctor</a>
+  <span class="sp"></span>
+  <div class="links"><a href="#case">The case</a><a href="#how">How it decides</a><a href="#trap">The trap</a><a href="#honest">Honest</a><a href="#faq">FAQ</a></div>
+  <a class="btn" href="deck/">Pitch deck</a>
+  <a class="btn pri" href="https://github.com/edycutjong/querydoc">Source</a>
+</div></nav>
+
+<main id="top">
+<div class="wrap hero">
+  <div class="copy">
+    <p class="lbl">Findings · verified by execution</p>
+    <h1>Same rows. Faster.<br>Or the doctor <span class="pen">won't sign.<svg viewBox="0 0 400 30" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 19 C 92 8, 214 27, 396 9"/></svg></span></h1>
+    <p class="sub">Drop an unused LEFT JOIN and a Zetaris query runs <b>2.11× faster</b> over <b>10 paired runs</b> — unless the joined key has duplicates, and then the same edit quietly changes the count. Query Doctor executes both versions on the engine before anyone merges and signs only when the rows match. Wrong rewrites shipped: <b>0</b>.</p>
+    <div class="cta">
+      <a class="btn pri" href="https://github.com/edycutjong/querydoc">Source on GitHub</a>
+      <a class="btn" href="deck/">Pitch deck</a>
+      <a class="btn" href="#case">See the recorded run</a>
+    </div>
+    <div class="run"><code id="cmd">docker build -t querydoc . &amp;&amp; docker run --rm -p 8000:8000 -e SAMPLE_MODE=true querydoc</code><button type="button" id="copy" aria-label="Copy the run command">Copy</button></div>
+    <p class="strip"><span>runs keyless in sample mode</span><span>executes both queries</span><span>a model never decides</span></p>
+  </div>
+
+  <section class="sheet" id="sheet" aria-label="Case report, recorded live on Zetaris" data-case="promo">
+    <header><h2>Case report <span class="data" id="runid">hero-r1</span></h2><span class="lbl" style="margin:0">recorded live · Zetaris</span></header>
+    <div class="switch" role="radiogroup" aria-label="Join key">
+      <button type="button" role="radio" aria-checked="true" data-k="promo"><b>ON p_promo_sk</b>300 rows · 300 distinct</button>
+      <button type="button" role="radio" aria-checked="false" data-k="item"><b>ON p_item_sk</b>300 rows · 291 distinct</button>
+    </div>
+    <p class="lbl">Specimen · the rewrite drops the struck line</p>
+<pre class="spec">SELECT COUNT(1) AS n
+FROM   TPCDS_DB.store_sales ss
+<span class="cut">LEFT JOIN TPCDS_DB.promotion p ON <span class="key" id="on">ss.ss_promo_sk = p.p_promo_sk</span></span>
+WHERE  ss.ss_customer_sk IS NULL</pre>
+    <p class="margin" id="note">The key is unique, so the join cannot change the count.</p>
+    <p class="lbl" id="reslbl">Results vs reference · median of 3 alternating pairs</p>
+    <div class="res" id="res">
+      <span>original</span><div class="bar" style="width:100%"><i>H</i></div><span class="t">29.3 s</span>
+      <span>rewrite</span><div class="bar rw" id="rwbar" style="width:45.1%"></div><span class="t" id="rwt">13.2 s</span>
+    </div>
+    <div class="verdict"><div class="fp"><span>original</span><span class="hex" id="fpo">87cd00c5</span><span>rewrite</span><span class="hex" id="fpr">87cd00c5</span></div>
+    <div class="stamp" id="stamp">ROW-IDENTICAL · 87CD00C5</div></div>
+    <div class="signed"><span>Verified by <b>Verifier</b> — code, no model · <span id="sig">2.1× median, 3/3 pairs faster</span></span><button type="button" class="replay" id="replay">replay</button></div>
+    <p class="src" id="src">recorded/live/hero-r1/case.json</p>
+  </section>
+</div>
+
+<div class="receipts" aria-label="Receipts"><div class="wrap">
+  <div class="rc"><div class="num" data-count="2.11" data-dec="2" data-suf="×">2.11×</div><p class="what">hero speedup on Zetaris</p><p class="ref">median of 10 alternating pairs, 10/10 faster, same row · DEMO.md</p></div>
+  <div class="rc"><div class="num" data-count="0">0</div><p class="what">rewrites shipped with changed rows</p><p class="ref">an ACCEPT needs an identical row fingerprint · evals/results.md</p></div>
+  <div class="rc"><div class="num red" data-count="6" data-suf=" / 15">6 / 15</div><p class="what">baseline rewrites that changed rows</p><p class="ref">one plain model call, same Verifier · evals/results.md</p></div>
+  <div class="rc"><div class="num" data-count="286">286</div><p class="what">tests, no keys needed</p><p class="ref">26 files · npm test</p></div>
+</div></div>
+
+<section class="sec" id="case"><div class="wrap">
+  <p class="lbl">Report · hero-r1, shown twice</p>
+  <h2 class="t">The report a reviewer signs, and the trace <em>behind it.</em></h2>
+  <p class="lede">Left, the Report screen from the frozen build replaying the recorded live run. Right, the same run's agent trace, line by line: the Verifier runs the original twice, the Diagnoser reads the plan and the key, the Rewriter proposes, the Verifier times three alternating pairs and signs.</p>
+  <div class="pair">
+    <figure style="margin:0">
+      <div class="frame"><div class="bar0"><i></i><i></i><i></i><span>localhost:8000/#/recorded/hero-r1</span></div>
+      <img src="assets/ui-hero-r1.webp" width="1280" height="800" loading="lazy" alt="Query Doctor Report screen for the recorded live run hero-r1: Case report — Accepted, 2.1× median over 3 alternating pairs, a red runtime bar of 29.3 s above a green bar of 13.2 s, a green stamp reading ROW-IDENTICAL · 87CD00C5, the specimen SQL, and the agent trace rail on the right."></div>
+      <figcaption class="cap">Real screen · <code>npm start</code> → <code>#/recorded/hero-r1</code> · evidence from the recorded run, not a new execution</figcaption>
+    </figure>
+    <div>
+      <div class="tape" id="tape" aria-label="Agent trace of hero-r1">
+        <p class="hd">logs/live-hero-r1.jsonl · 21 events · 12:58:44 → 13:03:09 UTC<br>re-set from the recorded JSONL · real timestamps · plays about 60× faster</p>
+        <ol id="trace"><li class="" data-ms="1792933124862"><span>12:58:44</span><span class="a">Orchestrator</span><span>start_case</span><span class="o">engine zetaris; llm nim; attempt cap 3</span></li><li class="" data-ms="1792933149325"><span>12:59:09</span><span class="a">Verifier</span><span>execute</span><span class="o">1 row(s) in 24460.9 ms</span><span class="s">zetaris:run_sql</span></li><li class="" data-ms="1792933186779"><span>12:59:46</span><span class="a">Verifier</span><span>execute</span><span class="o">1 row(s) in 37452.7 ms</span><span class="s">zetaris:run_sql</span></li><li class="" data-ms="1792933186780"><span>12:59:46</span><span class="a">Verifier</span><span>critique</span><span class="o">deterministic, 1 row(s), multiset compare, fingerprint rows 87cd00c5</span></li><li class="" data-ms="1792933196561"><span>12:59:56</span><span class="a">Orchestrator</span><span>explain</span><span class="o">12 plan node(s)</span><span class="s">zetaris:explain</span></li><li class="" data-ms="1792933205904"><span>13:00:05</span><span class="a">Orchestrator</span><span>profile_keys</span><span class="o">rows 300, non-null 300, distinct 300</span><span class="s">zetaris:run_sql</span></li><li class="" data-ms="1792933205905"><span>13:00:05</span><span class="a">Diagnoser</span><span>detect_pattern</span><span class="o">unused_outer_join; 1 hit(s); parser ok; cites plan nodes 7</span></li><li class="" data-ms="1792933238630"><span>13:00:38</span><span class="a">Diagnoser</span><span>analyse_plan</span><span class="o">3 LLM hypothesis(es), 0 dropped; ranked: h1 &gt; h2 &gt; h3 &gt; h4</span><span class="s">nim:chat_completions</span></li><li class="" data-ms="1792933238631"><span>13:00:38</span><span class="a">Orchestrator</span><span>playbook_open</span><span class="o">12 entries; pattern unused_outer_join; schema tpcds_db</span><span class="s">hmem:open</span></li><li class="" data-ms="1792933238634"><span>13:00:38</span><span class="a">Orchestrator</span><span>playbook_query</span><span class="o">mem-12 refused (0.262), mem-3 refused (0.256), mem-2 refused (0.254), mem-11 refused (0.24), mem-1 refused (0.237)</span><span class="s">hmem:query</span></li><li class="" data-ms="1792933241753"><span>13:00:41</span><span class="a">Rewriter</span><span>rewrite</span><span class="o">Removed unnecessary LEFT JOIN to promotion since no promotion columns are referenced and p_promo_sk is unique, so the join cannot change the | sql SELECT COUNT(1) AS n FROM TPCDS_DB.store_sales ss WHERE ss.ss_customer_sk IS NULL</span><span class="s">nim:chat_completions</span></li><li class="" data-ms="1792933241753"><span>13:00:41</span><span class="a">Orchestrator</span><span>handoff</span><span class="o">to Verifier</span><span class="s">markovian:chunk</span></li><li class="" data-ms="1792933259912"><span>13:00:59</span><span class="a">Verifier</span><span>execute</span><span class="o">1 row(s) in 18157.7 ms</span><span class="s">zetaris:run_sql</span></li><li class="" data-ms="1792933287616"><span>13:01:27</span><span class="a">Verifier</span><span>execute</span><span class="o">1 row(s) in 27703.2 ms</span><span class="s">zetaris:run_sql</span></li><li class="" data-ms="1792933300846"><span>13:01:40</span><span class="a">Verifier</span><span>execute</span><span class="o">1 row(s) in 13228.6 ms</span><span class="s">zetaris:run_sql</span></li><li class="" data-ms="1792933316318"><span>13:01:56</span><span class="a">Verifier</span><span>execute</span><span class="o">1 row(s) in 15470.7 ms</span><span class="s">zetaris:run_sql</span></li><li class="" data-ms="1792933348733"><span>13:02:28</span><span class="a">Verifier</span><span>execute</span><span class="o">1 row(s) in 32414.6 ms</span><span class="s">zetaris:run_sql</span></li><li class="" data-ms="1792933378050"><span>13:02:58</span><span class="a">Verifier</span><span>execute</span><span class="o">1 row(s) in 29309.4 ms</span><span class="s">zetaris:run_sql</span></li><li class="" data-ms="1792933389614"><span>13:03:09</span><span class="a">Verifier</span><span>execute</span><span class="o">1 row(s) in 11562.9 ms</span><span class="s">zetaris:run_sql</span></li><li class="ok" data-ms="1792933389615"><span>13:03:09</span><span class="a">Verifier</span><span>critique</span><span class="o">ACCEPT: same 1 row(s), 2.1× median over 3 pairs</span></li><li class="ok" data-ms="1792933389616"><span>13:03:09</span><span class="a">Orchestrator</span><span>case_verdict</span><span class="o">ACCEPTED</span></li></ol>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<section class="sec" id="how" style="padding-top:0"><div class="wrap">
+  <p class="lbl">Method · four agents, one rule</p>
+  <h2 class="t">A model proposes. <em>Code decides.</em></h2>
+  <p class="lede">Nemotron writes the diagnosis and the rewrite. The verdict, every number and every timing come from code that executes both queries on Zetaris.</p>
+  <div class="bento">
+    <article class="card c-ver">
+      <svg class="g" viewBox="0 0 34 34" aria-hidden="true"><path d="M17 4v26M7 30h20M5 12h24M5 12l-3 8h6zM29 12l-3 8h6z"/><path d="M2 20a3 2 0 0 0 6 0M26 20a3 2 0 0 0 6 0"/></svg>
+      <h3>Verifier</h3>
+      <p>No model. It runs the original and the rewrite on the engine and refuses anything it cannot measure.</p>
+      <ol class="gate">
+        <li><span>determinism pre-check — the original runs twice</span><span>same rows</span></li>
+        <li><span>schema check — columns and types</span><span>equal</span></li>
+        <li><span>row diff, or an engine-side row hash above the cap</span><span>0 rows differ</span></li>
+        <li><span>alternating paired timing — ≥ 1.2×, most pairs won</span><span>saving &gt; 1,782.9 ms</span></li>
+      </ol>
+      <figure class="pairs"><figcaption class="lbl">hero-r1 · the three timed pairs, in the order they ran</figcaption><ol><li><span>pair 1</span><div class="pb"><i style="width:66.7%"></i><b>original 27.7 s</b></div><div class="pb c"><i style="width:31.8%"></i><b>rewrite 13.2 s</b></div></li><li><span>pair 2</span><div class="pb c"><i style="width:37.2%"></i><b>rewrite 15.5 s</b></div><div class="pb"><i style="width:78.0%"></i><b>original 32.4 s</b></div></li><li><span>pair 3</span><div class="pb"><i style="width:70.5%"></i><b>original 29.3 s</b></div><div class="pb c"><i style="width:27.8%"></i><b>rewrite 11.6 s</b></div></li></ol></figure>
+      <span class="chip det">xxhash64 · EXPLAIN FORMATTED · run_sql</span>
+    </article>
+    <article class="card c-dia">
+      <svg class="g" viewBox="0 0 34 34" aria-hidden="true"><path d="M17 4v8M17 12l-9 8M17 12l9 8M8 20v9M26 20v9"/><rect x="13" y="2" width="8" height="5"/><rect x="4" y="27" width="8" height="5"/><rect x="22" y="27" width="8" height="5"/></svg>
+      <h3>Diagnoser</h3>
+      <p>Reads the Spark plan, a pattern detector and SQL-aggregate key facts. On the hero: <code>unused_outer_join</code> at plan node 7, key 300 of 300 distinct.</p>
+      <span class="chip">nemotron-3-ultra-550b-a55b</span>
+    </article>
+    <article class="card c-rew">
+      <svg class="g" viewBox="0 0 34 34" aria-hidden="true"><path d="M24 3l7 7-17 17H7v-7z"/><path d="M20 7l7 7M3 31h14"/></svg>
+      <h3>Rewriter</h3>
+      <p>One rewrite per hypothesis. It sees every refusal so far, with the Verifier's reason and the differing row.</p>
+      <span class="chip">nemotron-3-ultra-550b-a55b</span>
+    </article>
+    <article class="card c-mem">
+      <svg class="g" viewBox="0 0 34 34" aria-hidden="true"><path d="M5 4h20v26H5zM25 8h4v22H9M9 10h12M9 15h12M9 20h8"/></svg>
+      <h3>Playbook</h3>
+      <p>The Verifier writes refusals and outcomes. A candidate already refused for the same original result is answered from the ledger, not run again.</p>
+      <span class="chip">Meterless H-MEM</span>
+    </article>
+    <article class="card c-chn">
+      <svg class="g" viewBox="0 0 34 34" aria-hidden="true"><rect x="2" y="12" width="9" height="10"/><rect x="13" y="12" width="9" height="10"/><rect x="24" y="12" width="9" height="10"/><path d="M11 17h2M22 17h2"/></svg>
+      <div><h3>Retry chain</h3><p>One attempt is one chunk; the carry-over is the hypothesis ledger and the refused attempts. "Correct but not faster" goes back to <code>Diagnoser.revise</code>; at most three attempts.</p></div>
+      <span class="chip">Meterless Markovian</span>
+    </article>
+  </div>
+</div></section>
+
+<section class="sec band2" id="trap"><div class="wrap">
+  <p class="lbl">Comments · hero-trap-r1</p>
+  <h2 class="t">Three wrong rewrites, <em>kept on the page.</em></h2>
+  <p class="lede">Same query, one word changed: the join key is <code>p_item_sk</code>, which repeats. Dropping the join now changes the count. The Rewriter tried three times; the Verifier refused all three and wrote why in the margin.</p>
+  <div class="trap">
+    <div class="facts">
+      <div><span>key profile · p_item_sk</span><span>300 rows · 291 distinct <span class="flag">H</span></span></div>
+      <div><span>original fingerprint</span><span>e51f9da7</span></div>
+      <div><span>attempt 1 · drop the join</span><span class="flag">ROW_DIFF · row 129752</span></div>
+      <div><span>attempt 2 · LEFT SEMI JOIN</span><span class="flag">ROW_DIFF · row 2853</span></div>
+      <div><span>attempt 3 · drop the join again</span><span class="flag">refused from the ledger</span></div>
+      <div><span>verdict</span><span>NO_SAFE_REWRITE</span></div>
+    </div>
+    <figure style="margin:0"><img class="shot" src="assets/ui-trap-attempts.webp" width="784" height="582" loading="lazy" alt="The Attempts section of the hero-trap-r1 report: three attempts, each Rewriter note struck through in red, with margin notes 'rows differ: 1 vs 1 — first differing row [129752] (rewrite only)', 'first differing row [2853]', and 'refusal reused from ledger mem-11 — same original-result fingerprint; not re-run'.">
+      <figcaption class="cap">Real screen · <code>#/recorded/hero-trap-r1</code> · Attempts</figcaption></figure>
+  </div>
+  <div class="dots">
+    <div>
+      <h3>Without the Verifier</h3>
+      <p class="lede" style="font-size:15px">Sample pack on DuckDB: one plain model call per query, no diagnosis, no memory, one attempt — scored by the same Verifier.</p>
+      <div class="row" aria-label="15 baseline runs: 6 changed rows, 5 identical but not faster, 4 guard or error, 0 identical and faster"><span class="d chg" aria-hidden="true">Δ</span><span class="d chg" aria-hidden="true">Δ</span><span class="d chg" aria-hidden="true">Δ</span><span class="d chg" aria-hidden="true">Δ</span><span class="d chg" aria-hidden="true">Δ</span><span class="d chg" aria-hidden="true">Δ</span><span class="d " aria-hidden="true">=</span><span class="d " aria-hidden="true">=</span><span class="d " aria-hidden="true">=</span><span class="d " aria-hidden="true">=</span><span class="d " aria-hidden="true">=</span><span class="d err" aria-hidden="true">·</span><span class="d err" aria-hidden="true">·</span><span class="d err" aria-hidden="true">·</span><span class="d err" aria-hidden="true">·</span></div>
+      <p class="key"><b style="color:var(--before)">■</b> changed rows 6 · □ identical, not faster 5 · ⬚ guard / error 4 · identical and faster 0</p>
+    </div>
+    <div>
+      <h3>With it</h3>
+      <p class="lede" style="font-size:15px">Query Doctor's own first rewrite on the sample traps changed rows more often — 9 of 15 runs. Every one was refused.</p>
+      <div class="row" aria-label="15 first attempts on the sample traps: 9 changed rows, all 9 refused"><span class="d ref" aria-hidden="true">Δ</span><span class="d ref" aria-hidden="true">Δ</span><span class="d ref" aria-hidden="true">Δ</span><span class="d ref" aria-hidden="true">Δ</span><span class="d ref" aria-hidden="true">Δ</span><span class="d ref" aria-hidden="true">Δ</span><span class="d ref" aria-hidden="true">Δ</span><span class="d ref" aria-hidden="true">Δ</span><span class="d ref" aria-hidden="true">Δ</span><span class="d " aria-hidden="true"></span><span class="d " aria-hidden="true"></span><span class="d " aria-hidden="true"></span><span class="d " aria-hidden="true"></span><span class="d " aria-hidden="true"></span><span class="d " aria-hidden="true"></span></div>
+      <p class="key"><b style="color:var(--before)">▨</b> changed rows, refused 9 · □ other first attempts 6 · shipped with changed rows 0</p>
+    </div>
+  </div>
+  <p class="cap">Designed queries, small N — the shares are not a rate on real workloads (evals/results.md).</p>
+</div></section>
+
+<section class="sec" id="instruments"><div class="wrap">
+    <h2 class="t">Four sponsors, <em>four jobs.</em></h2>
+  <div class="inst">
+    <div><h3>Zetaris</h3><p>The engine both queries run on, over JDBC to the local platform: <code>run_sql</code>, <code>EXPLAIN FORMATTED</code>, engine-side <code>xxhash64</code> fingerprints. The local bundle has no MCP endpoint, so no MCP tools are used.</p></div>
+    <div><h3>Meterless</h3><p>H-MEM is the playbook, Markovian is the retry chain. Nightshift is the default model provider in code, tested against a mock runtime only.</p></div>
+    <div><h3>NVIDIA</h3><p>Nemotron 3 Ultra serves the Diagnoser and the Rewriter. The recorded runs called it directly through NIM, the declared fallback.</p></div>
+    <div><h3>Cursor</h3><p>Cursor's agent wrote the scaffold commit (<code>d3e823c</code>). Claude Code wrote the rest; every commit says which.</p></div>
+  </div>
+</div></section>
+
+<section class="sec honest" id="honest"><div class="wrap">
+  <p class="lbl">Honest by design · from the README</p>
+  <h2 class="t">What it <em>can't</em> do yet.</h2>
+  <div class="comments">
+    <blockquote><span class="n">COMMENT 1</span><p>“The retry loop does not reliably learn from a refusal: on the duplicated-key hero trap all 3 attempts changed the rows (two dropped the join, one swapped it for a LEFT SEMI JOIN) although the prompt carried the measured fact that the key is not unique.”</p><cite>— README · Limitations</cite></blockquote>
+    <blockquote><span class="n">COMMENT 2</span><p>“Nightshift was never run live; there is no hosted CI run to cite (GitHub Actions did not start on the private repo).”</p><cite>— README · Limitations</cite></blockquote>
+    <blockquote><span class="n">COMMENT 3</span><p>“We expected a 5–12 s hero; it runs about 35 s, so one live verification takes minutes, not seconds.”</p><cite>— README · What we got wrong</cite></blockquote>
+  </div>
+</div></section>
+
+<section class="sec" id="faq"><div class="wrap">
+  <p class="lbl">Questions a judge would ask</p>
+  <h2 class="t">Before you <em>sign off.</em></h2>
+  <div class="faq">
+    <details><summary>Does a model decide whether a rewrite ships?</summary><p>No. The Verifier is deterministic code: it executes both queries, compares the rows and times alternating pairs. The model's text is labelled as model text in every report and never decides anything.</p></details>
+    <details><summary>Is the 2.11× measured or estimated?</summary><p>Measured: wall clock on the local Zetaris platform over JDBC, 10 alternating pairs, rows verified identical first. The p50s are 32,442.6 ms and 16,428 ms. It is one laptop and says nothing about a hosted deployment.</p></details>
+    <details><summary>Can I run it without keys?</summary><p>Yes. Sample mode runs DuckDB on a committed NYC TLC subset with recorded model answers, and all 286 tests run keyless. The sample pack has no ACCEPT: the accepted speedup is from live Zetaris only.</p></details>
+    <details><summary>What is not shown live?</summary><p>Meterless Nightshift. It is the default provider in code with 16 mock-runtime tests, but it was never run against a live runtime; every recorded run used direct NVIDIA NIM, and every recorded trace with a model call names <code>nim</code>.</p></details>
+    <details><summary>Will it change my database?</summary><p>No. The guard admits one read-only statement per query; a rewrite cannot write or run a second statement. An accepted case is a candidate with a patch file for a human to review and apply.</p></details>
+    <details><summary>Is "same rows" a proof?</summary><p>No, and the report says so: the rewrite is identical on the current data and verified by execution — it is not a proof for all future data.</p></details>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <div class="sig">Verified by the Verifier.<small>Query Doctor · Open Agent Hackathon 2026 · Reasoning Architecture · Apache-2.0</small></div>
+  <ul>
+    <li><a href="https://github.com/edycutjong/querydoc">Source on GitHub</a></li>
+    <li><a href="deck/">Pitch deck</a></li>
+    <li><a href="https://github.com/edycutjong/querydoc/blob/main/DEMO.md">DEMO.md — measured proof</a></li>
+    <li><a href="https://github.com/edycutjong/querydoc/blob/main/FAILURE_MODES.md">Failure modes</a></li>
+    <li><a href="https://github.com/edycutjong/querydoc/tree/main/recorded/live">Recorded live runs</a></li>
+    <li><a href="https://github.com/trinodb/trino/issues/2939">trino#2939, the hero's shape</a></li>
+  </ul>
+  <p class="ver">Page built 2026-10-25 17:09 UTC from build 6a6125c · every figure is checked against DEMO.md, evals/results.md, README.md and recorded/live/ when the page is generated</p>
+</div></footer>
+
+<script>
+document.documentElement.classList.add("js");document.body.classList.add("js");
+(()=>{
+const RM=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $=s=>document.querySelector(s);
+const C={
+ promo:{run:"hero-r1",on:"ss.ss_promo_sk = p.p_promo_sk",note:"The key is unique, so the join cannot change the count.",red:false,
+   lbl:"Results vs reference · median of 3 alternating pairs",fpo:"87cd00c5",fpr:"87cd00c5",stamp:"ROW-IDENTICAL · 87CD00C5",ok:true,
+   sig:"2.1× median, 3/3 pairs faster",src:"recorded/live/hero-r1/case.json"},
+ item:{run:"hero-trap-r1",on:"ss.ss_item_sk = p.p_item_sk",note:"291 distinct of 300: the key repeats, so the join can multiply rows.",red:true,
+   lbl:"Results vs reference · not timed",fpo:"e51f9da7",fpr:"87cd00c5",stamp:"REFUSED · ROW_DIFF",ok:false,
+   sig:"3 attempts, 3 refused",src:"recorded/live/hero-trap-r1/case.json"}};
+const sheet=$("#sheet"),stamp=$("#stamp"),cut=document.querySelector(".spec .cut"),res=$("#res");
+const resOk=res.innerHTML;
+let timers=[],cur="promo";
+const later=(ms,f)=>timers.push(setTimeout(f,RM?0:ms));
+function hex(el,s,ref){el.innerHTML=[...s].map((c,i)=>`<span class="${ref?(c===ref[i]?"eq":"x"):""}">${c}</span>`).join("")}
+function play(k){
+  timers.forEach(clearTimeout);timers=[];cur=k;const c=C[k];
+  sheet.dataset.case=k;
+  document.querySelectorAll(".switch button").forEach(b=>b.setAttribute("aria-checked",b.dataset.k===k));
+  $("#runid").textContent=c.run;$("#on").textContent=c.on;$("#src").textContent=c.src;$("#sig").textContent=c.sig;
+  const note=$("#note");note.textContent=c.note;note.classList.toggle("red",c.red);
+  $("#reslbl").textContent=c.lbl;
+  cut.classList.add("arm");
+  stamp.className="stamp hide"+(c.ok?"":" no");stamp.textContent=c.stamp;
+  hex($("#fpo"),c.fpo);$("#fpr").textContent="········";
+  if(c.ok){res.innerHTML=resOk;const b=$("#rwbar");b.style.transition="none";b.style.width="100%";b.style.backgroundColor="var(--before)";$("#rwt").textContent="…";}
+  else{res.innerHTML='<span>original</span><span class="untimed">ran twice in the pre-check · 1 row</span><span>rewrite</span><span class="untimed">refused before the timing step</span>';}
+  later(350,()=>cut.classList.remove("arm"));
+  if(c.ok){
+    later(950,()=>{const b=$("#rwbar");b.style.transition="";void b.offsetWidth;b.style.width="45.1%";b.style.backgroundColor="";});
+    later(2100,()=>$("#rwt").textContent="13.2 s");
+  }
+  [...c.fpr].forEach((ch,i)=>later((c.ok?2000:1100)+i*70,()=>hex($("#fpr"),c.fpr.slice(0,i+1)+"········".slice(i+1),c.fpo)));
+  later(c.ok?2800:1900,()=>{stamp.classList.remove("hide");stamp.classList.add("land");sheet.classList.remove("thud");void sheet.offsetWidth;sheet.classList.add("thud");});
+}
+document.querySelectorAll(".switch button").forEach(b=>b.addEventListener("click",()=>play(b.dataset.k)));
+$("#replay").addEventListener("click",()=>play(cur));
+let played=false;
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting&&!played){played=true;play("promo");io.disconnect();}}),{threshold:.4});
+if(!RM)io.observe(sheet);
+$("#copy").addEventListener("click",async e=>{try{await navigator.clipboard.writeText($("#cmd").textContent);e.target.textContent="Copied";}catch{e.target.textContent="Select it";}setTimeout(()=>e.target.textContent="Copy",1600)});
+// receipts count-up from the already-visible final value
+const nums=[...document.querySelectorAll("[data-count]")];
+const io2=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting)return;io2.unobserve(e.target);const el=e.target,to=+el.dataset.count,d=+(el.dataset.dec||0),suf=el.dataset.suf||"";
+  if(RM||to===0)return;const t0=performance.now();const f=t=>{const p=Math.min(1,(t-t0)/1100),v=to*(1-Math.pow(1-p,3));el.textContent=v.toFixed(d)+suf;if(p<1)requestAnimationFrame(f)};requestAnimationFrame(f)}),{threshold:.6});
+nums.forEach(n=>io2.observe(n));
+// trace tape: re-feed the recorded lines with compressed real gaps
+const lis=[...document.querySelectorAll("#trace li")];
+const io3=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting||RM)return;io3.disconnect();
+  lis.forEach(l=>l.classList.add("hidden"));let t=0;
+  lis.forEach((l,i)=>{const gap=i?Math.min(900,Math.max(90,(+l.dataset.ms-(+lis[i-1].dataset.ms))/60)):200;t+=gap;
+    setTimeout(()=>{l.classList.remove("hidden");l.classList.add("new");},t)})}),{threshold:.35});
+io3.observe($("#tape"));
+})();
+</script>
+</body>
+</html>

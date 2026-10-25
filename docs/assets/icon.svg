@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Query Doctor — the Verifier's stamp bearing an equals sign: a rewrite proven row-identical">
+  <!-- Query Doctor mark. A report-paper tile with the Verifier's rubber stamp pressed on it at an angle.
+       The stamp's glyph is "=": two equal ruled rows - the rewrite's result rows equal the original's.
+       Green = state: proven row-identical (the "after" / "accent" token). It is the ONLY colour on the mark;
+       red (the "before" token) belongs to the slow state and never appears on the static mark.
+       Two geometries, one file. FULL (default, 65 px and up): double-ruled frame at -8 deg, ring 36 units,
+       hairline 8 units, bars 44 units with a 32-unit gap. SMALL (favicon grade, switched on by the media
+       query when this SVG's own viewport is 64 px or less): no hairline, ring 52, bars 64, 56 units between
+       the bars, 40 units between bars and ring, tilt -4 deg - every stroke and gap is at least 1.25 px at a
+       true 16 px (40 / 32), and the 48 px favicon size stays on the crisp geometry too.
+       Renderers without CSS show FULL only (SMALL carries display="none" as an attribute).
+       Colours use CSS custom properties with a hex fallback, plus plain presentation attributes. -->
+  <defs>
+    <style>
+      .plate { fill: #F3F0E8; stroke: #CFC8B8; }
+      .ink-frame { stroke: #1E6B52; }
+      .ink-fill { fill: #1E6B52; }
+      @media (max-width: 64px) {
+        .mark-full { display: none; }
+        .mark-small { display: inline; }
+      }
+    </style>
+    <!-- rubber-stamp ink: sparse voids where the rubber did not take ink, plus a hair of edge wobble -->
+    <filter id="qd-ink" x="-6%" y="-6%" width="112%" height="112%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="3" seed="11" result="grain"/>
+      <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -26 21" result="specks"/>
+      <feComposite in="SourceGraphic" in2="specks" operator="in" result="inked"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="4" result="wobble"/>
+      <feDisplacementMap in="inked" in2="wobble" scale="3" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <!-- the paper tile (self-plated: holds on GitHub light #ffffff AND dark #0d1117) -->
+  <rect class="plate" x="16" y="16" width="480" height="480" rx="104" fill="#F3F0E8" stroke="#CFC8B8" stroke-width="3"/>
+
+  <!-- FULL: the stamp, pressed at -8deg: double-ruled frame + "=" -->
+  <g class="mark-full" transform="rotate(-8 256 256)" filter="url(#qd-ink)">
+    <rect class="ink-frame" x="86" y="126" width="340" height="260" rx="34" fill="none" stroke="#1E6B52" stroke-width="36"/>
+    <rect class="ink-frame" x="124" y="164" width="264" height="184" rx="12" fill="none" stroke="#1E6B52" stroke-width="8"/>
+    <rect class="ink-fill" x="170" y="196" width="172" height="44" rx="3" fill="#1E6B52"/>
+    <rect class="ink-fill" x="170" y="272" width="172" height="44" rx="3" fill="#1E6B52"/>
+  </g>
+
+  <!-- SMALL: favicon-grade stamp, no ink texture (a 1 px speck would read as noise at 16 px) -->
+  <g class="mark-small" display="none" transform="rotate(-4 256 256)">
+    <rect class="ink-frame" x="70" y="98" width="372" height="316" rx="44" fill="none" stroke="#1E6B52" stroke-width="52"/>
+    <rect class="ink-fill" x="156" y="164" width="200" height="64" rx="4" fill="#1E6B52"/>
+    <rect class="ink-fill" x="156" y="284" width="200" height="64" rx="4" fill="#1E6B52"/>
+  </g>
+</svg>
