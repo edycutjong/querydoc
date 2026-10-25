@@ -8,6 +8,7 @@
 
   [![Live Site](https://img.shields.io/badge/🚀_Live-Site-06b6d4?style=for-the-badge)](https://querydoc.edycu.dev/)
   [![Pitch Deck](https://img.shields.io/badge/📊_Pitch-Deck-f59e0b?style=for-the-badge)](https://querydoc.edycu.dev/deck/)
+  [![Demo Video](https://img.shields.io/badge/🎬_Demo-Video-ef4444?style=for-the-badge)](https://youtu.be/7wvpmHZE_bY)
   [![Hackathon](https://img.shields.io/badge/GenAI_Works-Open_Agent_Hackathon_2026-8b5cf6?style=for-the-badge)](https://hackathon.genai.works/event/open-agent-hackathon-2026)
   [![Measured Proof](https://img.shields.io/badge/📏_Measured-Proof-10b981?style=for-the-badge)](DEMO.md)
   [![Failure Modes](https://img.shields.io/badge/⚠️_Failure-Modes-ef4444?style=for-the-badge)](FAILURE_MODES.md)
@@ -256,7 +257,7 @@ recorded/ evals/ evidence/ logs/      input_examples/ output_examples/      data
 
 ## 📽️ Demo Materials
 Measured numbers and how to reproduce them: [`DEMO.md`](DEMO.md).
-Landing page: https://querydoc.edycu.dev/ · pitch deck: https://querydoc.edycu.dev/deck/ ([PDF](https://querydoc.edycu.dev/deck/querydoc-deck.pdf)) — both are static pages in [`docs/`](docs/). The demo video is linked in the submission form.
+Landing page: https://querydoc.edycu.dev/ · pitch deck: https://querydoc.edycu.dev/deck/ ([PDF](https://querydoc.edycu.dev/deck/querydoc-deck.pdf)) — both are static pages in [`docs/`](docs/). Demo video (2:50): https://youtu.be/7wvpmHZE_bY.
 
 ## 📄 License
 Apache-2.0, see [`LICENSE`](LICENSE). `vendor/meterless/` keeps its upstream LICENSE and NOTICE. Security: [`SECURITY.md`](SECURITY.md).
