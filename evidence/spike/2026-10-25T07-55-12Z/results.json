@@ -1,0 +1,124 @@
+{
+  "run": "2026-10-25T07-55-12Z",
+  "health": {
+    "ok": true,
+    "wallMs": 388.5,
+    "call": 1
+  },
+  "rowcap": {
+    "requested": 200000,
+    "received": 200000,
+    "call": 2,
+    "engineCapObserved": false
+  },
+  "hash": {
+    "functions": {
+      "xxhash64": {
+        "ok": true,
+        "value": "8205864924878002737",
+        "type": "bigint",
+        "call": 3
+      },
+      "hash": {
+        "ok": true,
+        "value": -936062819,
+        "type": "int",
+        "call": 4
+      },
+      "md5": {
+        "ok": true,
+        "value": "0cc175b9c0f1b6a831c399e269772661",
+        "type": "string",
+        "call": 5
+      },
+      "sha2": {
+        "ok": true,
+        "value": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+        "type": "string",
+        "call": 6
+      },
+      "crc32": {
+        "ok": true,
+        "value": 3904355907,
+        "type": "bigint",
+        "call": 7
+      }
+    },
+    "fingerprint": {
+      "sql": "SELECT COUNT(*) AS qd_rows, CAST(SUM(CAST(xxhash64(COALESCE(CAST(q.`p_promo_sk` AS STRING), '<qd:null>'), COALESCE(CAST(q.`p_item_sk` AS STRING), '<qd:null>'), COALESCE(CAST(q.`p_cost` AS STRING), '<qd:null>'), COALESCE(CAST(q.`p_channel_details` AS STRING), '<qd:null>')) AS DECIMAL(38,0))) AS STRING) AS qd_hash_sum FROM (SELECT p_promo_sk, p_item_sk, p_cost, p_channel_details FROM TPCDS_DB.promotion) q",
+      "run1": [
+        300,
+        "-138363129335208073211"
+      ],
+      "run2": [
+        300,
+        "-138363129335208073211"
+      ],
+      "deterministic": true,
+      "minusOneRow": [
+        299,
+        "-132876726016210187820"
+      ],
+      "discriminates": true,
+      "calls": [
+        8,
+        9,
+        10
+      ]
+    }
+  },
+  "dialect": {
+    "results": {
+      "hive": {
+        "hero": "ok",
+        "rewrite": "ok",
+        "trap": "ok",
+        "fingerprint": "ok",
+        "q17": "ok"
+      },
+      "trino": {
+        "hero": "ok",
+        "rewrite": "ok",
+        "trap": "ok",
+        "fingerprint": "fail: Expected \"--\", \"/*\", \"//\", \"BIGINT\", \"BIGSERIAL\", \"BOOL\", \"BOOLEAN\", \"CHAR\", \"CHARACTER\", \"DATE\", \"DATETIME\", \"DECIMAL\",",
+        "q17": "fail: invalid column clause with select statement"
+      },
+      "postgresql": {
+        "hero": "ok",
+        "rewrite": "ok",
+        "trap": "ok",
+        "fingerprint": "fail: Expected \"--\", \".\", \"/*\", [ \\t\\n\\r], or [A-Za-z0-9_\\-$一-龥À-ſ] but \")\" found.",
+        "q17": "ok"
+      },
+      "mysql": {
+        "hero": "ok",
+        "rewrite": "ok",
+        "trap": "ok",
+        "fingerprint": "fail: Expected \"#\", \"--\", \"/*\", \"BIGINT\", \"BINARY\", \"BIT\", \"CHAR\", \"DATE\", \"DATETIME\", \"DECIMAL\", \"DOUBLE\", \"ENUM\", \"FLOAT\", \"",
+        "q17": "ok"
+      },
+      "bigquery": {
+        "hero": "ok",
+        "rewrite": "ok",
+        "trap": "ok",
+        "fingerprint": "ok",
+        "q17": "ok"
+      }
+    },
+    "parsesAll": [
+      "hive",
+      "bigquery"
+    ],
+    "call": 11
+  },
+  "nim": {
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "listed": true,
+    "listStatus": 200,
+    "chatStatus": 200,
+    "calls": [
+      12,
+      13
+    ]
+  }
+}
