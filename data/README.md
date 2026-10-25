@@ -2,7 +2,7 @@
 
 | Path | What |
 |---|---|
-| `sample/trips.parquet` | NYC TLC yellow-cab trips, January 2024 pickups, a deterministic 1-in-6 subset: 495,833 rows (7.6 MB) |
+| `sample/trips.parquet` | NYC TLC yellow-cab trips, January 2024 pickups, a deterministic 1-in-6 subset: 495,833 rows (7.6 MiB) |
 | `sample/zones.parquet` | TLC `taxi_zone_lookup.csv` as Parquet |
 | `hmem/` | git-ignored, created at run time (the committed sample seed is `fixtures/hmem-seed/sample/`) |
 | `runs/` | per-run output, git-ignored |

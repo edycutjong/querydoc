@@ -77,7 +77,7 @@ NY_TAXI (CSV read in place) is far noisier than TPCDS (Parquet): a `COUNT` there
 ## 8. What was not demonstrated
 
 - **Meterless Nightshift live.** `src/adapters/nightshift.ts` follows the provider contract and has 16 mock-runtime tests in test/nightshift.test.ts, but no
-  runtime was available here. Every recorded trace names `nim` (`sponsor_call.service`) and `llm-cache` entries record only the model: Nemotron 3 Ultra reached **directly** on
+  runtime was available here. Every recorded trace that contains a model call names `nim` (`sponsor_call.service`) and `llm-cache` entries record only the model: Nemotron 3 Ultra reached **directly** on
   NVIDIA's endpoint, the declared fallback (`LLM_PROVIDER=nim`). We do not claim a Nemotron-through-Nightshift run.
 - **Zetaris through MCP.** The local platform has no MCP endpoint; we use JDBC, paste-only intake, SQL-aggregate profiles and `EXPLAIN`
   (`docs/DX-REPORT.md`). None of the four documented MCP tools is used.

@@ -101,7 +101,7 @@ our own wall clock. Details and the other things we hit: [`docs/DX-REPORT.md`](d
   rejected attempts) is what the next attempt sees.
 - **Nightshift** is the default model provider (`src/adapters/nightshift.ts`, contract-following, 16 mock-runtime tests in test/nightshift.test.ts).
   **It was not run against a live Nightshift runtime.** All recorded runs used direct NVIDIA NIM, the declared fallback
-  (`LLM_PROVIDER=nim`), and every recorded trace names `nim` (`sponsor_call.service`). We do not claim a Nemotron-through-Nightshift run.
+  (`LLM_PROVIDER=nim`), and every recorded trace that contains a model call names `nim` (`sponsor_call.service`). We do not claim a Nemotron-through-Nightshift run.
 
 ### NVIDIA
 Nemotron 3 Ultra serves the Diagnoser and Rewriter. The model that answered is recorded in each trace line and case.
@@ -149,7 +149,7 @@ Read [`FAILURE_MODES.md`](FAILURE_MODES.md). The short list:
 - We planned on Zetaris' MCP tools; the local platform has none, so we rebuilt the engine layer over JDBC on day 1.
 - We expected a 5–12 s hero; it runs about 35 s, so one live verification takes minutes, not seconds.
 - We first called the NVIDIA endpoint directly and added Meterless Nightshift as the provider later, so the recordings predate it.
-- We specified Nemotron 3 Super; calls to it returned 404 for our account, so we switched to Nemotron 3 Ultra mid-build.
+- We specified Nemotron 3 Super and switched to Nemotron 3 Ultra mid-build.
 
 ## 🚀 Getting Started
 
@@ -205,7 +205,7 @@ from the committed `llm-cache/`; a cache miss gives a partial dossier, never an 
 - [x] `run.ts`, `README.md`, `.env.example` (empty values), `input_examples/` and `output_examples/` (6 each)
 - [x] Runs from a clean clone, keyless (`scripts/clean_clone.sh`, examples 1–3); no local GPU
 - [x] `POST /run` on port 8000; `SAMPLE_MODE=true` works with no Zetaris, Nightshift or key
-- [x] `logs/` traces (copies of recorded runs) name ≥ 2 agents (Diagnoser, Rewriter, Verifier, Orchestrator) and show critique, retry and revise events
+- [x] `logs/` traces (copies of recorded runs) name ≥ 2 agents (Diagnoser, Rewriter, Verifier, Orchestrator) and show critique, retry and revise events across the three files
 - [x] No secrets in the tree (gitleaks clean); credentials live outside it
 - [x] Limitations stated ([`FAILURE_MODES.md`](FAILURE_MODES.md)); pre-existing components declared above
 - [ ] Hosted green CI run, live Nightshift recording: **not done**, see Limitations
