@@ -1,6 +1,6 @@
 <div align="center">
   <h1>Query Doctor 🩺</h1>
-  <p><em>Same rows. Faster. A SQL rewrite ships only after executing both queries on Zetaris returns identical rows and a measured speedup.</em></p>
+  <p><em>Same rows. Faster. Or refused. A SQL rewrite is kept only when both queries, executed on Zetaris, return identical rows and the rewrite is measurably faster.</em></p>
 
   <br/>
 
@@ -21,10 +21,14 @@
 
 ---
 
-**Track: Reasoning Architecture.** Query Doctor takes one slow SQL query, reads its Zetaris plan, proposes a rewrite, and then lets
-deterministic code, not the model, decide whether the rewrite may ship. On the live hero query the accepted rewrite ran
-**2.11× faster** (median of 10 per-pair ratios; the p50s are 32,442.6 → 16,428 ms) with the same row ([`DEMO.md`](DEMO.md)); on the trap queries every
-rewrite that changed rows was refused and none shipped ([`evals/results.md`](evals/results.md)).
+**Track: Reasoning Architecture.** **Problem:** whoever reviews a SQL rewrite before it merges cannot tell from the diff whether
+"faster" is still the same answer. Dropping an unused `LEFT JOIN` (the shape of [trinodb/trino#2939](https://github.com/trinodb/trino/issues/2939))
+leaves our Zetaris count unchanged when the joined key is unique, and turns 129,776 into 129,752 when the key repeats.
+**Solution:** a model proposes; deterministic code executes both queries on Zetaris and keeps a rewrite only if the rows match on
+today's data and alternating timed pairs beat the noise floor. **Built:** on the live hero the accepted rewrite ran **2.11× faster**
+(median of 10 per-pair ratios; the p50s are 32,442.6 → 16,428 ms) with the same row ([`DEMO.md`](DEMO.md)); on its duplicated-key twin
+every rewrite was refused, and on the trap queries no rewrite that changed rows shipped ([`evals/results.md`](evals/results.md)).
+Open source (Apache-2.0), evals with a baseline arm, and written failure modes ([`FAILURE_MODES.md`](FAILURE_MODES.md)).
 
 ## 📸 See it in Action
 
@@ -33,6 +37,12 @@ docker build -t querydoc . && docker run --rm -p 8000:8000 -e SAMPLE_MODE=true q
 # open http://localhost:8000  (Intake → Report), or:
 curl -X POST localhost:8000/run -H 'Content-Type: application/json' -d @input_examples/example_1.json
 ```
+
+Keyless sample mode shows the Verifier, refusals and memory reuse on DuckDB with recorded model answers; it has no ACCEPT. The
+accepted speedup is the recorded live Zetaris run, which the same container replays at `http://localhost:8000/#/recorded/hero-r1`
+(and its refused twin at `#/recorded/hero-trap-r1`).
+
+![Query Doctor Report screen replaying the recorded live run hero-r1: accepted, 2.1× median over 3 alternating pairs, row-identical fingerprint 87cd00c5](docs/assets/ui-report-main.webp)
 
 Recorded runs, each with its Markdown dossier and Hub-schema trace: [`recorded/live/`](recorded/live/README.md) (Zetaris),
 [`recorded/sample/`](recorded/sample/) (DuckDB). A dossier shows the diagnosis, every attempt with its verdict, the differing
@@ -46,7 +56,7 @@ a join whose key is not unique, or change a `NOT IN` into something with differe
 faster **and wrong**. Reviewers cannot tell from the diff.
 
 ### The Solution
-Four agents, one rule: **a model never decides.**
+Three agents and an orchestrator, one rule: **a model never decides.**
 
 1. **Diagnoser** reads the Zetaris `EXPLAIN` plan, a static pattern detector and SQL-aggregate key facts (is the join key unique?).
 2. **Rewriter** proposes one rewrite per hypothesis, seeing the refusals so far.
@@ -58,9 +68,10 @@ Four agents, one rule: **a model never decides.**
 Nothing is applied to your database. An accepted case is a candidate with a patch file for a human to review.
 
 ### Related work
-Engine optimizers apply fixed rules, safely, but only the rules they have (join elimination for the hero's shape is an open request in Trino, #2939). LLM rewriters
-propose anything, with no check. Our baseline arm is that second kind: one plain model call, scored by the same Verifier; it changed rows
-in 6 of 15 sample runs and was faster-and-identical in 0 of 15 (`evals/results.md`). The hero is the shape from
+Engine optimizers apply fixed rules, safely, but only the rules they have (join elimination for the hero's shape is an open request in Trino, #2939). A model asked
+for a rewrite in one call proposes edits nothing has executed. Our baseline arm is exactly that: one plain model call, scored by the same Verifier; it changed rows
+in 6 of 15 sample runs and was faster-and-identical in 0 of 15 (`evals/results.md`). Query Doctor's sample runs have no ACCEPT either;
+the difference is that none of its changed-row rewrites shipped. The hero is the shape from
 [trinodb/trino#2939](https://github.com/trinodb/trino/issues/2939), re-expressed on `TPCDS_DB`.
 
 ## 🏗️ Architecture & Tech Stack
@@ -107,15 +118,16 @@ our own wall clock. Details and the other things we hit: [`docs/DX-REPORT.md`](d
 Nemotron 3 Ultra serves the Diagnoser and Rewriter. The model that answered is recorded in each trace line and case.
 
 ### Cursor
-Cursor's agent wrote the scaffold commit only (`d3e823c`). Everything else was built with Claude Code.
+Dev environment: Cursor's agent wrote the scaffold commit only (`d3e823c`). Everything else was built with Claude Code.
 
 ### AI usage disclosure
 - **Code:** every commit except the scaffold carries `Tool: claude-code` (Claude Code); the scaffold carries `Tool: cursor` and
   `Co-authored-by: Cursor`. `git log --format='%h %(trailers:key=Tool,valueonly)'` lists them.
-- **Review:** an outside panel of four models (Qwen, Grok, Codex, Claude Opus) reviewed the code and architecture in two rounds (transcripts not published); each
-  finding was checked against the code before a change, and the fixes are commits prefixed `a2a r03` / `a2a r04`.
+- **Review:** an outside panel of four models (Qwen, Grok, Codex, Claude Opus) reviewed the code and architecture in two rounds and the judge-facing copy in one
+  (transcripts not published); each finding was checked against the code before a change, and the fixes are commits prefixed `a2a r03` / `a2a r04` / `a2a r05`.
 - **Runtime:** a model proposes diagnoses and rewrites. The verdict, every number and every timing come from code.
-- **Pre-existing:** `vendor/meterless/` (upstream engines, unmodified) and the public NYC TLC data in `data/sample/`.
+- **Pre-existing:** `vendor/meterless/` (upstream engines, unmodified) and the public NYC TLC data in `data/sample/`. The icon
+  (`docs/assets/icon.svg`) and the colour and type direction were drawn on 15 Oct, before the build window; no product code or data predates it.
 
 ## 📊 Engineering Rigor
 
@@ -123,7 +135,7 @@ Cursor's agent wrote the scaffold commit only (`d3e823c`). Everything else was b
 |---|---|---|
 | Tests | **286 tests, 26 files** (vitest) | `npm test` |
 | Hero on Zetaris (TPCDS_DB, local JDBC) | 2.11× median, 10/10 pairs faster | [`DEMO.md`](DEMO.md) |
-| Live accepted runs | hero 2.1× and 2.15×; correlated-avg 1.44× (rows identical) | [`recorded/live/README.md`](recorded/live/README.md) |
+| Live accepted runs | hero 2.1× and 2.15×; correlated-avg 1.44× (rows identical); 3 hero takes filmed for the video, 2.13× · 2.11× · 2.32× | [`recorded/live/README.md`](recorded/live/README.md), [`evidence/video/`](evidence/video/README.md) |
 | Rewrites shipped with changed rows | 0 | an ACCEPT requires an identical row fingerprint |
 | Baseline arm (one model call, same Verifier) | 6/15 changed rows, 0/15 identical and faster | [`evals/results.md`](evals/results.md) |
 | Dependencies | `npm audit --omit=dev`: 0 vulnerabilities | `npm audit` |
@@ -139,9 +151,9 @@ Cursor's agent wrote the scaffold commit only (`d3e823c`). Everything else was b
 
 ### Limitations
 Read [`FAILURE_MODES.md`](FAILURE_MODES.md). The short list:
-- The queries in the evals are ones we designed (hero, traps, controls); N is small (live hero N=2) and the shares are not a rate on real workloads.
+- The queries in the evals are ones we designed (hero, traps, controls); N is small (live hero: 2 recorded runs + 3 filmed takes, all ACCEPT) and the shares are not a rate on real workloads.
 - The sample (DuckDB) pack has **no ACCEPT**; the accepted speedup is live Zetaris only. A hand-written sample rewrite benchmarks 16.24× faster with identical rows (`DEMO.md`); the Verifier's verdict on it is machine-dependent and not recorded, and some examples' verdicts vary by machine (`output_examples/expected.json`).
-- The retry loop does not reliably learn from a refusal: on the duplicated-key hero trap all 3 attempts changed the rows (two dropped the join, one swapped it for a LEFT SEMI JOIN) although the prompt carried the measured fact that the key is not unique.
+- The retry loop does not reliably learn from a refusal: on the duplicated-key hero trap the first two attempts changed the rows when executed (one dropped the join, one swapped it for a LEFT SEMI JOIN) and the third repeated the first and was refused from the ledger without running, although the prompt carried the measured fact that the key is not unique.
 - Nightshift was never run live; there is no hosted CI run to cite (GitHub Actions did not start on the private repo).
 - Floats compare to 9 significant digits; the speedup is one laptop over local JDBC and says nothing about a hosted deployment.
 
@@ -191,14 +203,14 @@ did not start on the private repo (account billing); the same steps were replaye
 git clone <repo-url> final-check && cd final-check
 ls run.ts README.md .env.example input_examples/ output_examples/
 docker build -t querydoc .
-docker run --rm -p 8000:8000 --env-file .env querydoc          # or -e SAMPLE_MODE=true with no .env
+docker run --rm -p 8000:8000 --env-file .env querydoc          # or -e SAMPLE_MODE=true with no .env; the image has no JDK, so live Zetaris runs with `npm start` on the host
 curl -X POST localhost:8000/run -H 'Content-Type: application/json' -d @input_examples/example_1.json   # also example_2 … example_6
 ls logs/ && cat logs/*.jsonl | head -50                          # committed traces; live runs write data/runs/<id>/trace-<id>.jsonl
 grep -RIn --exclude-dir=.git --exclude-dir=node_modules -E "(sk-|nvapi-|api[_-]?key|secret|token|password)" .
 rm .env && docker run --rm -p 8000:8000 -e SAMPLE_MODE=true querydoc   # no credentials at all
 ```
 `example_1` is a tempting rewrite supplied as `candidate_sql` (refused deterministically); `example_3` reuses that refusal from the
-playbook ledger without executing it; `example_5` ends `NOT_VERIFIABLE` (non-deterministic query). With no model key, rewrites come
+playbook ledger without executing it (its verdict line reads `NO_SAFE_REWRITE — llm_unavailable` because, with no key, there is no model to write a second rewrite); `example_5` ends `NOT_VERIFIABLE` (non-deterministic query). With no model key, rewrites come
 from the committed `llm-cache/`; a cache miss gives a partial dossier, never an invented rewrite.
 
 ### Hub readiness checklist
