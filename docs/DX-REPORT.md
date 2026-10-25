@@ -14,8 +14,8 @@ given). The 2026-10-20 entry predates this repo; its facts were noted at setup t
   Slow-query intake is paste-only (no `get_slow_queries`), table profiles are SQL aggregates (no `profile_table`), plans come
   from `EXPLAIN FORMATTED` (no `explain_query`), and timings are our own wall clock (no `get_query_stats`).
 - Running live: `npm start` on a machine that has the Zetaris JDBC jar (`ZETARIS_JDBC_JAR`) and a JDK on PATH. The sidecar is compiled
-  with `javac` on first use (`engine/zetaris-jdbc/out/` is never committed or shipped), so a JRE alone is not enough. Every live run in
-  this repo used OpenJDK 17.0.14 (`evidence/verify/java-version-2026-10-25.txt`). The Docker image is the keyless sample mode: it carries no JDK and no driver.
+  with `javac` on first use (`engine/zetaris-jdbc/out/` is never committed or shipped), so a JRE alone is not enough. The machine that made the live runs in
+  this repo has OpenJDK 17.0.14 (`evidence/verify/java-version-2026-10-25.txt`). The Docker image is the keyless sample mode: it carries no JDK and no driver.
 - Bare `SHOW DATABASES` / `SHOW TABLES` are disabled. `SHOW TABLES IN <db>` works and returns `DB.table` names.
 
 ## 2026-10-25 — Day-1 spike (`scripts/spike_zetaris.ts`)
