@@ -18,7 +18,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm audit --omit=dev
-      - run: npm test
+      - run: npm run test:coverage
   keyless:
     # The Hub self-test, with no keys anywhere: build the image, start it in SAMPLE_MODE, POST the shipped examples, assert the verdict.
     runs-on: ubuntu-latest
