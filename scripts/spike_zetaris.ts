@@ -122,7 +122,6 @@ const sections: Record<Section, () => Promise<void>> = {
 
   async explain() {
     const plain = await q("EXPLAIN hero", `EXPLAIN ${HERO}`, { rowCap: 1 });
-    const t0 = performance.now();
     const plan = await engine.explain(HERO);
     const formattedCall = log({ kind: "explain", label: "EXPLAIN FORMATTED hero", sql: HERO, wallMs: plan.wallMs, nodes: plan.nodes, text: plan.text });
     // Does EXPLAIN run the query? Explain a query whose execution takes minutes (COUNT over the CSV trips table).
@@ -130,7 +129,7 @@ const sections: Record<Section, () => Promise<void>> = {
     results.explain = {
       plainCall: plain.call,
       formattedCall,
-      formattedWallMs: r1(performance.now() - t0),
+      formattedWallMs: plan.wallMs,
       nodeCount: plan.nodes.length,
       nodes: plan.nodes.map((n) => `(${n.id}) ${"  ".repeat(n.depth)}${n.operator}`),
       joinKept: plan.nodes.some((n) => n.operator === "BroadcastHashJoin" || n.operator === "SortMergeJoin"),
