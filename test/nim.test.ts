@@ -92,6 +92,22 @@ describe("llm-cache + LlmGateway", () => {
     await expect(always.call("t", {}, REQ, (r) => Ok.parse(r))).rejects.toThrow(/failed validation twice/);
   });
 
+  it("a reply cut off at max_tokens is retried with reasoning off, and the failure says why", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    let n = 0;
+    const fetchFn = (async (_u: unknown, init: RequestInit) => {
+      bodies.push(JSON.parse(init.body as string));
+      return ++n === 1
+        ? new Response(JSON.stringify({ choices: [{ message: { content: '{"x":', reasoning_content: "very long" }, finish_reason: "length" }] }), { status: 200 })
+        : reply('{"x":3}');
+    }) as typeof fetch;
+    const g = new LlmGateway({ client: new NimClient("k", { fetchFn }) });
+    expect((await g.call("t", {}, REQ, (r) => Ok.parse(r))).out).toEqual({ x: 3 });
+    expect(bodies.map((b) => (b.chat_template_kwargs as { enable_thinking: boolean }).enable_thinking)).toEqual([true, false]);
+    const cut = new LlmGateway({ client: new NimClient("k", { fetchFn: (async () => new Response(JSON.stringify({ choices: [{ message: { content: "{" }, finish_reason: "length" }] }), { status: 200 })) as typeof fetch }) });
+    await expect(cut.call("t", {}, REQ, (r) => Ok.parse(r))).rejects.toThrow(/truncated at max_tokens/);
+  });
+
   it("a cache file with a stale shape fails validation keyless instead of being trusted", async () => {
     const dir = mkdtempSync(join(tmpdir(), "qd-cache-"));
     writeFileSync(join(dir, `${normalisedKey("t", {})}.json`), JSON.stringify({ value: { x: "str" } }));

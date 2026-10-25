@@ -1,0 +1,34 @@
+{
+  "run": "2026-10-25T09-09-01Z",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b",
+  "results": [
+    {
+      "reasoning": "on",
+      "diagnoser_ms": 13723,
+      "diagnoser_narrative": "llm",
+      "diagnoser_hypotheses": 4,
+      "rewriter_ms": 9858,
+      "rewriter_valid": true,
+      "rewriter_reply": {
+        "hypothesis_id": "h1",
+        "sql": "SELECT COUNT(1) AS n FROM TPCDS_DB.store_sales ss WHERE ss.ss_customer_sk IS NULL",
+        "change_summary": "Removed unnecessary LEFT JOIN to promotion table because p_promo_sk is unique and no promotion columns are referenced, so the join cannot change the row count.",
+        "risk_notes": "Only safe because p_promo_sk is unique and non-null and the join is LEFT with no additional filters; if uniqueness were violated the count could change."
+      }
+    },
+    {
+      "reasoning": "off",
+      "diagnoser_ms": 13440,
+      "diagnoser_narrative": "llm",
+      "diagnoser_hypotheses": 4,
+      "rewriter_ms": 7652,
+      "rewriter_valid": true,
+      "rewriter_reply": {
+        "hypothesis_id": "h1",
+        "sql": "SELECT COUNT(1) AS n FROM TPCDS_DB.store_sales ss WHERE ss.ss_customer_sk IS NULL",
+        "change_summary": "Removed the LEFT JOIN to promotion table since no promotion columns are used in the output and p_promo_sk is unique, making the join logically unnecessary.",
+        "risk_notes": ""
+      }
+    }
+  ]
+}

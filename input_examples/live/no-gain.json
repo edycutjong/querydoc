@@ -1,0 +1,4 @@
+{
+  "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.promotion p\nWHERE  p.p_channel_tv = 'N'",
+  "source": "paste"
+}

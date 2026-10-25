@@ -1,0 +1,1 @@
+{"timestamp":"2026-10-25T09:32:19.993Z","run_id":"run-2026-10-25T09-32-19Z","agent_name":"Orchestrator","action":"start_case","input_summary":"SELECT COUNT(1) AS n FROM TPCDS_DB.store_sales ss LEFT JOIN TPCDS_DB.promotion p ON ss.ss_item_sk = p.p_item_sk WHERE ss","output_summary":"engine zetaris; llm nim; attempt cap 3","target_agent":"Verifier","retry_count":0,"status":"ok"}

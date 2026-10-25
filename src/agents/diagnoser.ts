@@ -75,7 +75,7 @@ export class Diagnoser {
       const r = await this.llm.call(
         "diagnose",
         { sql: normaliseSql(sql), pattern: d.label, nodes: [...cited], facts: facts.map(keyFactLine) },
-        { system: DIAGNOSER_SYSTEM, user, reasoning: this.reasoning, maxTokens: 3500, temperature: 1.0 },
+        { system: DIAGNOSER_SYSTEM, user, reasoning: this.reasoning, maxTokens: 6000, temperature: 1.0 },
         (raw) => Reply.parse(raw),
       );
       diagnosis.bottleneck = r.out.bottleneck;

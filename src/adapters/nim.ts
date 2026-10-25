@@ -179,10 +179,13 @@ export class LlmGateway {
       return { out: parse(JSON.parse(readFileSync(file, "utf8")).value), source: "llm-cache", latencyMs: 0, reasoningChars: 0 };
     }
     let user = req.user;
+    let reasoning = req.reasoning;
     let lastErr = "";
     for (let tryN = 0; tryN < 2; tryN++) {
-      const r = await client.chat({ ...req, user });
+      const r = await client.chat({ ...req, user, reasoning });
       try {
+        // Reasoning tokens count against max_tokens: a long think can cut the JSON off. That is a truncation, not a bad answer.
+        if (r.finishReason === "length") throw new Error(`reply truncated at max_tokens (finish_reason length, ${r.completionTokens ?? "?"} tokens, reasoning ${r.reasoning.length} chars)`);
         const raw = extractJson(r.content);
         const out = parse(raw);
         if (this.o.cacheWrite) {
@@ -192,7 +195,8 @@ export class LlmGateway {
         return { out, source: "nim", latencyMs: r.latencyMs, reasoningChars: r.reasoning.length };
       } catch (e) {
         lastErr = (e as Error).message.slice(0, 400);
-        user = `${req.user}\n\nYour previous reply was rejected: ${lastErr}\nReply again with ONLY the JSON object, exactly in the requested shape.`;
+        user = `${req.user}\n\nYour previous reply was rejected: ${lastErr}\nReply again with ONLY the JSON object, exactly in the requested shape. Be brief.`;
+        if (r.finishReason === "length") reasoning = "off"; // the retry answers directly so it fits
       }
     }
     throw new NimError(`${task}: reply failed validation twice (${lastErr})`);

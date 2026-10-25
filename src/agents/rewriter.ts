@@ -59,7 +59,7 @@ export class Rewriter {
     const r = await this.llm.call(
       "rewrite",
       { sql: normaliseSql(c.sql), hypothesis: c.hypothesis.id, claim: c.hypothesis.claim, attempt: c.attemptNo, carryover: c.carryover },
-      { system: REWRITER_SYSTEM, user, reasoning: this.reasoning, maxTokens: 4000, temperature: 1.0 },
+      { system: REWRITER_SYSTEM, user, reasoning: this.reasoning, maxTokens: 8000, temperature: 1.0 },
       (raw) => Reply.parse(raw),
     );
     this.trace.emit({

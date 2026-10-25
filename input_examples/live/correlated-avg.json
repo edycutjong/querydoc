@@ -1,0 +1,4 @@
+{
+  "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.item i\nWHERE  i.i_current_price > (SELECT AVG(i2.i_current_price) FROM TPCDS_DB.item i2 WHERE i2.i_category = i.i_category)",
+  "source": "paste"
+}
