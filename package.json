@@ -22,6 +22,7 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
+    "@duckdb/node-api": "^1.4.5-r.1",
     "node-sql-parser": "5.4.0"
   }
 }
