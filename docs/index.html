@@ -427,7 +427,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
 </div></section>
 
 <section class="sec" id="how" style="padding-top:0"><div class="wrap">
-  <p class="lbl">Method · three agents, one rule</p>
+  <p class="lbl">Method · three agents and an orchestrator, one rule</p>
   <h2 class="t">A model proposes. <em>Code decides.</em></h2>
   <p class="lede">Nemotron writes the diagnosis and the rewrite. The verdict, every number and every timing come from code that executes both queries on Zetaris.</p>
   <article class="ver">
@@ -450,7 +450,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
     <div><p class="tagk m">model</p><h3>Diagnoser</h3><p>Reads the Spark plan, a pattern detector and SQL-aggregate key facts.</p><p class="ex">hero: <code>unused_outer_join</code> at plan node 7 · key 300 distinct of 300</p><span class="chip">nemotron-3-ultra-550b-a55b</span></div>
     <div><p class="tagk m">model</p><h3>Rewriter</h3><p>One rewrite per hypothesis. It sees every earlier refusal as a reason code, and the latest one with the Verifier's detail and the differing row.</p><span class="chip">nemotron-3-ultra-550b-a55b</span></div>
     <div><p class="tagk">code</p><h3>Playbook</h3><p>Refusals, and outcomes a human approves, go into the playbook. A candidate already refused for the same original result is answered from the ledger, not run again.</p><span class="chip">Meterless H-MEM</span></div>
-    <div><p class="tagk">code</p><h3>Retry chain</h3><p>One attempt is one chunk. "Correct but no time saved" (<code>no_gain</code>) goes back to <code>Diagnoser.revise</code>; at most three attempts.</p><span class="chip">Meterless Markovian</span></div>
+    <div><p class="tagk">code</p><h3>Orchestrator</h3><p>Runs the retry chain: one attempt is one chunk. "Correct but no time saved" (<code>no_gain</code>) goes back to <code>Diagnoser.revise</code>; at most three attempts.</p><span class="chip">Meterless Markovian</span></div>
   </div>
 </div></section>
 
@@ -536,7 +536,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
     <li><a href="https://github.com/edycutjong/querydoc/tree/main/recorded/live">Recorded live runs</a></li>
     <li><a href="https://github.com/trinodb/trino/issues/2939">trino#2939, the hero's shape</a></li>
   </ul>
-  <p class="vstamp">v0.1.0 · code 09a0bb0 · page built 2026-10-25 20:30 UTC · numbers from DEMO.md, evals/results.md and recorded/live/</p>
+  <p class="vstamp">v0.1.0 · code 7ac4af9 · page built 2026-10-25 20:42 UTC · numbers from DEMO.md, evals/results.md and recorded/live/</p>
 </div></footer>
 
 <script>
