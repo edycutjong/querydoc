@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Cell, Column, Plan, QueryEngine, RunOptions, RunResult, TableRef } from "../../src/engine/types.js";
+import { EngineError, type Cell, type Column, type Plan, type QueryEngine, type RunOptions, type RunResult, type TableRef } from "../../src/engine/types.js";
 
 // An in-memory engine for Verifier tests. Each registered query has columns, rows (or a function of the call number, for a
 // non-deterministic query) and a wall time. It answers the Verifier's two wrappers — COUNT(*) and the row-hash fingerprint —
@@ -9,6 +9,8 @@ export interface StubQuery {
   columns: Column[];
   rows: Cell[][] | ((call: number) => Cell[][]);
   wallMs?: number;
+  delayMs?: number; // real time spent per call, for the timing cap
+  failOnCall?: number; // the n-th plain run of this query throws (an engine error mid-timing)
 }
 
 export class StubEngine implements QueryEngine {
@@ -19,6 +21,7 @@ export class StubEngine implements QueryEngine {
     private readonly queries: Record<string, StubQuery>,
     readonly reportsTruncation = true,
     private readonly silentLimit = Infinity,
+    private readonly brokenRowHash = false, // the fingerprint wrapper returns a NULL sum (e.g. a DECIMAL overflow)
   ) {}
 
   private lookup(sql: string): { q: StubQuery; rows: Cell[][] } {
@@ -38,6 +41,7 @@ export class StubEngine implements QueryEngine {
       return this.result([{ name: "qd_count", type: "bigint" }], [[rows.length]], q.wallMs ?? 10, false);
     }
     const hashInner = inner("SELECT COUNT(*) AS qd_rows");
+    if (hashInner !== null && this.brokenRowHash) return this.result([{ name: "qd_rows", type: "bigint" }, { name: "qd_hash_sum", type: "string" }], [[0, null]], 1, false);
     if (hashInner !== null) {
       const { q, rows } = this.lookup(hashInner);
       let sum = 0n;
@@ -45,6 +49,8 @@ export class StubEngine implements QueryEngine {
       return this.result([{ name: "qd_rows", type: "bigint" }, { name: "qd_hash_sum", type: "string" }], [[rows.length, sum.toString()]], q.wallMs ?? 10, false);
     }
     const { q, rows } = this.lookup(sql);
+    if (q.delayMs) await new Promise((r) => setTimeout(r, q.delayMs));
+    if (q.failOnCall !== undefined && this.counts.get(sql) === q.failOnCall) throw new EngineError("stub: engine error", null, 1);
     const cap = opts.rowCap ?? 10_000;
     const visible = rows.slice(0, this.silentLimit);
     const truncated = this.reportsTruncation && visible.length > cap;

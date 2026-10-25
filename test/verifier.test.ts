@@ -12,10 +12,10 @@ const cfg: VerifierConfig = {
 const K: Column[] = [{ name: "k", type: "bigint" }];
 const range = (n: number, f: (i: number) => Cell[] = (i) => [i]) => Array.from({ length: n }, (_, i) => f(i));
 
-function setup(queries: Record<string, StubQuery>, reportsTruncation = true, silentLimit = Infinity) {
-  const engine = new StubEngine(queries, reportsTruncation, silentLimit);
+function setup(queries: Record<string, StubQuery>, reportsTruncation = true, silentLimit = Infinity, c: Partial<VerifierConfig> = {}, brokenRowHash = false) {
+  const engine = new StubEngine(queries, reportsTruncation, silentLimit, brokenRowHash);
   const trace = new Trace("test");
-  return { engine, trace, v: new Verifier(engine, cfg, trace) };
+  return { engine, trace, v: new Verifier(engine, { ...cfg, ...c }, trace) };
 }
 const attempt = (sql: string) => ({ n: 1, origin: "candidate_sql" as const, hypothesis_id: null, sql, change_summary: "test" });
 const critiques = (t: Trace) => t.events.filter((e) => e.action === "critique");
@@ -149,5 +149,44 @@ describe("Verifier — a stub engine that silently truncates at L (unknown tool 
     const a = await v.verify(attempt("SELECT k FROM u"), await v.precheck("SELECT k FROM t"));
     expect(a).toMatchObject({ verdict: "ACCEPT", fingerprint_kind: "engine" });
     expect(a.timing_ms?.timed_as).toBe("fingerprint");
+  });
+});
+
+describe("Verifier — timing table end to end (stub engine)", () => {
+  const q = (wallMs: number, extra: Partial<StubQuery> = {}): StubQuery => ({ columns: K, rows: [[1]], wallMs, ...extra });
+  it("3 pairs → ACCEPT; the candidate runs once for the diff, then 3 times", async () => {
+    const { v, engine } = setup({ "SELECT k FROM a": q(1000), "SELECT k FROM b": q(400) });
+    const a = await v.verify(attempt("SELECT k FROM b"), await v.precheck("SELECT k FROM a"));
+    expect(a.verdict).toBe("ACCEPT");
+    expect(a.timing_ms?.orig).toHaveLength(3);
+    expect(engine.calls.filter((s) => s === "SELECT k FROM b")).toHaveLength(4);
+  });
+  it("the time cap leaves fewer than 3 pairs → NOT_FASTER under_gate, never ACCEPT", async () => {
+    const { v } = setup({ "SELECT k FROM a": q(1, { delayMs: 15 }), "SELECT k FROM b": q(0.5, { delayMs: 15 }) }, true, Infinity, { timingCapMinMs: 0 });
+    const a = await v.verify(attempt("SELECT k FROM b"), await v.precheck("SELECT k FROM a"));
+    expect(a).toMatchObject({ verdict: "REJECT", reason: "NOT_FASTER", not_faster_detail: "under_gate" });
+    expect(a.timing_ms?.gates_missed).toEqual(["pairs"]);
+    expect(a.timing_ms?.capped_at_ms).toBeGreaterThan(0);
+  });
+  it("an engine error during timing → REJECT(ERROR), not a verdict on partial pairs", async () => {
+    const { v } = setup({ "SELECT k FROM a": q(1000), "SELECT k FROM b": q(400, { failOnCall: 3 }) });
+    const a = await v.verify(attempt("SELECT k FROM b"), await v.precheck("SELECT k FROM a"));
+    expect(a).toMatchObject({ verdict: "REJECT", reason: "ERROR" });
+    expect(a.detail).toMatch(/engine error during timing/);
+  });
+});
+
+describe("Verifier — hardening", () => {
+  it("a NULL/empty row-hash result is an engine error, never a shared fingerprint", async () => {
+    const { v } = setup({ "SELECT k FROM big": { columns: K, rows: range(150) } }, true, Infinity, {}, true);
+    await expect(v.precheck("SELECT k FROM big")).rejects.toThrow(/no usable \(count, sum\)/);
+  });
+  it("ORDER BY a non-selected key with LIMIT → NOT_VERIFIABLE (the tie at the cut cannot be checked)", async () => {
+    const { v } = setup({ "SELECT v FROM a ORDER BY created_at LIMIT 2": { columns: [{ name: "v", type: "string" }], rows: [["x"], ["y"]] } });
+    expect((await v.precheck("SELECT v FROM a ORDER BY created_at LIMIT 2")).reason).toMatch(/top-N cut not checkable/);
+  });
+  it("minPairs below 3 in the config is clamped to 3", async () => {
+    const { loadConfig } = await import("../src/config.js");
+    expect(loadConfig().minPairs).toBeGreaterThanOrEqual(3);
   });
 });
