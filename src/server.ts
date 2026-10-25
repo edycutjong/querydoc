@@ -52,6 +52,22 @@ export function crossSite(req: IncomingMessage): boolean {
   }
 }
 
+// DNS rebinding: a hostile name re-resolved to 127.0.0.1 makes Origin and Host agree, so the check above passes and the page can
+// read the answers too. In live mode (the user's Zetaris behind this API) only a loopback name, an IP literal (cannot be re-resolved)
+// or a name listed in QUERYDOC_ALLOWED_HOSTS (comma-separated) is served. Sample mode serves any Host (public sample data only).
+export function trustedHost(host: string | undefined, allowed = (process.env.QUERYDOC_ALLOWED_HOSTS ?? "").split(",")): boolean {
+  if (!host) return false;
+  let name: string;
+  try {
+    name = new URL(`http://${host}`).hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  } catch {
+    return false;
+  }
+  if (name === "localhost" || name.endsWith(".localhost")) return true;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(name) || name.includes(":")) return true; // IPv4 / IPv6 literal
+  return allowed.map((h) => h.trim().toLowerCase()).filter(Boolean).includes(name);
+}
+
 const send = (res: ServerResponse, r: Reply) => {
   if (res.headersSent || res.destroyed) return;
   const body = JSON.stringify(r.json);
@@ -66,6 +82,9 @@ export function createApp(svc: QueryDocService, serveStatic?: (url: URL, res: Se
       const path = url.pathname.replace(/\/+$/, "") || "/";
       const m = req.method ?? "GET";
       let m2: RegExpMatchArray | null;
+      if (svc.resolveMode(undefined).engine === "zetaris" && !trustedHost(req.headers.host)) {
+        return send(res, { status: 403, json: { status: "error", error: { type: "UntrustedHost", message: "live mode answers only on localhost, an IP address or a name in QUERYDOC_ALLOWED_HOSTS", recoverable: false } } });
+      }
       if (m === "POST" && crossSite(req)) {
         return send(res, { status: 403, json: { status: "error", error: { type: "CrossOrigin", message: "POST from another origin refused", recoverable: false } } });
       }

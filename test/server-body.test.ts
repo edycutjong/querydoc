@@ -28,7 +28,7 @@ describe("POST from another origin", () => {
   it("is refused before the service runs; same-origin and Origin-less POSTs pass", async () => {
     const { createApp } = await import("../src/server.js");
     let runs = 0;
-    const svc = { run: async () => (runs++, { status: 200, json: { status: "ok" } }) } as unknown as Parameters<typeof createApp>[0];
+    const svc = { resolveMode: () => ({ engine: "duckdb" }), run: async () => (runs++, { status: 200, json: { status: "ok" } }) } as unknown as Parameters<typeof createApp>[0];
     const server = createApp(svc);
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -40,5 +40,28 @@ describe("POST from another origin", () => {
     expect((await post({ "content-type": "application/json" })).status).toBe(200);
     expect(runs).toBe(2);
     server.close();
+  });
+});
+
+describe("live mode and DNS rebinding", () => {
+  it("trustedHost: loopback names and IP literals pass, other names only when listed", async () => {
+    const { trustedHost } = await import("../src/server.js");
+    for (const h of ["localhost:8000", "127.0.0.1:8000", "[::1]:8000", "192.168.1.20:8000", "app.localhost"]) expect(trustedHost(h, [])).toBe(true);
+    for (const h of ["evil.example:8000", "rebind.attacker.test", undefined]) expect(trustedHost(h, [])).toBe(false);
+    expect(trustedHost("box.lan:8000", ["box.lan"])).toBe(true);
+  });
+  it("a live-mode server refuses a request whose Host is a re-resolvable name; sample mode does not check", async () => {
+    const { createApp } = await import("../src/server.js");
+    const get = (port: number, host: string) =>
+      new Promise<number>((done) => request({ host: "127.0.0.1", port, path: "/nope", headers: { host } }, (r) => (r.resume(), done(r.statusCode!))).end());
+    for (const [engine, expectEvil] of [["zetaris", 403], ["duckdb", 404]] as const) {
+      const svc = { resolveMode: () => ({ engine }) } as unknown as Parameters<typeof createApp>[0];
+      const server = createApp(svc);
+      await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+      const port = (server.address() as AddressInfo).port;
+      expect(await get(port, "evil.example:8000")).toBe(expectEvil);
+      expect(await get(port, `localhost:${port}`)).toBe(404);
+      server.close();
+    }
   });
 });
