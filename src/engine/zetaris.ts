@@ -18,6 +18,9 @@ const SIDECAR_OUT = resolve(ROOT, "engine/zetaris-jdbc/out");
 
 export const DEFAULT_ROW_CAP = 10_000;
 const DEFAULT_TIMEOUT_SEC = 120;
+// The sidecar asks the driver for a query timeout, but the driver may ignore it (QuerySidecar.java). Past timeoutSec + this grace
+// with no reply, the sidecar is killed and the request fails: one stuck statement must not hold the service's queue for ever.
+export const SIDECAR_GRACE_SEC = 30;
 
 interface SidecarOk {
   id: string;
@@ -45,6 +48,8 @@ export interface ZetarisConfig {
   password: string;
   driverClass?: string;
   java?: string;
+  sidecarCmd?: string[]; // test seam: a stand-in sidecar speaking the same line protocol (skips javac)
+  graceSec?: number; // default SIDECAR_GRACE_SEC
 }
 
 export function zetarisConfigFromEnv(env: NodeJS.ProcessEnv = process.env): ZetarisConfig | null {
@@ -83,9 +88,10 @@ export class ZetarisEngine implements QueryEngine {
   private start(): Promise<void> {
     if (this.ready) return this.ready;
     const java = this.cfg.java ?? "java";
-    ensureCompiled(java);
+    const [cmd, ...args] = this.cfg.sidecarCmd ?? [java, "-cp", `${resolve(this.cfg.jdbcJar)}:${SIDECAR_OUT}`, "QuerySidecar"];
+    if (!this.cfg.sidecarCmd) ensureCompiled(java);
     // Absolute classpath entries: the driver resolves relative entries against a different base.
-    const proc = spawn(java, ["-cp", `${resolve(this.cfg.jdbcJar)}:${SIDECAR_OUT}`, "QuerySidecar"], {
+    const proc = spawn(cmd!, args, {
       env: {
         PATH: process.env.PATH ?? "",
         HOME: process.env.HOME ?? "",
@@ -104,7 +110,17 @@ export class ZetarisEngine implements QueryEngine {
     this.ready = new Promise((resolveReady, reject) => {
       const rl = createInterface({ input: proc.stdout });
       rl.on("line", (line) => {
-        const msg = JSON.parse(line) as SidecarReply | { ready: true };
+        let msg: SidecarReply | { ready: true };
+        try {
+          msg = JSON.parse(line) as SidecarReply | { ready: true };
+        } catch {
+          // stdout is reserved for the protocol, but the JVM itself can still write there (e.g. a fatal-error banner). A line
+          // that is not a reply is kept for the error message and ignored; an exit that follows fails the waiting requests.
+          this.stderrTail.push(`[stdout] ${line.slice(0, 300)}\n`);
+          if (this.stderrTail.length > 20) this.stderrTail.shift();
+          return;
+        }
+        if (!msg || typeof msg !== "object") return;
         if ("ready" in msg) return resolveReady();
         const done = msg.id !== null ? this.waiting.get(msg.id) : undefined;
         if (done && msg.id !== null) {
@@ -112,15 +128,21 @@ export class ZetarisEngine implements QueryEngine {
           done(msg);
         }
       });
-      proc.on("exit", (code) => {
-        const err: SidecarErr = { id: null, ok: false, error: `sidecar exited (${code}): ${this.stderrTail.join("").slice(-500)}`, sqlState: null, elapsedMs: 0 };
-        for (const done of this.waiting.values()) done(err);
-        this.waiting.clear();
-        this.ready = undefined;
-        this.proc = undefined;
+      const gone = (why: string) => {
+        const err: SidecarErr = { id: null, ok: false, error: `sidecar ${why}: ${this.stderrTail.join("").slice(-500)}`, sqlState: null, elapsedMs: 0 };
+        if (this.proc === proc) {
+          // A sidecar already replaced (killed at a deadline, or closed) must not touch its successor's state.
+          for (const done of this.waiting.values()) done(err);
+          this.waiting.clear();
+          this.ready = undefined;
+          this.proc = undefined;
+        }
         reject(new EngineError(err.error));
-      });
+      };
+      proc.on("exit", (code) => gone(`exited (${code})`));
+      proc.on("error", (e) => gone(`could not run (${e.message})`)); // e.g. spawn ENOENT: without a listener this is an uncaught throw
     });
+    proc.stdin.on("error", () => undefined); // EPIPE after the sidecar died: the exit handler above fails the waiting request
     return this.ready;
   }
 
@@ -129,10 +151,25 @@ export class ZetarisEngine implements QueryEngine {
       await this.start();
       const id = String(++this.seq);
       const line = [id, op, rowCap, drain ? 1 : 0, timeoutSec, Buffer.from(sql, "utf8").toString("base64")].join("\t");
+      const proc = this.proc;
+      if (!proc) throw new EngineError(`sidecar exited before the statement was sent: ${this.stderrTail.join("").slice(-300)}`);
       const t0 = performance.now();
       const reply = await new Promise<SidecarReply>((done) => {
-        this.waiting.set(id, done);
-        this.proc!.stdin.write(`${line}\n`);
+        const deadlineSec = timeoutSec + (this.cfg.graceSec ?? SIDECAR_GRACE_SEC);
+        const timer = setTimeout(() => {
+          if (!this.waiting.delete(id)) return;
+          if (this.proc === proc) {
+            this.proc = undefined; // the next statement starts a fresh sidecar
+            this.ready = undefined;
+          }
+          proc.kill("SIGKILL");
+          done({ id, ok: false, error: `no reply from the sidecar ${deadlineSec} s after sending a statement with a ${timeoutSec} s timeout; sidecar killed (restarts on the next statement)`, sqlState: null, elapsedMs: deadlineSec * 1000 });
+        }, deadlineSec * 1000);
+        this.waiting.set(id, (r) => {
+          clearTimeout(timer);
+          done(r);
+        });
+        proc.stdin.write(`${line}\n`);
       });
       return { reply, wallMs: Math.round((performance.now() - t0) * 10) / 10 };
     });
@@ -199,6 +236,9 @@ export class ZetarisEngine implements QueryEngine {
   }
 
   async close() {
+    const err: SidecarErr = { id: null, ok: false, error: "engine closed", sqlState: null, elapsedMs: 0 };
+    for (const done of this.waiting.values()) done(err);
+    this.waiting.clear();
     this.proc?.stdin.end();
     this.proc?.kill();
     this.proc = undefined;
