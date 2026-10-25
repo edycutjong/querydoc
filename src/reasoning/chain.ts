@@ -139,7 +139,9 @@ export async function runChain(a: ChainArgs): Promise<ChainResult> {
       const hits = a.retrieve?.() ?? [];
       for (const h of hits) if (!seenHits.includes(h.id)) seenHits.push(h.id);
       try {
-        rw = await a.rewriter.rewrite({ sql: a.sql, plan: a.plan, diagnosis: a.diagnosis, hypothesis: current, facts: a.facts, carryover, carryoverKey: carryoverKey(ledger, rejected), attemptNo: n, playbook: hits, engine: a.engine, ...(a.schema ? { schema: a.schema } : {}) });
+        // Chunk 1 after a refused own candidate: the engine's carryover is still empty, so the refusal is handed over here.
+        const carry = carryover || (rejected.length ? carryoverBlock(ledger, rejected) : carryover);
+        rw = await a.rewriter.rewrite({ sql: a.sql, plan: a.plan, diagnosis: a.diagnosis, hypothesis: current, facts: a.facts, carryover: carry, carryoverKey: carryoverKey(ledger, rejected), attemptNo: n, playbook: hits, engine: a.engine, ...(a.schema ? { schema: a.schema } : {}) });
       } catch (e) {
         llmError = { unavailable: e instanceof SampleModeNoLLM, message: (e as Error).message.slice(0, 300) };
         a.trace.emit({

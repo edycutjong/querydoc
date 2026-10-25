@@ -163,6 +163,26 @@ describe("runCase — Diagnoser → Rewriter → Verifier end to end (stub engin
     expect(chain?.carryovers[0]).not.toMatch(/\[FINAL\]|<DONE|\[TASK_COMPLETE\]/);
   });
 
+  it("a refused own candidate reaches the first Rewriter prompt as carryover (not \"This is the first attempt\")", async () => {
+    const { llm, prompts } = fakeLlm([RIGHT]);
+    const { case: c } = await runCase({ sql: ORIG, candidate_sql: WRONG }, deps(llm), { runId: "t4c" });
+    expect(c.attempts.map((a) => a.verdict)).toEqual(["REJECT", "ACCEPT"]);
+    const first = prompts.find((p) => p.task === "rewrite")!.user;
+    expect(first).toContain("CARRYOVER STATE FROM EARLIER ATTEMPTS");
+    expect(first).not.toContain("This is the first attempt.");
+  });
+
+  it("an original whose result changes during timing ends the case NOT_VERIFIABLE instead of retrying into a later ACCEPT", async () => {
+    const { llm } = fakeLlm([RIGHT]);
+    // pre-check runs the original twice (equal); from its 3rd plain run on (timing) it returns another count
+    const flaky = { ...queries, [ORIG]: { columns: N, rows: (k: number) => (k >= 3 ? [[11]] : [[10]]), wallMs: 1000 } };
+    const { case: c } = await runCase({ sql: ORIG, candidate_sql: RIGHT }, { ...deps(llm), engine: new PlanEngine(flaky) }, { runId: "t4d" });
+    expect(c.verdict).toBe("NOT_VERIFIABLE");
+    expect(c.attempts).toHaveLength(1);
+    expect(c.attempts[0]).toMatchObject({ reason: "ERROR", original_changed: true });
+    expect(c.detail).toMatch(/the original's result changed between runs/);
+  });
+
   it("verifies a supplied candidate_sql without calling the Rewriter", async () => {
     const { llm, prompts } = fakeLlm([WRONG]);
     const { case: c } = await runCase({ sql: ORIG, candidate_sql: RIGHT }, deps(llm), { runId: "t4" });
