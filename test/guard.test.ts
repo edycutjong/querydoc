@@ -14,6 +14,7 @@ describe("sqlGuard (Zetaris side, hive dialect)", () => {
     "SELECT `parquet_files`.a FROM t `parquet_files`",
     "SELECT 'parquet.`x`' AS s",
     "SELECT a.k FROM t a JOIN u b USING (k)",
+    "SELECT a.k FROM t a JOIN u b USING(k) JOIN v c USING (`k`, j)",
     "SELECT `TPCDS_DB`.`store_sales`.ss_store_sk FROM `TPCDS_DB`.`store_sales`",
     "SELECT transform(arr, x -> x + 1) AS t2, 'USING \\'cmd\\'' AS s FROM t",
   ];
@@ -38,6 +39,10 @@ describe("sqlGuard (Zetaris side, hive dialect)", () => {
     ["SELECT TRANSFORM(a, b) USING 'cat /etc/passwd' AS (x, y) FROM t", /script/],
     ["SELECT TRANSFORM(a) USING \"sh -c id\" FROM t", /script/],
     ["FROM t SELECT 1", /not a SELECT/],
+    ["SELECT TRANSFORM(a) USING r'cat' FROM t", /script/],
+    ["SELECT TRANSFORM(a) USING /* c */ 'cat' FROM t", /script/],
+    ["SELECT TRANSFORM(a)\nUSING\n'cat' FROM t", /script/],
+    ["SELECT call_function('reflect', 'java.lang.Runtime', 'getRuntime')", /JVM/],
     ["/* hi */ DELETE FROM t", /not a SELECT/],
     ["", /empty/],
   ];

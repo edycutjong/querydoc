@@ -30,9 +30,11 @@ const WRITE_RE = new RegExp(`\\b(${WRITE_KEYWORDS.join("|")})\\b`, "i");
 const FILE_READ_RE = /`?\b(parquet|csv|json|orc|text|avro|binaryfile|delta|jdbc|hive)`?\s*\.\s*`/i;
 // Any qualifier (incl. a fully-qualified source like `org.apache.spark.sql.parquet`) applied to a back-quoted path or URI.
 const PATH_READ_RE = /`?[\w.]+`?\s*\.\s*`(?:[a-z][a-z0-9+.-]*:\/\/|\/)/i;
-// USING followed by a string literal = an external script (JOIN … USING (col) is followed by a parenthesis, not a literal).
-const SCRIPT_RE = /\bUSING\s*['"]/i;
-const JVM_CALL_RE = /\b(reflect|java_method|try_reflect)`?\s*\(/i;
+// In a read-only SELECT, USING may only open a JOIN column list `USING (col)`. Any other USING is refused: it is how a script
+// transform names its command (`USING 'cmd'`, raw `USING r'cmd'`), and every other form (CREATE … USING, MERGE … USING) is a write.
+const SCRIPT_RE = /\bUSING\b(?!\s*\()/i;
+// call_function('reflect', …) names the function in a literal the mask hides, so call_function itself is refused.
+const JVM_CALL_RE = /\b(reflect|java_method|try_reflect|call_function)`?\s*\(/i;
 
 export function sqlGuard(sql: string, dialect = "hive"): GuardResult {
   const warnings: string[] = [];
@@ -47,7 +49,7 @@ export function sqlGuard(sql: string, dialect = "hive"): GuardResult {
   if (hit) return { ok: false, reason: `keyword ${hit[1]!.toUpperCase()} outside literals`, warnings };
   const withIdents = maskSql(stmt, true);
   if (FILE_READ_RE.test(withIdents) || PATH_READ_RE.test(withIdents)) return { ok: false, reason: "direct file/source read", warnings };
-  if (SCRIPT_RE.test(masked)) return { ok: false, reason: "script transform (USING 'command')", warnings };
+  if (SCRIPT_RE.test(masked)) return { ok: false, reason: "USING outside a JOIN column list (script transform)", warnings };
   if (JVM_CALL_RE.test(withIdents)) return { ok: false, reason: "JVM reflection call", warnings };
 
   try {
