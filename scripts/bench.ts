@@ -106,12 +106,14 @@ function updateDemo(r: Record<string, any>, file: string) {
   const head = "# DEMO — measured proof\n\nEvery number below is copied from the run file named under it (`npm run bench`, `npm run eval`); nothing is typed by hand.\n\n";
   let doc = existsSync(path) ? readFileSync(path, "utf8") : head;
   const tag = `bench-${r.engine}`;
+  // Only a rewrite taken from a recorded case is an accepted one; a hand-written comparison rewrite was never a Verifier ACCEPT.
+  const rw = /case\.json/.test(String(r.rewrite_source)) ? "accepted rewrite" : "hand-written comparison rewrite (not a Verifier ACCEPT)";
   const block =
     `<!-- BEGIN ${tag} -->\n` +
     `## Benchmark — ${r.engine === "zetaris" ? "hero on the local Zetaris platform (TPCDS_DB, Parquet)" : "hero on the sample engine (DuckDB, committed NYC TLC subset)"}\n\n` +
-    `Original vs the accepted rewrite, ${r.pairs} alternating pairs, wall clock, rows verified identical first ` +
+    `Original vs the ${rw}, ${r.pairs} alternating pairs, wall clock, rows verified identical first ` +
     `(${r.identical_rows.original_rows} row(s) both sides). Rewrite: ${r.rewrite_source}. Percentiles are nearest-rank over ${r.pairs} runs per side.\n\n` +
-    `| | p50 ms | p95 ms |\n|---|---:|---:|\n| original | ${r.original.p50} | ${r.original.p95} |\n| accepted rewrite | ${r.rewrite.p50} | ${r.rewrite.p95} |\n\n` +
+    `| | p50 ms | p95 ms |\n|---|---:|---:|\n| original | ${r.original.p50} | ${r.original.p95} |\n| ${rw.split(" (")[0]} | ${r.rewrite.p50} | ${r.rewrite.p95} |\n\n` +
     `Speedup: **${r.speedup.median_of_pair_ratios}×** median of per-pair ratios (${r.speedup.pairs_faster}/${r.pairs} pairs faster). ` +
     `Run file: \`${file}\`. Reproduce: \`npx tsx scripts/bench.ts --engine ${r.engine} --pairs ${r.pairs}\`.\n` +
     `<!-- END ${tag} -->\n`;
