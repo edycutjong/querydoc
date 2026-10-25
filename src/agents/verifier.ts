@@ -183,6 +183,8 @@ export class Verifier {
     const origRunMs: number[] = [];
     if (!a.overCap) {
       const b = await this.side("original (pre-check run 2)", sql, false); // COUNT(*) runs once per pre-check
+      // A second run that crosses the cap changed its row count: the transferred prefix alone could still fingerprint equal.
+      if (b.overCap) return stop("NOT_VERIFIABLE", "non-deterministic: the second run of the original reached the row cap, the first did not", base);
       fpA = rowsFingerprint(a.canon, spec);
       fpB = rowsFingerprint(b.canon, spec);
       rows = a.res.rows.length;
@@ -312,6 +314,13 @@ export class Verifier {
     let changed: "original" | "candidate" | null = null;
     const timed = async (side: "original" | "candidate", s: string, cols: Column[], expected: string | null): Promise<number> => {
       const r = await this.exec(`${label} timing: ${side}`, stmt(s, cols), cap);
+      // Plain timing compares transferred rows: a run that now crosses the cap has more rows than were verified, even if the
+      // transferred prefix fingerprints equal.
+      const grew = timedAs === "plain" && (r.truncated || (!this.engine.reportsTruncation && r.rows.length >= cap));
+      if (grew) {
+        changed = side;
+        throw new EngineError(`the ${side}'s result changed between runs (it now crosses the ${cap}-row cap)`);
+      }
       const fp = timedAs === "plain"
         ? rowsFingerprint(canonRows(r.rows, r.columns, this.cfg.floatSigDigits), pre.spec)
         : sha256Text(`${Number(r.rows[0]?.[0])}|${String(r.rows[0]?.[1])}`);

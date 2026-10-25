@@ -186,6 +186,20 @@ describe("Verifier — timing table end to end (stub engine)", () => {
 });
 
 describe("Verifier — hardening", () => {
+  it("a candidate whose result grows past the cap during timing is refused, though its transferred prefix is unchanged", async () => {
+    const { v } = setup({
+      "SELECT k FROM t": { columns: K, rows: range(100), wallMs: 1000 },
+      "SELECT k FROM t2": { columns: K, rows: (n: number) => (n >= 2 ? range(101) : range(100)), wallMs: 500 },
+    });
+    const pre = await v.precheck("SELECT k FROM t");
+    const a = await v.verify(attempt("SELECT k FROM t2"), pre);
+    expect(a).toMatchObject({ verdict: "REJECT", reason: "ROW_DIFF" });
+    expect(a.detail).toMatch(/crosses the 100-row cap/);
+  });
+  it("an original whose second pre-check run crosses the cap is NOT_VERIFIABLE", async () => {
+    const { v } = setup({ "SELECT k FROM t": { columns: K, rows: (n: number) => (n >= 2 ? range(101) : range(100)) } });
+    expect((await v.precheck("SELECT k FROM t")).reason).toMatch(/second run of the original reached the row cap/);
+  });
   it("only a recorded row difference is reused from the ledger; a recorded GUARD refusal is re-checked and the candidate runs", async () => {
     const { v, engine } = setup({
       "SELECT k FROM t": { columns: K, rows: range(5), wallMs: 1000 },
