@@ -52,16 +52,18 @@ p{margin:0}
 nav{border-bottom:3px double var(--ink);background:var(--bg);position:sticky;top:0;z-index:5}
 nav .wrap{display:flex;align-items:center;gap:28px;padding-top:12px;padding-bottom:12px}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;font:italic 30px/1 var(--font-display)}
-.brand img{width:30px;height:30px}
+.brand img{width:30px;height:30px;transition:transform .2s}
+.brand:hover img{transform:rotate(-8deg)}
+.brand:hover{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:5px}
 nav .sp{flex:1}
 nav .links a{font-size:14px;text-decoration:none;padding:6px 2px;border-bottom:1px solid transparent;transition:border-color .2s}
 nav .links a:hover{border-bottom-color:var(--ink)}
 nav .links{display:flex;gap:22px}
 .btn{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--ink);padding:10px 16px;font:600 14px/1.2 var(--font-body);color:var(--ink);text-decoration:none;background:var(--panel);cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,background .15s}
-.btn:hover{transform:translate(-2px,-2px);box-shadow:3px 3px 0 var(--ink)}
+.btn:hover{transform:translate(-2px,-2px);box-shadow:3px 3px 0 var(--ink);background:var(--bg)}
 .btn:active{transform:translate(0,0);box-shadow:none}
 .btn.pri{background:var(--ink);color:var(--panel)}
-.btn.pri:hover{box-shadow:3px 3px 0 var(--muted)}
+.btn.pri:hover{box-shadow:3px 3px 0 var(--muted);background:color-mix(in srgb,var(--ink) 82%,var(--muted))}
 
 /* hero */
 .hero{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,1fr);gap:clamp(28px,4.5vw,64px);align-items:start;padding-top:clamp(36px,6vh,72px);padding-bottom:clamp(40px,7vh,80px)}
@@ -98,6 +100,7 @@ h1 .pen path{fill:none;stroke:var(--before);stroke-width:3.4;stroke-linecap:roun
 .switch button[aria-checked=true]{background:var(--ink);color:var(--rule)}
 .switch button[aria-checked=true] b{color:var(--panel)}
 .switch button:not([aria-checked=true]):hover{background:var(--bg)}
+.switch button[aria-checked=true]:hover b{text-decoration:underline;text-underline-offset:3px}
 .sheet .lbl{margin:15px 0 6px;font-size:11px}
 .spec{margin:0;font:13px/1.7 var(--font-data);white-space:pre-wrap;overflow-wrap:anywhere}
 .spec .cut{color:var(--muted);background:linear-gradient(var(--before),var(--before)) no-repeat 0 56%/100% 2px;-webkit-box-decoration-break:clone;box-decoration-break:clone;transition:background-size .55s cubic-bezier(.6,0,.2,1)}
@@ -196,6 +199,7 @@ section.sec{padding:clamp(64px,10vh,112px) 0}
 .pairs li{display:grid;grid-template-columns:52px minmax(0,1fr);gap:2px 10px;font:12px var(--font-data);align-items:center}
 .pairs li>span{grid-row:span 2;color:var(--muted)}
 .pairs .pb{display:flex;align-items:center;gap:8px;min-width:0}
+.pairs .trk{flex:1;min-width:0}
 .pairs .pb i{display:block;height:10px;background:var(--before);flex:none}
 .pairs .pb.c i{background:var(--after)}
 .pairs .pb b{font-weight:400;white-space:nowrap}
@@ -390,7 +394,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
         <li><span>row diff, or an engine-side row hash above the cap</span><span>0 rows differ</span></li>
         <li><span>alternating paired timing — ≥ 1.2×, most pairs won</span><span>saving &gt; 1,782.9 ms</span></li>
       </ol>
-      <figure class="pairs"><figcaption class="lbl">hero-r1 · the three timed pairs, in the order they ran</figcaption><ol><li><span>pair 1</span><div class="pb"><i style="width:66.7%"></i><b>original 27.7 s</b></div><div class="pb c"><i style="width:31.8%"></i><b>rewrite 13.2 s</b></div></li><li><span>pair 2</span><div class="pb c"><i style="width:37.2%"></i><b>rewrite 15.5 s</b></div><div class="pb"><i style="width:78.0%"></i><b>original 32.4 s</b></div></li><li><span>pair 3</span><div class="pb"><i style="width:70.5%"></i><b>original 29.3 s</b></div><div class="pb c"><i style="width:27.8%"></i><b>rewrite 11.6 s</b></div></li></ol></figure>
+      <figure class="pairs"><figcaption class="lbl">hero-r1 · the three timed pairs, in the order they ran</figcaption><ol><li><span>pair 1</span><div class="pb"><span class="trk"><i style="width:85.5%"></i></span><b>original 27.7 s</b></div><div class="pb c"><span class="trk"><i style="width:40.8%"></i></span><b>rewrite 13.2 s</b></div></li><li><span>pair 2</span><div class="pb c"><span class="trk"><i style="width:47.7%"></i></span><b>rewrite 15.5 s</b></div><div class="pb"><span class="trk"><i style="width:100.0%"></i></span><b>original 32.4 s</b></div></li><li><span>pair 3</span><div class="pb"><span class="trk"><i style="width:90.4%"></i></span><b>original 29.3 s</b></div><div class="pb c"><span class="trk"><i style="width:35.7%"></i></span><b>rewrite 11.6 s</b></div></li></ol></figure>
       <span class="chip det">xxhash64 · EXPLAIN FORMATTED · run_sql</span>
     </article>
     <article class="card c-dia">
@@ -496,7 +500,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
     <li><a href="https://github.com/edycutjong/querydoc/tree/main/recorded/live">Recorded live runs</a></li>
     <li><a href="https://github.com/trinodb/trino/issues/2939">trino#2939, the hero's shape</a></li>
   </ul>
-  <p class="ver">Page built 2026-10-25 17:19 UTC from build 7bb1625 · every figure is checked against DEMO.md, evals/results.md, README.md and recorded/live/ when the page is generated</p>
+  <p class="ver">Page built 2026-10-25 17:24 UTC from build d2cd78e · every figure is checked against DEMO.md, evals/results.md, README.md and recorded/live/ when the page is generated</p>
 </div></footer>
 
 <script>
