@@ -1,0 +1,26 @@
+{
+  "name": "querydoc",
+  "version": "0.1.0",
+  "description": "Query Doctor: diagnose a slow SQL query on Zetaris, rewrite it, ship it only when a verifier proves same rows, faster.",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:sidecar": "javac -d engine/zetaris-jdbc/out engine/zetaris-jdbc/QuerySidecar.java",
+    "spike": "tsx scripts/spike_zetaris.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "node-sql-parser": "5.4.0"
+  }
+}
