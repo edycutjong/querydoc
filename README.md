@@ -133,8 +133,9 @@ Dev environment: Cursor's agent wrote the scaffold commit only (`d3e823c`). Ever
 - **Review:** an outside panel of four models (Qwen, Grok, Codex, Claude Opus) reviewed the code and architecture in two rounds and the judge-facing copy in one
   (transcripts not published); each finding was checked against the code before a change, and the fixes are commits prefixed `a2a r03` / `a2a r04` / `a2a r05`.
 - **Runtime:** a model proposes diagnoses and rewrites. The verdict, every number and every timing come from code.
-- **Pre-existing:** `vendor/meterless/` (upstream engines, unmodified) and the public NYC TLC data in `data/sample/`. The icon
-  (`docs/assets/icon.svg`) and the colour and type direction were drawn on 15 Oct, before the build window; no product code or data predates it.
+- **Pre-existing:** `vendor/meterless/` (upstream engines, unmodified) and the public NYC TLC data in `data/sample/`. The visual suite in
+  `docs/assets/` (icon, animated icon and hero, README hero, social and gallery cards) and the colour and type direction were designed
+  on 15–21 Oct, before the build window, and copied into this repo on 26 Oct; no product code or data predates the window.
 
 ## 📊 Engineering Rigor
 
