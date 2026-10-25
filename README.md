@@ -38,9 +38,11 @@ docker build -t querydoc . && docker run --rm -p 8000:8000 -e SAMPLE_MODE=true q
 curl -X POST localhost:8000/run -H 'Content-Type: application/json' -d @input_examples/example_1.json
 ```
 
-Keyless sample mode shows the Verifier, refusals and memory reuse on DuckDB with recorded model answers; it has no ACCEPT. The
+Keyless sample mode shows the Verifier, refusals and memory reuse on DuckDB with recorded model answers; its recorded runs have no ACCEPT (a keyless run on another machine can differ:
+`output_examples/expected.json` allows ACCEPTED for examples 2, 4 and 6). The
 accepted speedup is the recorded live Zetaris run, which the same container replays at `http://localhost:8000/#/recorded/hero-r1`
-(and its refused twin at `#/recorded/hero-trap-r1`).
+(and its refused twin at `#/recorded/hero-trap-r1`). That screen is one recorded run, 2.1× over 3 alternating pairs; the
+headline 2.11× is the 10-pair benchmark in [`DEMO.md`](DEMO.md).
 
 ![Query Doctor Report screen replaying the recorded live run hero-r1: accepted, 2.1× median over 3 alternating pairs, row-identical fingerprint 87cd00c5](docs/assets/ui-report-main.webp)
 
@@ -63,14 +65,15 @@ Three agents and an orchestrator, one rule: **a model never decides.**
 3. **Verifier** (no model) runs original and rewrite on the engine: determinism pre-check → schema check → row diff (or an engine-side
    row-hash fingerprint above the row cap) → alternating paired timing. ACCEPT needs identical rows, ≥ 1.2×, a saving above the noise
    floor and most pairs won.
-4. **Orchestrator** sequences the case; a refusal goes back to the Rewriter, "correct but not faster" goes to `Diagnoser.revise`.
+4. **Orchestrator** sequences the case; a refusal goes back to the Rewriter; a correct rewrite with no real gain (`no_gain`) goes to `Diagnoser.revise`, one that
+   misses another speed gate (`under_gate`) goes back to the Rewriter.
 
 Nothing is applied to your database. An accepted case is a candidate with a patch file for a human to review.
 
 ### Related work
 Engine optimizers apply fixed rules, safely, but only the rules they have (join elimination for the hero's shape is an open request in Trino, #2939). A model asked
 for a rewrite in one call proposes edits nothing has executed. Our baseline arm is exactly that: one plain model call, scored by the same Verifier; it changed rows
-in 6 of 15 sample runs and was faster-and-identical in 0 of 15 (`evals/results.md`). Query Doctor's sample runs have no ACCEPT either;
+in 6 of 15 sample runs and was faster-and-identical in 0 of 15 (`evals/results.md`). Query Doctor's recorded sample runs have no ACCEPT either;
 the difference is that none of its changed-row rewrites shipped. The hero is the shape from
 [trinodb/trino#2939](https://github.com/trinodb/trino/issues/2939), re-expressed on `TPCDS_DB`.
 
