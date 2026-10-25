@@ -229,6 +229,10 @@ export class Verifier {
 
     const g = sqlGuard(sql, this.cfg.dialect);
     if (!g.ok) return finish({ ...att, verdict: "REFUSED", reason: "GUARD", detail: `read-only guard: ${g.reason}` });
+    // The original passed this lint in the pre-check; a candidate must too. One diff run cannot show a rewrite equal when its own
+    // answer can change between runs (rand(), current_date, sampling, an unordered LIMIT): equal today is not equivalent.
+    const lint = lintDeterminism(sql, orderSpec(sql, [], this.cfg.dialect));
+    if (lint.length) return finish({ ...att, verdict: "REFUSED", reason: "GUARD", detail: `determinism lint: ${lint.join("; ")} — not executed` });
 
     // Ledger reuse (architecture §Verifier order step 1): a refusal recorded on this original, this candidate and this original-result
     // fingerprint is repeated without executing the candidate. Only refusals are ever reused.
