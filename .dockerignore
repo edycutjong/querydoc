@@ -1,0 +1,10 @@
+node_modules
+.git
+.env
+.env.*
+!.env.example
+data/runs
+data/hmem
+logs
+evidence
+engine/zetaris-jdbc/out
