@@ -1,7 +1,8 @@
 # DX report — building on Zetaris
 
 A dated log of what we hit while building Query Doctor on Zetaris, and what we did about it. All times WIB (UTC+7).
-Every number below comes from a logged call in `evidence/spike/<run>/calls.jsonl` (run id and call number given).
+Every number in the 2026-10-25 sections comes from a logged call in `evidence/spike/<run>/calls.jsonl` (run id and call number
+given). The 2026-10-20 entry predates this repo; its facts were noted at setup time and are not logged here.
 
 ## 2026-10-20 — the MCP endpoint does not exist locally → JDBC
 
@@ -23,44 +24,47 @@ every measured value in `querydoc.config.json` from these logs.
 
 **What the instance hosts.** Two sources, both from `s3a://zetaris-public-dataset`: `TPCDS_DB` (24 Parquet tables, from 5
 rows in `warehouse` to 11,745,000 in `inventory`; `store_sales` 2,880,404) and `NY_TAXI` (15 CSV tables, read in place, not
-counted). A join across the two sources runs: `TPCDS_DB.warehouse` × 5 rows of `NY_TAXI.customers` returned 25 rows in 17.6 s
-(run 07-48-28Z, calls 66–67).
+counted). A query across the two sources runs: a `CROSS JOIN` of `TPCDS_DB.warehouse` (5 rows) with 5 rows of `NY_TAXI.customers`
+counted 25 rows in 17.6 s (run 07-48-28Z, call 67; its plan is call 66).
 
 **Sidecar.** One warm connection, one request per line, JSON back. The driver logs to stdout, so the sidecar moves `System.out`
-to stderr and keeps stdout for the protocol. Relative classpath entries failed with `ClassNotFoundException`, so the adapter
-passes absolute paths.
+to stderr and keeps stdout for the protocol. A relative classpath entry for the sidecar's own classes did not resolve
+(`ClassNotFoundException: QuerySidecar` when we tried it by hand; not logged), so the adapter passes absolute paths.
 
 **Execution and row cap.** Each request runs on a JDBC statement. JDBC has no truncation flag, and we saw no row cap: 200,000
 rows drained in full (run 07-39-14Z, call 2). Query Doctor keeps up to `rowCap` rows (10,000), reads one more row to flag
-truncation, and lets the engine fingerprint decide past the cap.
+truncation. Past the cap, the Verifier is designed to compare engine fingerprints (below) instead of rows.
 
 **Plans.** `EXPLAIN FORMATTED <sql>` returns a Spark physical plan as one string row. The tree lists each operator with
 Spark's own id, e.g. `+- BroadcastHashJoin LeftOuter BuildRight (7)`, followed by one detail block per id. Query Doctor numbers
 plan nodes with those ids (`src/engine/sparkPlan.ts`), so a diagnosis that cites "node (7)" points at the same line a human
 reads. Plain `EXPLAIN` (no ids) falls back to line numbering.
-- **EXPLAIN plans without running the query.** `EXPLAIN FORMATTED SELECT COUNT(*) FROM NY_TAXI.trips` came back in 3.7 s
-  (run 07-40-47Z, call 3). Running that COUNT took 200 s on 2026-10-20.
-- **EXPLAIN is still not free.** Planning lists the S3 files: 8.5 s for plain `EXPLAIN` of the hero (call 1), about 11 s for
-  `EXPLAIN FORMATTED` (call 2).
+- **EXPLAIN plans without running the query.** `EXPLAIN FORMATTED` of the hero takes 7.3–7.4 s (run 07-40-47Z, calls 2 and 14);
+  running the hero takes 33.5–41.9 s (calls 15–19). `EXPLAIN FORMATTED SELECT COUNT(*) FROM NY_TAXI.trips` came back in 3.7 s
+  (call 3); on 2026-10-20 (pre-repo, not logged) that COUNT ran for about 200 s. Plans are printed with
+  `isFinalPlan=false`: adaptive execution may still change them at run time.
+- **EXPLAIN is still not free.** 8.5 s for plain `EXPLAIN` of the hero (call 1), 7.3 s for `EXPLAIN FORMATTED` (call 2). We did
+  not split planning time from file listing.
 
 **Timing.** The engine does not report its own time over JDBC and has no cache-hit flag, so the Verifier uses wall clock.
 - `SELECT 1` ×10 (calls 4–13): first run 168 ms (dropped as connection setup), then a median of **66.2 ms**, a spread of
   **594.3 ms** (one 651 ms outlier on run 2) → **noise floor 1,782.9 ms** = max(50 ms, 3 × spread).
 - Queries on the TPCDS Parquet tables take about 10 s even when they touch 300 rows (fingerprint of `promotion`: 9.3–11.0 s,
-  calls 8–10, run 07-39-14Z). Most of that is reading the public S3 dataset from a laptop.
+  calls 8–10, run 07-39-14Z). We have not split that time into planning, S3 file listing and reading; the data is read from
+  the public S3 bucket by the local stack.
 
 **Per-row hash for the fingerprint.** `xxhash64`, `hash`, `md5`, `sha2` and `crc32` all exist (calls 3–7). We use
 `xxhash64` over the columns cast to string (NULL → sentinel, because `xxhash64` skips NULL arguments), summed as
 `DECIMAL(38,0)`: two runs on `promotion` gave the same `(300, -138363129335208073211)`; dropping one row changed it
 (calls 8–10).
 
-**Numeric types.** The TPCDS money columns are `double`, not `DECIMAL` (`DESCRIBE TPCDS_DB.store_sales`, call 11). `SUM` and
-`AVG` come back as `double`, `COUNT` as `bigint` (call 12). The Verifier's float tolerance therefore applies to TPCDS money
+**Numeric types.** The TPCDS money columns are `double`, not `DECIMAL` (`DESCRIBE TPCDS_DB.store_sales`, run 07-39-14Z call 11; again in run 07-52-47Z call 1). `SUM` and
+`AVG` come back as `double`, `COUNT` as `bigint` (run 07-39-14Z call 12). The Verifier's float tolerance therefore applies to TPCDS money
 aggregates. The hero is a `COUNT`, so it compares exactly.
 
 **SQL dialect for the guard.** `node-sql-parser` with `database: "hive"` parses the hero, its rewrite, the trap, the
 fingerprint SQL and TPC-H Q17. `trino`, `postgresql` and `mysql` fail on the fingerprint's `CAST(... AS STRING)` (run 07-39-14Z,
-call 13). Zetaris runs Spark SQL, and `hive` is the closest dialect the parser supports.
+call 13); `trino` also fails on Q17. `hive` and `bigquery` parse all five. We use `hive` because Zetaris runs Spark SQL.
 
 **LLM.** `GET /v1/models` lists `nvidia/nemotron-3-ultra-550b-a55b`, and a chat call to it returned 200 in 0.9 s (calls 14–15).
 
@@ -72,12 +76,14 @@ unique key), re-expressed on `TPCDS_DB.store_sales` × `TPCDS_DB.promotion`. Run
 - The engine keeps the join: `BroadcastHashJoin LeftOuter BuildRight (7)` in the plan (call 14).
 - Original ×5: 33.5 / 34.2 / 41.9 / 36.8 / 35.7 s, median **35.7 s**, no cold/warm gap (calls 15–19).
 - Three alternating pairs, original vs a hand-written join elimination: **33.8 / 17.9, 38.3 / 22.2, 36.0 / 19.0 s**, both
-  sides returning **129,752** every time (calls 20–25). That is a ~1.9× gap on the pair medians, far above the 1.78 s noise
-  floor. This is the probe that a faster rewrite is plausible; the agents and the Verifier produce the real one.
+  sides returning **129,752** every time (calls 20–25). That is a ~1.9× gap on the pair medians (36.0 vs 19.0 s). Each pair's gap
+  (16.0–17.0 s) is about 9× the 1.78 s noise floor and about 2× the 8.4 s spread of the original's own five runs. This is a
+  hand-written probe that a faster rewrite is plausible; producing and verifying the rewrite is the agents' and the Verifier's job.
 - The join is only removable because `p_promo_sk` is unique: `promotion` has 300 rows, 300 distinct `p_promo_sk`, **291**
   distinct `p_item_sk` (call 28).
 - **Trap sibling** (`01-hero-trap-dupkey.sql`): the same join on `p_item_sk`. Dropping it changes the count, **129,776 →
   129,752** (calls 26–27), so the Verifier must refuse that rewrite.
 
 Friction: the hero runs for about 36 s, well over the 5–12 s we planned for. One live verification (pre-check plus three timed
-pairs) therefore takes about three minutes, and the live timeouts are sized for that.
+pairs) will therefore take about three minutes (the six pair runs above sum to 167 s). The spike used a 300 s timeout per
+execution; the adapter's default is 120 s, so live verification must raise it.
