@@ -17,7 +17,6 @@
 <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
 <link rel="preload" href="../assets/fonts/instrument-serif-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="../assets/fonts/instrument-serif-latin-400-italic.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="../assets/fonts/ibm-plex-mono-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>
 @font-face{font-family:"Instrument Serif";font-style:normal;font-weight:400;font-display:swap;src:url(../assets/fonts/instrument-serif-latin-400-normal.woff2) format("woff2")}
 @font-face{font-family:"Instrument Serif";font-style:italic;font-weight:400;font-display:swap;src:url(../assets/fonts/instrument-serif-latin-400-italic.woff2) format("woff2")}
@@ -190,12 +189,12 @@ h2 em,h1 em{font-style:italic}
 .sp{display:grid;grid-template-columns:1fr 1fr;gap:70px;margin-top:56px}
 .sp h3{font:italic 64px/1 var(--font-display);margin:0 0 10px}
 .hero-n{display:flex;align-items:baseline;gap:22px;margin:0 0 18px}
-.hero-n b{font:400 200px/.9 var(--font-display)}
+.hero-n b{font:400 180px/.9 var(--font-data);letter-spacing:-.04em}
 .hero-n span{font-size:34px}
 .hero-n code{font:.9em var(--font-data)}
 .calls{list-style:none;margin:0;padding:0;border-top:1.5px solid var(--ink)}
 .calls li{display:grid;grid-template-columns:90px 1fr;gap:20px;padding:24px 0;border-bottom:1px solid var(--rule);font-size:30px;line-height:1.35;align-items:baseline}
-.calls li b{font:400 54px/1 var(--font-display);text-align:left;font-variant-numeric:tabular-nums}
+.calls li b{font:400 46px/1 var(--font-data);text-align:left;font-variant-numeric:tabular-nums}
 .calls li code{font:.86em var(--font-data)}
 .nsx{font:22px var(--font-data);color:var(--muted);margin:20px 0 0}
 .also{margin-top:-20px;margin-bottom:40px;font-size:26px;color:var(--muted);display:flex;gap:46px}
@@ -333,7 +332,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
     <div class="legend"><span><i></i>model call</span><span><i style="border-top-style:solid"></i>code</span></div>
     <svg viewBox="0 0 1680 700" aria-hidden="true"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#1A1C1E" stroke="none"/></marker><marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#B03A2E" stroke="none"/></marker><marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#1E6B52" stroke="none"/></marker></defs>
       <path d="M250 90 H330"/><path d="M640 90 H720"/><path d="M1030 90 H1110"/>
-      <path d="M1265 152 V205 H715 V270"/>
+      <path d="M1265 152 V234 H715 V264"/>
       <path d="M870 320 H1110"/>
       <path class="g" d="M1420 320 H1500"/>
       <path class="r" d="M1265 372 V490 H940"/>
@@ -349,7 +348,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
     <div class="nd" style="left:1500px;top:270px;width:180px;border-color:var(--after)"><b class="green">ACCEPTED</b>patch for a human</div>
     <div class="nd" style="left:560px;top:436px;width:380px"><b>Playbook</b>H-MEM: refusals + outcomes<br><span class="sm">Markovian chain · ≤ 3 attempts</span></div>
     <span class="lab red" style="left:960px;top:500px">ROW_DIFF → playbook, retry</span>
-    <span class="lab red" style="left:1474px;top:136px;line-height:1.35">NOT_FASTER →<br>Diagnoser.revise</span>
+    <span class="lab red" style="left:1474px;top:126px;line-height:1.35">NOT_FASTER<br>(no_gain) →<br>Diagnoser.revise</span>
     <div class="nd" style="left:0;top:628px;width:1680px;display:flex;gap:40px;align-items:baseline;font-size:18px"><b style="display:inline;font-size:26px">Engines</b>Zetaris · local platform over a Java JDBC sidecar (live) <span class="mut">|</span> DuckDB · committed NYC TLC subset (sample, keyless) <span class="mut">|</span> model: Nightshift default · NIM fallback (recorded)</div>
   </div>
   <div class="ft"><span>src/orchestrator.ts · src/agents/verifier.ts · src/reasoning/chain.ts · src/memory/playbook.ts</span><span>v0.1.0 · code b05f6f7 · 04 / 11</span></div>
@@ -363,8 +362,8 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
   <h2>The report a reviewer <em>signs.</em></h2>
   <div class="wrapx">
     <div class="frame art" style="position:relative"><div class="b0"><i></i><i></i><i></i><span>localhost:8000/#/recorded/hero-r1</span></div>
-      <img src="../assets/ui-report-main.webp" width="1600" height="1328" alt="Query Doctor — the Report screen of the recorded live run hero-r1: Accepted, 2.1×, runtime bars and the ROW-IDENTICAL stamp">
-      <span class="mk" style="left:684px;top:306px">1</span><span class="mk" style="left:8px;top:536px">2</span><span class="mk" style="left:8px;top:84px">3</span></div>
+      <img src="../assets/ui-report-main.webp" loading="lazy" decoding="async" width="1600" height="1328" alt="Query Doctor — the Report screen of the recorded live run hero-r1: Accepted, 2.1×, runtime bars and the ROW-IDENTICAL stamp">
+      <span class="mk" style="left:676px;top:306px">1</span><span class="mk" style="left:-26px;top:536px">2</span><span class="mk" style="left:-26px;top:84px">3</span></div>
     <ol class="call">
       <li class="rise">Verdict and stamp, first.</li>
       <li class="rise">Measured bars: original vs rewrite.</li>
@@ -394,7 +393,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
 <pre class="art">LEFT JOIN TPCDS_DB.promotion p
   ON <u>ss.ss_item_sk = p.p_item_sk</u></pre>
       <div class="kp"><span class="mono">ON p_item_sk</span><span class="big red">291 distinct</span><span class="mono mut">of 293 non-null</span></div>
-      <div class="verdict mono art">fingerprint e51f9da7 ≠ 87cd00c5<br><span class="red">first differing row 129752</span></div>
+      <div class="verdict mono art">attempt 1 fingerprint e51f9da7 ≠ 87cd00c5<br><span class="red">first differing row 129752</span></div>
       <div class="stamp no">REFUSED · ROW_DIFF</div>
     </div>
   </div>
@@ -476,7 +475,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
       <li class="rise"><span>in memory</span>A repeated refusal is read from the ledger.</li>
       <li class="rise"><span>in the report</span>"identical on the current data" — not a proof.</li>
     </ul>
-    <img class="shot art" src="../assets/ui-trap-attempts.webp" width="1568" height="1164" alt="Query Doctor — three refused attempts on the duplicated-key trap, each struck through with the Verifier's reason">
+    <img class="shot art" loading="lazy" decoding="async" src="../assets/ui-trap-attempts.webp" width="1568" height="1164" alt="Query Doctor — three refused attempts on the duplicated-key trap, each struck through with the Verifier's reason">
   </div>
   <div class="ft"><span>real screen · README Limitations: the retry loop does not reliably learn from a refusal</span><span>v0.1.0 · code b05f6f7 · 10 / 11</span></div>
   <aside class="speaker-notes">We keep the losing rewrites on the report too, with the row that proves them wrong. Honestly: the retry loop did not learn here; all three attempts changed the rows. What saved it was the gate, not the model.</aside>

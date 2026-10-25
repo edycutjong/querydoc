@@ -249,7 +249,7 @@ section.sec{padding:clamp(64px,10vh,112px) 0}
 .lr h3{font:italic 38px/1 var(--font-display);margin:0}
 .lr p{font-size:15.5px;max-width:46em;margin:0}
 .lr code{font:.9em var(--font-data);background:rgba(207,200,184,.35);padding:1px 4px}
-.lr .n{font:400 76px/.9 var(--font-display);text-align:right;font-variant-numeric:tabular-nums}
+.lr .n{font:400 64px/.9 var(--font-data);letter-spacing:-.03em;text-align:right;font-variant-numeric:tabular-nums}
 .lr .n small{display:block;font:12px/1.5 var(--font-data);color:var(--muted);margin-top:8px}
 
 /* honest — pathologist's comments */
@@ -388,12 +388,12 @@ FROM   TPCDS_DB.store_sales ss
 WHERE  ss.ss_customer_sk IS NULL</pre>
     <p class="margin" id="note">The key is unique, so the join cannot change the count.</p>
     <p class="lbl" id="reslbl">Results vs reference · per-side medians of 3 alternating pairs</p>
-    <p class="xbig" id="xbig"><span id="xnum">2.1×</span><small id="xcap">median pair ratio · 3/3 pairs faster · saves 16.9 s (median pair saving)</small></p>
+    <p class="xbig" id="xbig"><span id="xnum">2.1×</span><small id="xcap">live verdict · median pair ratio · 3/3 pairs faster · saves 16.9 s (median pair saving)</small></p>
     <div class="res" id="res">
       <span>original</span><div class="bar" style="width:100%"><i>H</i></div><span class="t">29.3 s</span>
       <span>rewrite</span><div class="bar rw" id="rwbar" style="width:45.1%"></div><span class="t" id="rwt">13.2 s</span>
     </div>
-    <div class="verdict"><div class="fp"><span>original</span><span class="hex" id="fpo">87cd00c5</span><span>rewrite</span><span class="hex" id="fpr">87cd00c5</span></div>
+    <div class="verdict"><div class="fp"><span>original</span><span class="hex" id="fpo">87cd00c5</span><span id="fprl">rewrite</span><span class="hex" id="fpr">87cd00c5</span></div>
     <div class="stamp" id="stamp">ROW-IDENTICAL · 87CD00C5</div></div>
     <div class="signed"><span>Verified by <b>Verifier</b> — code, no model · <span id="sig">recorded live on Zetaris</span></span><button type="button" class="replay" id="replay">replay</button></div>
     <p class="src" id="src">recorded/live/hero-r1/case.json</p>
@@ -449,8 +449,8 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
   <div class="findings">
     <div><p class="tagk m">model</p><h3>Diagnoser</h3><p>Reads the Spark plan, a pattern detector and SQL-aggregate key facts.</p><p class="ex">hero: <code>unused_outer_join</code> at plan node 7 · key 300 distinct of 300</p><span class="chip">nemotron-3-ultra-550b-a55b</span></div>
     <div><p class="tagk m">model</p><h3>Rewriter</h3><p>One rewrite per hypothesis. It sees every earlier refusal as a reason code, and the latest one with the Verifier's detail and the differing row.</p><span class="chip">nemotron-3-ultra-550b-a55b</span></div>
-    <div><p class="tagk">code</p><h3>Playbook</h3><p>Refusals and verified outcomes go into the playbook. A candidate already refused for the same original result is answered from the ledger, not run again.</p><span class="chip">Meterless H-MEM</span></div>
-    <div><p class="tagk">code</p><h3>Retry chain</h3><p>One attempt is one chunk. "Correct but not faster" goes back to <code>Diagnoser.revise</code>; at most three attempts.</p><span class="chip">Meterless Markovian</span></div>
+    <div><p class="tagk">code</p><h3>Playbook</h3><p>Refusals, and outcomes a human approves, go into the playbook. A candidate already refused for the same original result is answered from the ledger, not run again.</p><span class="chip">Meterless H-MEM</span></div>
+    <div><p class="tagk">code</p><h3>Retry chain</h3><p>One attempt is one chunk. "Correct but no time saved" (<code>no_gain</code>) goes back to <code>Diagnoser.revise</code>; at most three attempts.</p><span class="chip">Meterless Markovian</span></div>
   </div>
 </div></section>
 
@@ -460,7 +460,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
   <p class="lede">Same query, a different join key: <code>p_item_sk</code>, which repeats. Dropping the join now changes the count. The Rewriter tried three times; the Verifier refused all three and wrote why in the margin.</p>
   <div class="twin">
     <div class="fig"><p class="lbl">hero-r1 · ON p_promo_sk</p><p class="big">300 <span>distinct</span></p><p class="of">of 300 non-null values · fingerprints 87cd00c5 = 87cd00c5</p><div class="stamp static" id="stamp3">ROW-IDENTICAL · 87CD00C5</div></div>
-    <div class="fig"><p class="lbl">hero-trap-r1 · ON p_item_sk</p><p class="big"><span class="red">291</span> <span>distinct</span></p><p class="of">of 293 non-null values · fingerprints e51f9da7 ≠ 87cd00c5</p><div class="stamp no static" id="stamp2">REFUSED · ROW_DIFF</div></div>
+    <div class="fig"><p class="lbl">hero-trap-r1 · ON p_item_sk</p><p class="big"><span class="red">291</span> <span>distinct</span></p><p class="of">of 293 non-null values · attempt 1 fingerprints e51f9da7 ≠ 87cd00c5</p><div class="stamp no static" id="stamp2">REFUSED · ROW_DIFF</div></div>
   </div>
   <div class="trap">
     <div>
@@ -536,7 +536,7 @@ WHERE  ss.ss_customer_sk IS NULL</pre>
     <li><a href="https://github.com/edycutjong/querydoc/tree/main/recorded/live">Recorded live runs</a></li>
     <li><a href="https://github.com/trinodb/trino/issues/2939">trino#2939, the hero's shape</a></li>
   </ul>
-  <p class="vstamp">v0.1.0 · code b05f6f7 · page built 2026-10-25 17:56 UTC · numbers from DEMO.md, evals/results.md and recorded/live/</p>
+  <p class="vstamp">v0.1.0 · code b05f6f7 · page built 2026-10-25 18:07 UTC · numbers from DEMO.md, evals/results.md and recorded/live/</p>
 </div></footer>
 
 <script>
@@ -547,7 +547,7 @@ const $=s=>document.querySelector(s);
 const C={
  promo:{run:"hero-r1",on:"ss.ss_promo_sk = p.p_promo_sk",note:"The key is unique, so the join cannot change the count.",red:false,
    lbl:"Results vs reference · per-side medians of 3 alternating pairs",fpo:"87cd00c5",fpr:"87cd00c5",stamp:"ROW-IDENTICAL · 87CD00C5",ok:true,
-   x:"2.1×",xc:"median pair ratio · 3/3 pairs faster · saves 16.9 s (median pair saving)",sig:"recorded live on Zetaris",src:"recorded/live/hero-r1/case.json"},
+   x:"2.1×",xc:"live verdict · median pair ratio · 3/3 pairs faster · saves 16.9 s (median pair saving)",sig:"recorded live on Zetaris",src:"recorded/live/hero-r1/case.json"},
  item:{run:"hero-trap-r1",on:"ss.ss_item_sk = p.p_item_sk",note:"291 distinct among 293 non-null values: the key repeats, so the join can multiply rows.",red:true,
    lbl:"Results vs reference · not timed",fpo:"e51f9da7",fpr:"87cd00c5",stamp:"REFUSED · ROW_DIFF",ok:false,
    x:"3 refused",xc:"3 attempts · rows differ · no kept rewrite",sig:"recorded live on Zetaris",src:"recorded/live/hero-trap-r1/case.json"}};
@@ -562,7 +562,7 @@ function play(k){
   document.querySelectorAll(".switch button").forEach(b=>b.setAttribute("aria-checked",b.dataset.k===k));
   $("#runid").textContent=c.run;$("#on").textContent=c.on;$("#src").textContent=c.src;$("#sig").textContent=c.sig;
   const note=$("#note");note.textContent=c.note;note.classList.toggle("red",c.red);
-  $("#reslbl").textContent=c.lbl;$("#xnum").textContent=c.x;$("#xcap").textContent=c.xc;$("#xbig").classList.toggle("no",!c.ok);
+  $("#reslbl").textContent=c.lbl;$("#fprl").textContent=c.ok?"rewrite":"attempt 1";$("#xnum").textContent=c.x;$("#xcap").textContent=c.xc;$("#xbig").classList.toggle("no",!c.ok);
   cut.classList.add("arm");
   stamp.className="stamp hide"+(c.ok?"":" no");stamp.textContent=c.stamp;
   hex($("#fpo"),c.fpo);$("#fpr").textContent="········";
