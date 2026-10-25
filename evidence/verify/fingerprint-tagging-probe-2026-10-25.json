@@ -1,0 +1,13 @@
+{
+  "what": "engineFingerprintSql after a2a r03 (tagged parts: COALESCE(concat('v', CAST(col AS STRING)), 'n')), run on the local Zetaris platform through the JDBC sidecar",
+  "at": "2026-10-25T15:20Z",
+  "columns": ["a int", "s string"],
+  "results": {
+    "SELECT 1 AS a, CAST(NULL AS STRING) AS s": [1, "1244188169773561729"],
+    "SELECT 1 AS a, 'n' AS s": [1, "4390790657164222690"],
+    "SELECT 1 AS a, '<qd:null>' AS s": [1, "7095633037424363759"],
+    "SELECT 1 AS a, CAST(NULL AS STRING) AS s (second run)": [1, "1244188169773561729"]
+  },
+  "null_distinct_from_literals": true,
+  "deterministic": true
+}

@@ -75,6 +75,26 @@ describe("DuckDB sample engine (committed NYC TLC subset)", () => {
   });
 });
 
+describe("DuckDB row-hash fingerprint encoding", () => {
+  const fp = async (inner: string) => {
+    const probe = await e.run(inner, { rowCap: 10 });
+    return (await e.run(e.rowHashSql(inner, probe.columns, 9), { rowCap: 1 })).rows[0];
+  };
+  it("NULL never hashes like a string value (the old untagged sentinel equalled its literal)", async () => {
+    expect(await fp("SELECT CAST(NULL AS VARCHAR) AS s")).not.toEqual(await fp("SELECT 'n' AS s"));
+    expect(await fp("SELECT CAST(NULL AS VARCHAR) AS s")).not.toEqual(await fp("SELECT '<qd:null>' AS s"));
+    expect(await fp("SELECT CAST(NULL AS VARCHAR) AS s")).not.toEqual(await fp("SELECT 'vn' AS s"));
+  });
+  it("a value holding the old separator cannot shift a column boundary", async () => {
+    const a = await fp("SELECT 'a' || chr(31) || 'b' AS x, 'c' AS y");
+    const b = await fp("SELECT 'a' AS x, 'b' || chr(31) || 'c' AS y");
+    expect(a).not.toEqual(b);
+  });
+  it("equal rows in another order still give the same fingerprint", async () => {
+    expect(await fp("SELECT * FROM (VALUES (1, 'x'), (2, NULL)) t(k, v)")).toEqual(await fp("SELECT * FROM (VALUES (2, NULL), (1, 'x')) t(k, v)"));
+  });
+});
+
 describe("DuckDB engine limits and guard extras", () => {
   it("interrupts a query that runs past its timeout and stays usable afterwards", async () => {
     await expect(e.run("SELECT COUNT(*) FROM range(100000000000) a, range(1000) b", { timeoutSec: 1, drain: true })).rejects.toBeInstanceOf(EngineError);
