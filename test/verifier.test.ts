@@ -186,6 +186,14 @@ describe("Verifier — timing table end to end (stub engine)", () => {
 });
 
 describe("Verifier — hardening", () => {
+  it("a tie at the cut is still seen when LIMIT k equals the row cap (the probe reads k+1 rows)", async () => {
+    const tied = (n: number) => range(n, (i) => [i < 99 ? i : 99]); // rows 100 and 101 share the sort key 99
+    const { v } = setup({
+      "SELECT k FROM t ORDER BY k LIMIT 100": { columns: K, rows: tied(100) },
+      "SELECT k FROM t ORDER BY k LIMIT 101": { columns: K, rows: tied(101) },
+    });
+    expect((await v.precheck("SELECT k FROM t ORDER BY k LIMIT 100")).reason).toMatch(/ties at the cut/);
+  });
   it("a candidate whose result grows past the cap during timing is refused, though its transferred prefix is unchanged", async () => {
     const { v } = setup({
       "SELECT k FROM t": { columns: K, rows: range(100), wallMs: 1000 },

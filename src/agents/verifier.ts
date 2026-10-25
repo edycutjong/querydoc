@@ -117,11 +117,11 @@ export class Verifier {
     }
   }
 
-  private async side(label: string, sql: string, countCheck = true): Promise<Side> {
-    const res = await this.exec(label, sql, this.cfg.rowCap);
+  private async side(label: string, sql: string, countCheck = true, rowCap = this.cfg.rowCap): Promise<Side> {
+    const res = await this.exec(label, sql, rowCap);
     // An engine that reads one row past the cap reports `truncated` itself: exactly rowCap rows is then a complete result and keeps
     // the full row diff. Without that flag, reaching the cap is treated as incomplete (and the COUNT(*) check below decides).
-    let overCap = res.truncated || (!this.engine.reportsTruncation && res.rows.length >= this.cfg.rowCap);
+    let overCap = res.truncated || (!this.engine.reportsTruncation && res.rows.length >= rowCap);
     let countStar: number | undefined;
     if (!this.engine.reportsTruncation && countCheck) {
       // Unknown tool limit: COUNT(*) above the transferred rows is treated exactly like reaching the cap.
@@ -207,7 +207,8 @@ export class Verifier {
     if (spec.kind === "ordered" && spec.limit !== null) {
       const probe = tieProbeSql(sql, spec.limit);
       if (!probe) return stop("NOT_VERIFIABLE", "top-N tie probe could not be built (LIMIT is not the last clause)", done);
-      const t = await this.side(`original top-N tie probe (LIMIT ${spec.limit + 1})`, probe, false);
+      // Read k+1 rows: at LIMIT k = rowCap the row-capped read would hold only k and never see the row past the cut.
+      const t = await this.side(`original top-N tie probe (LIMIT ${spec.limit + 1})`, probe, false, spec.limit + 1);
       if (tieAtCut(t.canon, spec.keyIdx, spec.limit)) return stop("NOT_VERIFIABLE", `ties at the cut (rows ${spec.limit} and ${spec.limit + 1} share the sort keys)`, done);
     }
 
