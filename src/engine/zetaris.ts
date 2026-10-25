@@ -74,7 +74,7 @@ function ensureCompiled(java: string) {
   if (r.status !== 0) {
     const missing = (r.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT";
     throw new EngineError(missing
-      ? `live mode needs a JDK on PATH: the JDBC sidecar is compiled with ${javac} on first use (a JRE alone has no javac; built on OpenJDK 17)`
+      ? `live mode needs a JDK on PATH: the JDBC sidecar is compiled with ${javac} on first use (a JRE alone has no javac; tested with OpenJDK 17.0.14, docs/DX-REPORT.md)`
       : `javac failed: ${r.stderr || r.error?.message}`);
   }
 }
