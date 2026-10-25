@@ -17,7 +17,9 @@
     "start": "tsx src/main.ts",
     "seed": "tsx scripts/seed.ts",
     "record": "tsx scripts/record.ts",
-    "test:offline": "vitest run test/replay-parity.test.ts"
+    "test:offline": "vitest run test/replay-parity.test.ts",
+    "bench": "tsx scripts/bench.ts",
+    "eval": "tsx scripts/eval.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
