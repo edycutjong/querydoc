@@ -203,8 +203,9 @@ docker run --rm querydoc npm test    # the same suite in the image
 ```
 
 CI (`.github/workflows/`): typecheck, tests, `npm audit --omit=dev`, a keyless Docker job (builds the image, starts it in
-`SAMPLE_MODE`, POSTs all six `input_examples/`), and gitleaks over the full history. No hosted run is cited because Actions
-did not start on the private repo (account billing); the same steps were replayed locally in a clean clone (`scripts/clean_clone.sh`, examples 1–3).
+`SAMPLE_MODE`, POSTs all six `input_examples/`), and gitleaks over the full history. First green hosted run after the public flip:
+[run 40238714337](https://github.com/edycutjong/querydoc/actions/runs/40238714337) (test + keyless jobs). Releases are cut automatically from
+conventional commits (`release.yml`), and `pages.yml` publishes `docs/` to GitHub Pages.
 
 ### Hub validation flow (this repo's names)
 ```bash
