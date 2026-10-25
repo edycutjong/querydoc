@@ -62,5 +62,5 @@ export interface Case {
   detail?: string;
   playbook_hits: string[];
   decision?: Decision;
-  playbook_state?: string; // sample mode: the options.playbook value this run started from
+  playbook_state?: string; // sample mode: the options.playbook value this run started from; live: "persistent" (data/hmem, shared)
 }

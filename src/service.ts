@@ -146,7 +146,7 @@ export class QueryDocService {
         engine, cfg, llm: this.llm, attemptCap: 3, logDir: runDir, playbook,
       }, { runId, ...(maxAttempts ? { maxAttempts } : {}) });
       const c = ran.case;
-      c.playbook_state = pbOpt ?? "seed";
+      c.playbook_state = mode.engine === "zetaris" ? "persistent" : pbOpt ?? "seed"; // live always opens the one shared store (data/hmem)
       writeFileSync(join(runDir, "case.json"), JSON.stringify(c, null, 2) + "\n");
       const dossier = caseMarkdown(c);
       writeFileSync(join(runDir, "dossier.md"), dossier);
