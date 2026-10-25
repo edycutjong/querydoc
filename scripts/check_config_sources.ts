@@ -6,6 +6,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { roundSig } from "../src/verify/canonical.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const config = JSON.parse(readFileSync(join(ROOT, "querydoc.config.json"), "utf8"));
@@ -87,8 +88,26 @@ const recompute: Record<string, (v: any, cs: Call[]) => [boolean, string]> = {
   },
 };
 
+// floatTolerance comes from the Day-2 live run (scripts/verify_live.ts), recorded in evidence/verify/<run>/results.json.
+function checkFloatTolerance(v: Record<string, any>) {
+  const path = join(ROOT, v.source.file);
+  if (!existsSync(path)) return check("floatTolerance", false, `${v.source.file} missing`);
+  const cal = JSON.parse(readFileSync(path, "utf8"))[v.source.key];
+  const pairs = cal.pairs as { direct: number; preagg: number | null }[];
+  const rel = pairs.map((x) => (x.preagg === null ? Infinity : x.direct === 0 ? Math.abs(x.preagg) : Math.abs(x.direct - x.preagg) / Math.abs(x.direct)));
+  const differ = pairs.filter((x) => x.direct !== x.preagg).length;
+  const rowsEqual = pairs.every((x) => x.preagg !== null && roundSig(x.direct, v.floatSigDigits) === roundSig(x.preagg, v.floatSigDigits));
+  const fpEqual = JSON.stringify(cal.engineFingerprint.direct) === JSON.stringify(cal.engineFingerprint.preagg);
+  const ok = Math.max(...rel) === v.liveMaxRelDiff && differ === v.liveRawBitsDiffer && rowsEqual === v.liveRowsEqual && fpEqual === v.liveEngineFingerprintEqual;
+  check("floatTolerance", ok, `run ${v.source.run}: ${pairs.length} pairs, ${differ} raw-different, max rel ${Math.max(...rel).toExponential(2)}, equal at ${v.floatSigDigits} digits ${rowsEqual}, engine fp equal ${fpEqual}`);
+}
+
 for (const [key, value] of Object.entries(config)) {
   if (key === "policy") continue;
+  if (key === "floatTolerance") {
+    checkFloatTolerance(value as Record<string, any>);
+    continue;
+  }
   const v = value as { source?: { run: string; calls: number[] } };
   if (!v.source) {
     check(key, false, "no source {run, calls}");
