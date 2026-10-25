@@ -1,0 +1,271 @@
+{
+  "run": "2026-10-25T08-42-12Z",
+  "engine": "zetaris (local platform, JDBC sidecar)",
+  "config": {
+    "speedupMin": 1.2,
+    "noGainSpeedup": 1.05,
+    "noiseFloorMs": 1782.9,
+    "minPairs": 3,
+    "maxPairs": 5,
+    "rowCap": 10000,
+    "floatSigDigits": 9,
+    "timingCapMinMs": 150000,
+    "dialect": "hive"
+  },
+  "select1": {
+    "wallMs": [
+      1261.4,
+      52.5,
+      51.5,
+      46.9,
+      52.3,
+      44.9,
+      49.4,
+      52.1,
+      44.3,
+      48.7
+    ],
+    "medianMs": 49.4,
+    "spreadMs": 8.2,
+    "rule": "runs 2–10"
+  },
+  "cases": [
+    {
+      "name": "hero",
+      "precheck": {
+        "ok": true,
+        "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.store_sales ss\nLEFT JOIN TPCDS_DB.promotion p ON ss.ss_promo_sk = p.p_promo_sk\nWHERE  ss.ss_customer_sk IS NULL",
+        "deterministic": true,
+        "rows": 1,
+        "fingerprint": "87cd00c56c06b340c26eb368c7775e833b337c8746e7882df6611ac1ec59b8e4",
+        "fingerprint_kind": "rows",
+        "vacuous": false,
+        "columns": [
+          {
+            "name": "n",
+            "type": "bigint"
+          }
+        ],
+        "spec": {
+          "kind": "multiset",
+          "limit": null
+        },
+        "overCap": false,
+        "transferredRows": 1,
+        "origRunMs": [
+          42545.7,
+          34857.4
+        ],
+        "warnings": [],
+        "firstRows": [
+          [
+            "129752"
+          ]
+        ]
+      },
+      "attempt": {
+        "n": 1,
+        "origin": "candidate_sql",
+        "hypothesis_id": null,
+        "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.store_sales ss\nWHERE  ss.ss_customer_sk IS NULL",
+        "change_summary": "drop the unused LEFT JOIN to promotion (unique key p_promo_sk)",
+        "verdict": "ACCEPT",
+        "rows": {
+          "orig": 1,
+          "rewrite": 1
+        },
+        "fingerprint": {
+          "orig": "87cd00c56c06b340c26eb368c7775e833b337c8746e7882df6611ac1ec59b8e4",
+          "rewrite": "87cd00c56c06b340c26eb368c7775e833b337c8746e7882df6611ac1ec59b8e4"
+        },
+        "fingerprint_kind": "rows",
+        "timing_ms": {
+          "orig": [
+            33358.7,
+            34018.7,
+            40993.3
+          ],
+          "rewrite": [
+            28497.9,
+            16020.6,
+            16557.7
+          ],
+          "median_speedup": 2.12,
+          "median_saving_ms": 17998.1,
+          "faster_pairs": 3,
+          "excluded_pairs": 0,
+          "timed_as": "plain",
+          "noise_floor_ms": 1782.9,
+          "gates_missed": [],
+          "cap_ms": 232209.3
+        }
+      }
+    },
+    {
+      "name": "trap",
+      "precheck": {
+        "ok": true,
+        "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.store_sales ss\nLEFT JOIN TPCDS_DB.promotion p ON ss.ss_item_sk = p.p_item_sk\nWHERE  ss.ss_customer_sk IS NULL",
+        "deterministic": true,
+        "rows": 1,
+        "fingerprint": "e51f9da70057feb68bb05a3c0d55f54623ecb3eba9fd892e2a394818cc29b4fe",
+        "fingerprint_kind": "rows",
+        "vacuous": false,
+        "columns": [
+          {
+            "name": "n",
+            "type": "bigint"
+          }
+        ],
+        "spec": {
+          "kind": "multiset",
+          "limit": null
+        },
+        "overCap": false,
+        "transferredRows": 1,
+        "origRunMs": [
+          37275.7,
+          27382.5
+        ],
+        "warnings": [],
+        "firstRows": [
+          [
+            "129776"
+          ]
+        ]
+      },
+      "attempt": {
+        "n": 1,
+        "origin": "candidate_sql",
+        "hypothesis_id": null,
+        "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.store_sales ss\nWHERE  ss.ss_customer_sk IS NULL",
+        "change_summary": "drop the LEFT JOIN to promotion (key p_item_sk — repeats)",
+        "verdict": "REJECT",
+        "rows": {
+          "orig": 1,
+          "rewrite": 1
+        },
+        "fingerprint": {
+          "orig": "e51f9da70057feb68bb05a3c0d55f54623ecb3eba9fd892e2a394818cc29b4fe",
+          "rewrite": "87cd00c56c06b340c26eb368c7775e833b337c8746e7882df6611ac1ec59b8e4"
+        },
+        "fingerprint_kind": "rows",
+        "reason": "ROW_DIFF",
+        "first_diff": {
+          "side": "rewrite",
+          "row": [
+            "129752"
+          ]
+        },
+        "detail": "rows differ (1 vs 1 rows); first differing row [\"129752\"] returned by the candidate, not by the original"
+      }
+    }
+  ],
+  "calibration": {
+    "directSql": "SELECT ss.ss_store_sk AS store, SUM(ss.ss_net_paid) AS s FROM TPCDS_DB.store_sales ss WHERE ss.ss_customer_sk IS NULL GROUP BY ss.ss_store_sk",
+    "preaggSql": "SELECT store, SUM(s) AS s FROM (SELECT ss.ss_store_sk AS store, ss.ss_sold_date_sk AS d, SUM(ss.ss_net_paid) AS s FROM TPCDS_DB.store_sales ss WHERE ss.ss_customer_sk IS NULL GROUP BY ss.ss_store_sk, ss.ss_sold_date_sk) x GROUP BY store",
+    "columnTypes": [
+      "int",
+      "double"
+    ],
+    "pairs": [
+      {
+        "store": "null",
+        "direct": 56288637.170000285,
+        "preagg": 56288637.17000001
+      },
+      {
+        "store": "1",
+        "direct": 9389638.879999999,
+        "preagg": 9389638.879999992
+      },
+      {
+        "store": "4",
+        "direct": 9078079.009999994,
+        "preagg": 9078079.01000001
+      },
+      {
+        "store": "8",
+        "direct": 9537543.400000008,
+        "preagg": 9537543.399999985
+      },
+      {
+        "store": "7",
+        "direct": 9046857.600000001,
+        "preagg": 9046857.60000001
+      },
+      {
+        "store": "10",
+        "direct": 9527446.120000008,
+        "preagg": 9527446.120000025
+      },
+      {
+        "store": "2",
+        "direct": 9316301.719999986,
+        "preagg": 9316301.719999995
+      }
+    ],
+    "rawBitsDiffer": 7,
+    "maxRelDiff": 4.897462364448648e-15,
+    "floatSigDigits": 9,
+    "rowsEqualAtSigDigits": true,
+    "engineFingerprint": {
+      "direct": [
+        7,
+        "658079644923118509"
+      ],
+      "preagg": [
+        7,
+        "658079644923118509"
+      ],
+      "equal": true
+    },
+    "wallMs": [
+      29437.8,
+      37034.2,
+      26817.4,
+      40392.6
+    ]
+  },
+  "killRule": {
+    "comparableQueries": {
+      "value": 6,
+      "queries": [
+        "hero original",
+        "hero rewrite",
+        "trap original",
+        "trap rewrite",
+        "calibration direct",
+        "calibration pre-aggregated"
+      ],
+      "need": 3,
+      "pass": true
+    },
+    "engineTime": {
+      "heroOriginalMedianMs": 34857.4,
+      "heroOriginalRunsMs": [
+        42545.7,
+        34857.4,
+        33358.7,
+        34018.7,
+        40993.3
+      ],
+      "select1MedianMs": 49.4,
+      "engineMs": 34808,
+      "noiseFloorMs": 1782.9,
+      "need": 10697.4,
+      "pass": true
+    },
+    "select1SpreadRecorded": {
+      "spreadMs": 8.2,
+      "pass": true
+    },
+    "heroLiveVerdict": {
+      "hero": "ACCEPT",
+      "trap": "REJECT",
+      "trapReason": "ROW_DIFF",
+      "pass": true
+    },
+    "outcome": "YES"
+  }
+}
