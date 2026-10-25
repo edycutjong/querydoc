@@ -121,6 +121,7 @@ export class Verifier {
       // Unknown tool limit: COUNT(*) above the transferred rows is treated exactly like reaching the cap.
       const c = await this.exec(`${label} COUNT(*) check`, countStarSql(sql), 1);
       countStar = Number(c.rows[0]?.[0]);
+      if (!Number.isSafeInteger(countStar) || countStar < 0) throw new EngineError(`${label} COUNT(*) check returned ${JSON.stringify(c.rows[0] ?? null)}`);
       if (countStar > res.rows.length) overCap = true;
     }
     return { res, canon: canonRows(res.rows, res.columns, this.cfg.floatSigDigits), overCap, ...(countStar !== undefined ? { countStar } : {}) };
@@ -129,8 +130,11 @@ export class Verifier {
   private async rowHash(label: string, sql: string, columns: Column[]) {
     const r = await this.exec(`${label} row-hash fingerprint`, this.engine.rowHashSql(sql, columns, this.cfg.floatSigDigits), 1);
     const rows = Number(r.rows[0]?.[0]);
-    const sum = String(r.rows[0]?.[1] ?? "null");
-    return { rows, fingerprint: sha256Text(`${rows}|${sum}`), wallMs: r.wallMs };
+    const sum = r.rows[0]?.[1];
+    // An empty or NULL wrapper result (e.g. a DECIMAL overflow) must never yield a fingerprint two different queries can share.
+    if (!Number.isSafeInteger(rows) || rows < 0 || sum === null || sum === undefined || !/^-?\d+$/.test(String(sum)))
+      throw new EngineError(`${label} row-hash fingerprint returned no usable (count, sum): ${JSON.stringify(r.rows[0] ?? null)}`);
+    return { rows, fingerprint: sha256Text(`${rows}|${String(sum)}`), wallMs: r.wallMs };
   }
 
   private critique(target: AgentName, approved: boolean, input: string, output: string, retry = 0) {
@@ -190,6 +194,8 @@ export class Verifier {
     const done = { ...base, rows, fingerprint: fpA, fingerprint_kind: kind, origRunMs };
     if (fpA !== fpB) return stop("NOT_VERIFIABLE", `non-deterministic: two runs of the original differ (${fpA.slice(0, 8)} vs ${fpB.slice(0, 8)})`, done);
 
+    if (spec.kind === "raw" && spec.limit !== null)
+      return stop("NOT_VERIFIABLE", `top-N cut not checkable for ties: ${spec.reason}`, done);
     if (spec.kind === "ordered" && spec.limit !== null) {
       const probe = tieProbeSql(sql, spec.limit);
       if (!probe) return stop("NOT_VERIFIABLE", "top-N tie probe could not be built (LIMIT is not the last clause)", done);
