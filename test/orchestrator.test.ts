@@ -169,6 +169,7 @@ describe("runCase — Diagnoser → Rewriter → Verifier end to end (stub engin
     expect(c.verdict).toBe("ACCEPTED");
     expect(c.attempts[0]).toMatchObject({ origin: "candidate_sql", hypothesis_id: null });
     expect(prompts.filter((p) => p.task === "rewrite")).toHaveLength(0);
+    expect(c.llm).toBe("nim"); // the Diagnoser called the model before the candidate was accepted: never "none"
   });
 
   it("keyless with no cache: the detector still diagnoses, the Rewriter is unavailable → NO_SAFE_REWRITE llm_unavailable", async () => {

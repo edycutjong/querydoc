@@ -48,7 +48,9 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
     started_at: new Date().toISOString(), attempts: [], verdict: "ERROR", playbook_hits: [],
   };
   const finish = (verdict: Case["verdict"], extra: Partial<Case> = {}, chain?: ChainResult["markovian"]): CaseRun => {
-    Object.assign(c, { verdict, finished_at: new Date().toISOString() }, extra);
+    // What actually served this case's model calls (live provider, recorded cache, both, or none) — on every path, including an
+    // accepted own candidate and an upstream error, after the Diagnoser may already have called the model.
+    Object.assign(c, { verdict, finished_at: new Date().toISOString(), llm: deps.llm.servedLabel() }, extra);
     trace.emit({
       agent_name: "Orchestrator", action: "case_verdict", input_summary: `${c.attempts.length} attempt(s)`,
       output_summary: `${verdict}${c.no_rewrite_reason ? ` (${c.no_rewrite_reason})` : ""}${c.detail ? ` — ${c.detail.slice(0, 160)}` : ""}`,
@@ -128,7 +130,6 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
     const chain = await runChain({ sql: input.sql, plan, diagnosis: c.diagnosis, facts, pre, rewriter, diagnoser, verifier, trace, maxAttempts, prior, engine: deps.engine.name, schema: c.schema_fqn ?? "", retrieve, ...(reuse ? { reuse } : {}), onAttempt });
     c.attempts.push(...chain.attempts);
     syncHits();
-    c.llm = deps.llm.servedLabel(); // what actually served this case's model calls: the live provider, the recorded cache, or both
     if (chain.upstreamError) throw new Error(chain.upstreamError);
     return finalise(chain.accepted, chain.attempts, chain, finish);
   } catch (e) {
