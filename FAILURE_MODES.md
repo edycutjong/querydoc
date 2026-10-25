@@ -1,9 +1,18 @@
 # Failure modes
 
 What Query Doctor does when something goes wrong, and where it is still wrong. Every number comes from `evals/results.md`,
-`recorded/live/README.md`, `DEMO.md` or `docs/DX-REPORT.md`; those files are generated or dated and are the evidence.
+`recorded/live/README.md`, `DEMO.md` or `docs/DX-REPORT.md` (and, for single runs, the traces under `recorded/live/` and
+`evidence/video/`); those files are generated or dated and are the evidence.
 
-The design rule: **an error may cost a rewrite, never ship a wrong one.** The Verifier (`src/agents/verifier.ts`) is deterministic
+**Five lessons for other teams**, each detailed below:
+1. A fact in the prompt is not a constraint: the Rewriter was told the join key repeats and still dropped the join (§1).
+2. One timed run proves nothing: the hero's original ran between 24460.9 ms and 37452.7 ms in a single case (§5).
+3. Row hashes disagree where values are equal: `DECIMAL` scale and `-0.0` give false `ROW_DIFF`s on the fingerprint path (§4).
+4. Storage format decides timing: a `COUNT` over CSV read in place took 200 s in an unlogged probe; the hero runs on Parquet (§5).
+5. Check the platform before the plan: the local Zetaris bundle had no MCP endpoint, and the JDBC sidecar needs a JDK, not a JRE (§7, §8).
+
+The design rule: **an error may cost a rewrite; it must not ship one whose rows differ on the tested data** (under the comparison
+rules in §4, e.g. floats to 9 significant digits). The Verifier (`src/agents/verifier.ts`) is deterministic
 code. An ACCEPT needs identical rows, a speedup ≥ 1.2×, a saving above the noise floor and a majority of timed pairs won. Anything
 else is a REJECT, a REFUSED, or NOT_VERIFIABLE.
 
@@ -11,12 +20,12 @@ else is a REJECT, a REFUSED, or NOT_VERIFIABLE.
 
 | Where seen | What happened | What the system did |
 |---|---|---|
-| Live, `hero-trap` (duplicated join key) | all 3 attempts changed the rows (two dropped the join, one swapped it for a LEFT SEMI JOIN) although the prompt carried the measured fact that the key is not unique | `REJECT/ROW_DIFF` ×3, case ends `NO_SAFE_REWRITE`, differing row shown |
+| Live, `hero-trap` (duplicated join key) | the first two attempts changed the rows when executed (one dropped the join, one swapped it for a LEFT SEMI JOIN); the third repeated the first, although the prompt carried the measured fact that the key is not unique | `REJECT/ROW_DIFF` ×2 by execution with the differing row shown, the third refused from the ledger without running (`mem-11`); case ends `NO_SAFE_REWRITE` |
 | Live, `trap-t1` ×2 | LEFT→INNER and similar rewrites | `ROW_DIFF` caught each; no ACCEPT |
 | Sample traps T2 / T3 (15 runs from an empty playbook) | first attempt changed rows in 4/5 (T2) and 5/5 (T3); T1 0/5 | every one refused, none shipped |
-| Baseline arm (one plain model call, same Verifier, DuckDB, N=15) | 6/15 changed rows, 0/15 identical and faster | without a Verifier those 6 would ship |
+| Baseline arm (one plain model call, same Verifier, DuckDB, N=15) | 6/15 changed rows, 0/15 identical and faster | the Verifier caught all 6; a single call has no execution check of its own |
 
-Limit: the retry loop does **not** reliably learn from a refusal. On `hero-trap` all three attempts changed the rows. The ledger reuses refusals only for an identical pattern + schema; it is not a general fix.
+Limit: the retry loop does **not** reliably learn from a refusal. On `hero-trap` both executed attempts changed the rows, and the third repeated the first. The ledger reuses refusals only for an identical pattern + schema; it is not a general fix.
 
 ## 2. The rewrite is correct but not faster (designed for)
 
@@ -27,7 +36,7 @@ is "no safe, faster rewrite found", not a weak ACCEPT.
 
 On the DuckDB sample engine all six recorded examples end `NO_SAFE_REWRITE` or `NOT_VERIFIABLE`: the model avoids the T1 trap, and the
 sample hero (an OR-join) is rewritten into a pre-aggregation that double counts rows where pickup = dropoff and is refused. The
-accepted rewrite with a speedup is **live Zetaris only** (`recorded/live/hero-r1`, `hero-r2`: 2.1× and 2.15×). A hand-written sample
+accepted rewrite with a speedup is **live Zetaris only** (`recorded/live/hero-r1`, `hero-r2`: 2.1× and 2.15×; `correlated-avg-r1`: 1.44× after a `no_gain` revise; the three hero takes filmed for the video: 2.13×, 2.11×, 2.32×, `evidence/video/`). A hand-written sample
 rewrite benchmarks 16.24× faster with identical rows on DuckDB (`DEMO.md`); the Verifier's verdict on it is machine-dependent and not
 recorded, and `output_examples/expected.json` allows `ACCEPTED` for examples 2, 4 and 6.
 
@@ -49,7 +58,7 @@ Known gaps in this family:
 
 ## 5. Timing is noisy
 
-Wall-clock on the local platform is noisy: the original's own five runs span 8.4 s on a ~35 s query, and the `SELECT 1` floor
+Wall-clock on the local platform is noisy: the hero's original ran five times in one case (`recorded/live/hero-r1`) between 24460.9 ms and 37452.7 ms, and the `SELECT 1` floor
 (1.78 s) understates it. The rule needs a majority of alternating pairs to win, not a single run, and the saving must exceed the floor.
 The hero's 2.11× (median of 10 per-pair ratios; p50s 32,442.6 → 16,428 ms) is one laptop over local JDBC; it says nothing about a hosted deployment.
 NY_TAXI (CSV read in place) is far noisier than TPCDS (Parquet): a `COUNT` there took 200 s, so the live hero uses TPCDS (that 200 s figure is from an unlogged earlier probe).
@@ -81,7 +90,7 @@ NY_TAXI (CSV read in place) is far noisier than TPCDS (Parquet): a `COUNT` there
   NVIDIA's endpoint, the declared fallback (`LLM_PROVIDER=nim`). We do not claim a Nemotron-through-Nightshift run.
 - **Zetaris through MCP.** The local platform has no MCP endpoint; we use JDBC, paste-only intake, SQL-aggregate profiles and `EXPLAIN`
   (`docs/DX-REPORT.md`). None of the four documented MCP tools is used.
-- **A designed-by-others query set.** The evals use queries we wrote (hero, trap siblings, controls). N is small (live hero N=2; sample
+- **A designed-by-others query set.** The evals use queries we wrote (hero, trap siblings, controls). N is small (live hero: 2 recorded runs + 3 filmed takes; sample
   traps N=5; baseline N=3 per query) and the shares are not a rate on arbitrary workloads. The baseline arm was not run on Zetaris.
 - **CI.** The workflow exists (`.github/workflows/ci.yml`); GitHub Actions did not run on the private repo (account billing), so its
   steps were replayed locally in a clean clone and in the built image. There is no green hosted run to cite.
