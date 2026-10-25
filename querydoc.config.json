@@ -129,5 +129,18 @@
         19
       ]
     }
+  },
+  "floatTolerance": {
+    "floatSigDigits": 9,
+    "liveMaxRelDiff": 4.897462364448648e-15,
+    "liveRawBitsDiffer": 7,
+    "liveRowsEqual": true,
+    "liveEngineFingerprintEqual": true,
+    "ciTest": "test/duckdb-sum.test.ts",
+    "source": {
+      "run": "2026-10-25T08-13-25Z",
+      "file": "evidence/verify/2026-10-25T08-13-25Z/results.json",
+      "key": "calibration"
+    }
   }
 }
