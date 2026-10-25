@@ -71,7 +71,12 @@ function ensureCompiled(java: string) {
   if (existsSync(cls) && statSync(cls).mtimeMs >= statSync(SIDECAR_SRC).mtimeMs) return;
   const javac = java.endsWith("java") ? `${java}c` : "javac";
   const r = spawnSync(javac, ["-d", SIDECAR_OUT, SIDECAR_SRC], { encoding: "utf8" });
-  if (r.status !== 0) throw new EngineError(`javac failed: ${r.stderr || r.error?.message}`);
+  if (r.status !== 0) {
+    const missing = (r.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT";
+    throw new EngineError(missing
+      ? `live mode needs a JDK on PATH: the JDBC sidecar is compiled with ${javac} on first use (a JRE alone has no javac; built on OpenJDK 17)`
+      : `javac failed: ${r.stderr || r.error?.message}`);
+  }
 }
 
 export class ZetarisEngine implements QueryEngine {
