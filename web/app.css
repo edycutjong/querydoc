@@ -98,11 +98,11 @@ td.wrap{white-space:normal;font-family:var(--font-body)}
 .assay .margin{font:italic 19px/1.3 var(--font-display);color:var(--before);margin-top:8px}
 .assay .margin.ok{color:var(--after)}
 .assay.accepted{border-color:var(--after);box-shadow:0 0 0 1px var(--after) inset}
-.assay .bars{margin:14px 0 4px;display:grid;grid-template-columns:76px 1fr 96px;gap:8px 10px;align-items:center;font:13px var(--font-data)}
-.assay .bar{height:16px;background:var(--before);transform-origin:left;position:relative}
-.assay .bar.after{background:var(--after)}
-.assay .bar.anim{animation:draw .9s cubic-bezier(.2,.7,.2,1) both}
-.assay .bar .h{position:absolute;right:-1.9em;top:-3px;font:600 13px var(--font-data);color:var(--before)}
+:is(.assay,.hero-assay) .bars{margin:14px 0 4px;display:grid;grid-template-columns:76px 1fr 96px;gap:8px 10px;align-items:center;font:13px var(--font-data)}
+:is(.assay,.hero-assay) .bar{height:16px;background:var(--before);transform-origin:left;position:relative}
+:is(.assay,.hero-assay) .bar.after{background:var(--after)}
+:is(.assay,.hero-assay) .bar.anim{animation:draw .9s cubic-bezier(.2,.7,.2,1) both}
+:is(.assay,.hero-assay) .bar .h{position:absolute;right:5px;top:0;line-height:16px;font:600 12px/16px var(--font-data);color:var(--panel)}
 @keyframes draw{from{transform:scaleX(.02)}to{transform:scaleX(1)}}
 .stamp{position:absolute;right:16px;top:10px;transform:rotate(-7deg);border:3px solid var(--after);color:var(--after);font:600 15px var(--font-data);letter-spacing:.07em;padding:4px 10px;background:rgba(251,250,246,.9);text-transform:uppercase}
 .stamp.anim{animation:stamp .5s .6s cubic-bezier(.3,1.6,.5,1) both}
@@ -167,7 +167,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .foot{max-width:1240px;margin:0 auto;padding:18px 24px 40px;border-top:1px solid var(--rule);color:var(--muted);font-size:14px}
 
 @media (prefers-reduced-motion:reduce){
-  .assay .bar.anim,.stamp.anim,.status .dots::after{animation:none}
+  :is(.assay,.hero-assay) .bar.anim,.stamp.anim,.status .dots::after{animation:none}
   *{transition:none!important}
 }
 @media (max-width:700px){
