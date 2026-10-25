@@ -35,7 +35,7 @@ export interface Precheck {
   warnings: string[];
 }
 
-export type ReuseLookup = (candidateSql: string) => { id: string; rows: { orig: number; rewrite: number } | null; first_diff: { side: "orig" | "rewrite"; row: unknown[]; order?: true } | null; text: string } | null;
+export type ReuseLookup = (candidateSql: string) => { id: string; rows: { orig: number; rewrite: number } | null; first_diff: { side: "orig" | "rewrite"; row: unknown[]; order?: true } | null; reason?: string | null; text: string } | null;
 
 export interface AttemptInput {
   n: number;
@@ -242,7 +242,9 @@ export class Verifier {
 
     // Ledger reuse (architecture §Verifier order step 1): a refusal recorded on this original, this candidate and this original-result
     // fingerprint is repeated without executing the candidate. Only refusals are ever reused.
-    const hit = opts.reuse?.(sql);
+    // Only a recorded row difference is repeated as one: a recorded GUARD refusal that today's guard and lint pass is re-checked.
+    const found = opts.reuse?.(sql);
+    const hit = found && (found.reason ?? "ROW_DIFF") === "ROW_DIFF" ? found : null;
     if (hit) {
       const fd = hit.first_diff ?? undefined;
       return finish({

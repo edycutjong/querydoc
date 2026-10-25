@@ -186,6 +186,20 @@ describe("Verifier — timing table end to end (stub engine)", () => {
 });
 
 describe("Verifier — hardening", () => {
+  it("only a recorded row difference is reused from the ledger; a recorded GUARD refusal is re-checked and the candidate runs", async () => {
+    const { v, engine } = setup({
+      "SELECT k FROM t": { columns: K, rows: range(5), wallMs: 1000 },
+      "SELECT k FROM t WHERE k >= 0": { columns: K, rows: range(5), wallMs: 500 },
+    });
+    const pre = await v.precheck("SELECT k FROM t");
+    const guardHit = () => ({ id: "m1", rows: null, first_diff: null, reason: "GUARD", text: "refused by an older guard" });
+    const a = await v.verify(attempt("SELECT k FROM t WHERE k >= 0"), pre, { reuse: guardHit });
+    expect(a.reused_from).toBeUndefined();
+    expect(a.verdict).toBe("ACCEPT");
+    expect(engine.calls).toContain("SELECT k FROM t WHERE k >= 0");
+    const rowHit = () => ({ id: "m2", rows: { orig: 5, rewrite: 4 }, first_diff: null, reason: "ROW_DIFF", text: "rows differ" });
+    expect((await v.verify(attempt("SELECT k FROM t WHERE k >= 0"), pre, { reuse: rowHit })).reused_from).toBe("m2");
+  });
   it("an ordered original refuses a candidate that has no top-level ORDER BY, even if it returned the same sequence once", async () => {
     const { v, engine } = setup({ "SELECT k FROM t ORDER BY k": { columns: K, rows: range(5), wallMs: 1000 } });
     const pre = await v.precheck("SELECT k FROM t ORDER BY k");
