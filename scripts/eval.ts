@@ -145,7 +145,7 @@ function write() {
     "**What this is and is not:** the queries are ones we designed (the hero, its trap siblings, two controls). A set of queries *not* designed by us was cut from",
     "the build (autopilot §Cuts), so these shares say nothing about a general rate on arbitrary workloads. N is small (shown beside every share).",
     "",
-    "Definitions. *Changed rows* = the Verifier found a row difference (the rewrite would have shipped a wrong result). *Identical and faster* = the Verifier ACCEPTed",
+    "Definitions. *Changed rows* = the Verifier found a row difference (a wrong result that only execution exposed). *Identical and faster* = the Verifier ACCEPTed",
     "(same rows, ≥ 1.2× median, saving above the noise floor, a majority of pairs won). Both arms are scored by the same Verifier on the same engine.",
     "",
   ];
@@ -187,14 +187,14 @@ function write() {
   }
 
   // Head to head on the trap queries
-  L.push("## Head to head on the same designed queries", "");
+  L.push("## Side by side on the same trap queries (different run counts, not head-to-head)", "");
   const trapRuns = Object.values(sample.traps).flat();
   const trapFirstBad = trapRuns.filter((r) => r.first_attempt === "REJECT/ROW_DIFF").length;
   L.push(`Query Doctor's first rewrite on the sample traps changed rows in ${pctOf(trapFirstBad, trapRuns.length)} of runs — every one of those was refused by the Verifier and none shipped.`);
   const bd = combined.duckdb?.b.filter((r) => ["T1", "T2", "T3"].includes(r.query));
   if (bd?.length) {
     const ch = bd.filter((r) => r.outcome === "rows_changed").length;
-    L.push(`The baseline's one rewrite on the same traps changed rows in ${pctOf(ch, bd.length)} of runs; with no Verifier, those would have shipped.`);
+    L.push(`The baseline's one rewrite on the same traps changed rows in ${pctOf(ch, bd.length)} of runs; a single call has no execution check of its own, so nothing in that arm would have caught them.`);
   } else L.push("Baseline on the sample traps: not run yet.");
   L.push("");
   writeFileSync(join(ROOT, "evals", "results.md"), L.join("\n"));
