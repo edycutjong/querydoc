@@ -8,6 +8,7 @@ const fmtMs = (ms) => (ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.roun
 const median = (xs) => { const s = [...xs].sort((a, b) => a - b), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const short = (h, n = 8) => (h ? String(h).slice(0, n) : "—");
 const num = (n) => Number(n).toLocaleString("en-US");
+const diffWhere = (fd) => (fd.order ? "same rows, different order" : `${fd.side} only`); // = firstDiffWhere in src/verify/diff.ts
 const api = async (path, init) => {
   const r = await fetch(path, init);
   let j = null;
@@ -160,7 +161,7 @@ function verdictWord(v) {
 
 const reasonText = (a) => {
   if (a.reused_from) return `refusal reused from ledger ${a.reused_from} — same original-result fingerprint; not re-run`;
-  if (a.reason === "ROW_DIFF") return `rows differ: ${num(a.rows.orig)} vs ${num(a.rows.rewrite)}${a.first_diff ? ` — first differing row ${JSON.stringify(a.first_diff.row)} (${a.first_diff.side} only)` : ""}`;
+  if (a.reason === "ROW_DIFF") return `rows differ: ${num(a.rows.orig)} vs ${num(a.rows.rewrite)}${a.first_diff ? ` — first differing row ${JSON.stringify(a.first_diff.row)} (${diffWhere(a.first_diff)})` : ""}`;
   if (a.reason === "NOT_FASTER") {
     const t = a.timing_ms;
     return `rows identical, but not faster by the gate${t ? ` (${t.median_speedup}× median, saving ${fmtMs(t.median_saving_ms)}; missed: ${t.gates_missed.join(", ") || "see timing"})` : ""}`;
@@ -231,7 +232,7 @@ function renderCase(c, o) {
     const candAttempt = c.attempts.find((a) => a.origin === "candidate_sql");
     if (candAttempt) {
       const a = candAttempt;
-      const rowsLine = a.reason === "ROW_DIFF" ? `differ${a.first_diff ? ` (first differing row ${JSON.stringify(a.first_diff.row)}, ${a.first_diff.side} only)` : ""}` : a.reason === "GUARD" || a.reason === "ERROR" ? "not checked — the candidate failed before a comparison" : "identical";
+      const rowsLine = a.reason === "ROW_DIFF" ? `differ${a.first_diff ? ` (first differing row ${JSON.stringify(a.first_diff.row)}, ${diffWhere(a.first_diff)})` : ""}` : a.reason === "GUARD" || a.reason === "ERROR" ? "not checked — the candidate failed before a comparison" : "identical";
       const speedLine = a.verdict === "ACCEPT" ? `faster (median ${a.timing_ms?.median_speedup}×, saving ${fmtMs(a.timing_ms?.median_saving_ms ?? 0)})` : a.reason === "NOT_FASTER" ? `not faster (gate missed: ${a.timing_ms?.gates_missed.join(", ") || "see timing"})` : "not measured — refused before timing";
       h.push(`<div class="facts" aria-label="Your rewrite"><b>Rows</b><span>${esc(rowsLine)}</span><b>Speed</b><span>${esc(speedLine)}</span>${a.reason === "NOT_FASTER" && a.not_faster_detail ? `<b>Heading</b><span>Safe, not faster by the gate</span>` : ""}</div>`);
     }

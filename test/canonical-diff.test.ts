@@ -89,6 +89,19 @@ describe("row diff and fingerprint — ordered", () => {
     expect(rowsFingerprint(asc, spec)).not.toBe(rowsFingerprint(desc, spec));
     expect(diffRows(desc, asc, spec).equal).toBe(false);
   });
+  it("the first difference names a row that really is on one side only, or says only the order differs", () => {
+    const orig = canon([[3, "x"], [2, "a"], [1, "z"]]);
+    // same rows, other order: no row is missing from either side
+    expect(diffRows(orig, canon([[1, "z"], [2, "a"], [3, "x"]]), spec).firstDiff).toEqual({ side: "orig", row: orig[0], order: true });
+    // [2,"a"] → [2,"b"]: position 1 differs, and [2,"a"] really is missing from the rewrite (not [3,"x"], which both have)
+    const changed = diffRows(orig, canon([[3, "x"], [2, "b"], [1, "z"]]), spec).firstDiff!;
+    expect(changed.order).toBeUndefined();
+    expect(changed.row).toEqual(canon([[2, "b"]])[0]);
+    expect(changed.side).toBe("rewrite");
+    // an extra row at the top shifts every position; the named row is the extra one
+    const extra = diffRows(orig, canon([[4, "n"], [3, "x"], [2, "a"], [1, "z"]]), spec).firstDiff!;
+    expect(extra).toEqual({ side: "rewrite", row: canon([[4, "n"]])[0] });
+  });
   it("a non-selected or expression key falls back to raw order, which still sees a changed order", () => {
     const raw = orderSpec("SELECT v FROM t ORDER BY created_at DESC", ["v"]);
     expect(raw.kind).toBe("raw");

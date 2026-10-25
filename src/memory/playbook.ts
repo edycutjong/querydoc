@@ -5,6 +5,7 @@ import type { MemoryRecord } from "../../vendor/meterless/hmem/src/index.ts";
 import type { Attempt } from "../agents/verifier.js";
 import { canonicalSql } from "../sql/text.js";
 import { sha256Text } from "../verify/canonical.js";
+import { firstDiffWhere } from "../verify/diff.js";
 
 // The playbook: a thin layer over the vendored Meterless H-MEM (store + append-only trust ledger). The Verifier's outcomes are
 // written as measured facts; before every Rewriter call the entries for the same pattern and schema are retrieved and put in its
@@ -103,7 +104,7 @@ export class Playbook {
       construct = outcome === "no_gain" ? "rows identical but no time saved" : "rows identical but below the speed gate";
     } else return null;
     const head = `${ctx.pattern}: ${construct} (${att.reason}${att.not_faster_detail ? `/${att.not_faster_detail}` : ""}). ${att.change_summary}`.slice(0, 400);
-    const diff = att.first_diff ? ` First differing row (${att.first_diff.side} only): ${JSON.stringify(att.first_diff.row)}.` : "";
+    const diff = att.first_diff ? ` First differing row (${firstDiffWhere(att.first_diff)}): ${JSON.stringify(att.first_diff.row)}.` : "";
     const counts = ` Rows original ${att.rows.orig}, rewrite ${att.rows.rewrite}.`;
     const suffix = JSON.stringify({ rows: att.rows, first_diff: att.first_diff ?? null, reason: att.reason, detail: att.detail ?? null });
     return this.hmem.add({
@@ -144,7 +145,7 @@ export class Playbook {
 
   // Ledger reuse: a recorded refusal for the same canonical original and candidate, on the same original-result fingerprint.
   // Only refusals — never an ACCEPT, never a no_gain.
-  findRefusal(origSql: string, candSql: string, origFp: string): { id: string; rows: Attempt["rows"] | null; first_diff: { side: "orig" | "rewrite"; row: unknown[] } | null; reason: string | null; text: string } | null {
+  findRefusal(origSql: string, candSql: string, origFp: string): { id: string; rows: Attempt["rows"] | null; first_diff: { side: "orig" | "rewrite"; row: unknown[]; order?: true } | null; reason: string | null; text: string } | null {
     const o = `orig_sha:${sqlSha(origSql)}`;
     const c = `cand_sha:${sqlSha(candSql)}`;
     const fp = `orig_fp:${origFp.slice(0, 16)}`;

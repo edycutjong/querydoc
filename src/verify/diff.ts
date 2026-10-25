@@ -26,10 +26,19 @@ export function normaliseRows(rows: CanonRow[], spec: OrderSpec): CanonRow[] {
 
 export const rowsFingerprint = (rows: CanonRow[], spec: OrderSpec): string => sha256Rows(normaliseRows(rows, spec));
 
+export interface FirstDiff {
+  side: "orig" | "rewrite";
+  row: CanonRow;
+  order?: true; // both results hold the same rows; only their order differs (row = the original's first out-of-place row)
+}
+
 export interface RowDiff {
   equal: boolean;
-  firstDiff?: { side: "orig" | "rewrite"; row: CanonRow };
+  firstDiff?: FirstDiff;
 }
+
+// How a first difference is worded everywhere it is shown (dossier, trace, playbook, carryover): "<side> only", or the order case.
+export const firstDiffWhere = (fd: { side: string; order?: boolean }): string => (fd.order ? "same rows, different order" : `${fd.side} only`);
 
 export function diffRows(orig: CanonRow[], rewrite: CanonRow[], spec: OrderSpec): RowDiff {
   if (spec.kind === "multiset") {
@@ -54,7 +63,11 @@ export function diffRows(orig: CanonRow[], rewrite: CanonRow[], spec: OrderSpec)
     const x = a[i];
     const y = b[i];
     if (x && y && compareCanonRows(x, y) === 0) continue;
-    return x ? { equal: false, firstDiff: { side: "orig", row: x } } : { equal: false, firstDiff: { side: "rewrite", row: y! } };
+    // A positional mismatch does not say which side lacks a row: name a row that really is on one side only (multiset diff), and
+    // if every row is on both sides, say that only the order differs.
+    const asBags = diffRows(orig, rewrite, { kind: "multiset", limit: null });
+    if (!asBags.equal) return asBags;
+    return { equal: false, firstDiff: { side: "orig", row: (x ?? y)!, order: true } };
   }
   return { equal: true };
 }

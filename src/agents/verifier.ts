@@ -35,7 +35,7 @@ export interface Precheck {
   warnings: string[];
 }
 
-export type ReuseLookup = (candidateSql: string) => { id: string; rows: { orig: number; rewrite: number } | null; first_diff: { side: "orig" | "rewrite"; row: unknown[] } | null; text: string } | null;
+export type ReuseLookup = (candidateSql: string) => { id: string; rows: { orig: number; rewrite: number } | null; first_diff: { side: "orig" | "rewrite"; row: unknown[]; order?: true } | null; text: string } | null;
 
 export interface AttemptInput {
   n: number;
@@ -50,7 +50,7 @@ export interface Attempt extends AttemptInput {
   reason?: "ROW_DIFF" | "NOT_FASTER" | "GUARD" | "ERROR";
   not_faster_detail?: "no_gain" | "under_gate";
   detail?: string;
-  first_diff?: { side: "orig" | "rewrite"; row: unknown[] };
+  first_diff?: { side: "orig" | "rewrite"; row: unknown[]; order?: true };
   rows: { orig: number; rewrite: number };
   fingerprint: { orig: string; rewrite: string | null };
   fingerprint_kind?: "rows" | "engine";
@@ -262,6 +262,10 @@ export class Verifier {
       att.fingerprint_kind = "rows";
       if (!d.equal) {
         const fd = d.firstDiff!;
+        if (fd.order) {
+          return finish({ ...att, reason: "ROW_DIFF", first_diff: fd,
+            detail: `same ${att.rows.orig} rows in a different order (the original's ORDER BY is part of its result); first out-of-place row ${JSON.stringify(fd.row)}` });
+        }
         const where = fd.side === "rewrite" ? "returned by the candidate, not by the original" : "returned by the original, missing from the candidate";
         return finish({ ...att, reason: "ROW_DIFF", first_diff: fd,
           detail: `rows differ (${att.rows.orig} vs ${att.rows.rewrite} rows); first differing row ${JSON.stringify(fd.row)} ${where}` });

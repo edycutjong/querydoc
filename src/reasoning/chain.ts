@@ -8,6 +8,7 @@ import type { KeyFact } from "../agents/profile.js";
 import type { Plan } from "../engine/types.js";
 import type { Trace } from "../trace.js";
 import { sha256Text } from "../verify/canonical.js";
+import { firstDiffWhere } from "../verify/diff.js";
 import type { Diagnosis, Hypothesis } from "../types.js";
 
 // One Markovian chunk = one rewrite attempt (Rewriter call + Verifier call). The carryover the next chunk's Rewriter sees is a
@@ -75,7 +76,7 @@ export function carryoverBlock(ledger: Hypothesis[], rejected: Attempt[]): strin
   let context = "no attempt yet";
   if (last) {
     // one line: the engine reads CARRYOVER STATE only up to the first blank line, and a newline could fake a COMPLETED:/REMAINING: field
-    const why = neutralise(`${last.detail ?? last.reason}${last.first_diff ? ` — first differing row (${last.first_diff.side} only): ${JSON.stringify(last.first_diff.row)}` : ""}`).replace(/\s+/g, " ");
+    const why = neutralise(`${last.detail ?? last.reason}${last.first_diff ? ` — first differing row (${firstDiffWhere(last.first_diff)}): ${JSON.stringify(last.first_diff.row)}` : ""}`).replace(/\s+/g, " ");
     const sql = neutralise(last.sql.replace(/\s+/g, " "));
     context = cap(`${cap(why, 220)} — rejected SQL: ${sql}`);
   }
