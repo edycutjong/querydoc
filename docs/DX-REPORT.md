@@ -90,6 +90,16 @@ for the hero, pair and trap executions; the adapter's default is 120 s, so live 
 
 ## 2026-10-25 — Day 2: the Verifier on the instance (`scripts/verify_live.ts`, run `2026-10-25T08-13-25Z`)
 
+- **Re-run on the fixed Verifier (run `2026-10-25T08-42-12Z`, the current evidence).** After the first review round (count/hash
+  results validated, backtick-quoted file reads refused, top-N rules, kill-rule inputs tightened) the same two cases ran again.
+  Hero: pre-check 42.5 s and 34.9 s, same fingerprint; three pairs, original **33.4 / 34.0 / 41.0 s** vs candidate
+  **28.5 / 16.0 / 16.6 s** → **ACCEPT**, median speedup **2.12×**, median saving **18.0 s**, 3 of 3 pairs faster, timing cap
+  232.2 s. Trap: candidate returned 129,752 where the original returns **129,776** → **REJECT (ROW_DIFF)**, not timed.
+  `SELECT 1` median 49.4 ms, spread 8.2 ms over runs 2–10. Kill rule: **YES** (6 comparable queries; engine time
+  34,808 ms ≥ 10,697.4 ms). trace.jsonl: 16 Verifier events, 4 of them critiques. The two runs differ (1.72× vs 2.12×) because
+  a ~35 s query on this platform moves by several seconds from run to run, which is why the gate needs a majority of pairs
+  and not a single ratio. The bullets below are the first run.
+
 - **First live verdicts.** Hero, pre-check: two runs of the original, 36.7 s and 25.2 s, same fingerprint, 1 row. Candidate
   (the hand-written join elimination, `evals/queries/zetaris/01-hero-rewrite.sql`): same row, then three alternating pairs,
   original **28.8 / 29.3 / 35.3 s** vs candidate **17.5 / 17.1 / 16.0 s** → **ACCEPT**, median speedup **1.72×**, median
