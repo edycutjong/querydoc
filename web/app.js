@@ -27,7 +27,7 @@ async function loadHealth() {
   $("#badges").innerHTML =
     `<span class="badge ${live ? "live" : ""}" title="${live ? "queries run on the Zetaris platform" : "queries run on DuckDB over committed public sample data"}">${live ? "LIVE · Zetaris" : "SAMPLE · DuckDB (public sample data)"}</span>` +
     (state.health.llm_cache ? `<span class="badge" title="model responses may be replayed from llm-cache/">llm-cache</span>` : "") +
-    (state.health.nim?.configured ? "" : `<span class="badge" title="no NVIDIA_API_KEY: cached model responses only">no model key</span>`);
+    (state.health.llm?.configured ? "" : `<span class="badge" title="no Nightshift runtime token: cached model responses only">no model key</span>`);
   const b = $("#banner");
   if (state.health.banner) { b.hidden = false; b.textContent = state.health.banner; } else b.hidden = true;
 }
@@ -341,7 +341,7 @@ function wireDecision(c, o) {
 }
 
 // --- Trace rail --------------------------------------------------------------------------------------------------------------
-const SRC = { zetaris: "zetaris-live", duckdb: "duckdb-sample", nim: "nim-live", "llm-cache": "llm-cache", hmem: "hmem", markovian: "markovian" };
+const SRC = { zetaris: "zetaris-live", duckdb: "duckdb-sample", nightshift: "nightshift-live", nim: "nim-live", "llm-cache": "llm-cache", hmem: "hmem", markovian: "markovian" };
 function paintRail(events, recorded) {
   const rows = events.map((e) => {
     const sc = e.sponsor_call;

@@ -12,7 +12,15 @@ export interface TraceEvent {
   input_summary: string;
   output_summary: string;
   target_agent: AgentName | null;
-  sponsor_call?: { service: "zetaris" | "duckdb" | "nim" | "llm-cache" | "hmem" | "markovian"; name: string; latency_ms: number };
+  sponsor_call?: {
+    service: "zetaris" | "duckdb" | "nightshift" | "nim" | "llm-cache" | "hmem" | "markovian";
+    name: string;
+    latency_ms: number;
+    // live model calls only: which model handled the request (the response's `model`), beside the route we asked for
+    provider?: "nightshift" | "nim";
+    requested_model?: string;
+    handled_model?: string | null;
+  };
   retry_count: number;
   status: string;
 }

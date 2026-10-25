@@ -3,8 +3,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "../config.js";
 
-// NVIDIA NIM chat completions for Nemotron 3 Ultra (OpenAI-compatible, integrate.api.nvidia.com), plus the keyless `llm-cache`.
-// The key comes from NVIDIA_API_KEY in the process environment (src/env.ts loads ~/.config/querydoc/nvidia.env); it is never
+// The LLM gateway (live provider call or the keyless `llm-cache`) and the DECLARED FALLBACK provider: direct NVIDIA NIM chat
+// completions for Nemotron 3 Ultra (integrate.api.nvidia.com), used only when LLM_PROVIDER=nim. The primary provider is Meterless
+// Nightshift (nightshift.ts). The NIM key comes from NVIDIA_API_KEY in the process environment (src/env.ts loads ~/.config/querydoc/nvidia.env); it is never
 // logged or written. `reasoning_content` is kept out of the JSON parse: only `content` is parsed, the reasoning is returned
 // separately for the trace. Nothing here produces a verdict or a number.
 
@@ -22,32 +23,53 @@ export interface ChatRequest {
   timeoutMs?: number;
 }
 
+export type LlmProvider = "nightshift" | "nim";
+
 export interface ChatResult {
   content: string;
   reasoning: string;
   latencyMs: number;
   completionTokens: number | null;
   finishReason: string;
+  provider: LlmProvider;
+  requestedModel: string; // the model id we asked for
+  handledModel: string | null; // the `model` the response reports: which model actually handled the request (null = not reported)
+}
+
+// What the gateway needs from a live model provider. Nightshift (src/adapters/nightshift.ts) is the primary one; NimClient below
+// is the declared fallback (LLM_PROVIDER=nim).
+export interface LlmClient {
+  readonly provider: LlmProvider;
+  readonly model: string;
+  chat(req: ChatRequest): Promise<ChatResult>;
 }
 
 // Raised when no key is available and the cache has no entry. Never answered with a canned reply.
 export class SampleModeNoLLM extends Error {
   constructor(readonly task: string) {
-    super(`needs NVIDIA_API_KEY, or pass candidate_sql (llm-cache miss for ${task})`);
+    super(`needs a live model (Meterless Nightshift: METERLESS_RUNTIME_TOKEN), or pass candidate_sql (llm-cache miss for ${task})`);
     this.name = "SampleModeNoLLM";
   }
 }
 
-export class NimError extends Error {
+export class LlmError extends Error {
   constructor(message: string, readonly status: number | null = null, readonly timedOut = false) {
     super(message);
+    this.name = "LlmError";
+  }
+}
+
+export class NimError extends LlmError {
+  constructor(message: string, status: number | null = null, timedOut = false) {
+    super(message, status, timedOut);
     this.name = "NimError";
   }
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export class NimClient {
+export class NimClient implements LlmClient {
+  readonly provider = "nim" as const;
   constructor(
     private readonly apiKey: string,
     private readonly opts: { baseUrl?: string; model?: string; fetchFn?: typeof fetch; retries?: number; backoffMs?: number } = {},
@@ -95,6 +117,7 @@ export class NimClient {
         const data = (await res.json()) as {
           choices?: { message?: { content?: string | null; reasoning_content?: string | null }; finish_reason?: string }[];
           usage?: { completion_tokens?: number };
+          model?: string;
         };
         const choice = data.choices?.[0];
         if (!choice?.message) throw new NimError("NIM: response has no choices[0].message");
@@ -104,6 +127,9 @@ export class NimClient {
           latencyMs: performance.now() - t0,
           completionTokens: data.usage?.completion_tokens ?? null,
           finishReason: choice.finish_reason ?? "unknown",
+          provider: "nim",
+          requestedModel: this.model,
+          handledModel: data.model ?? null,
         };
       } catch (e) {
         if (e instanceof NimError && e.status !== null && e.status < 500 && e.status !== 429) throw e;
@@ -163,13 +189,22 @@ export function hasCandidateOrigin(keyFields: Record<string, unknown>): boolean 
 
 export interface LlmOutcome {
   value: unknown; // the parsed JSON object
-  source: "nim" | "llm-cache";
+  source: "live" | "llm-cache";
   latencyMs: number;
   reasoningChars: number;
+  provider: LlmProvider | null; // live calls only
+  requestedModel: string | null;
+  handledModel: string | null; // the model the response reports (null = cache hit or not reported)
+}
+
+// The trace's sponsor_call for one gateway outcome: live calls name the provider and the model that handled the request; cache hits say llm-cache.
+export function llmSponsorCall(r: Omit<LlmOutcome, "value">, latencyMs: number) {
+  if (r.source === "llm-cache" || !r.provider) return { service: "llm-cache" as const, name: "chat_completions", latency_ms: Math.round(latencyMs) };
+  return { service: r.provider, name: "chat_completions", latency_ms: Math.round(latencyMs), provider: r.provider, requested_model: r.requestedModel ?? "", handled_model: r.handledModel };
 }
 
 export interface GatewayOptions {
-  client?: NimClient | null; // null = keyless
+  client?: LlmClient | null; // null = keyless
   cacheDir?: string;
   cacheWrite?: boolean; // record.ts turns this on; trap N-repeat runs and A/B arms keep it off
 }
@@ -184,6 +219,10 @@ export class LlmGateway {
     return !!this.o.client;
   }
 
+  get provider(): LlmProvider | null {
+    return this.o.client?.provider ?? null;
+  }
+
   // Run one structured call. `parse` validates (zod); a validation failure is retried once with the error appended (the model
   // sees what was wrong), then rethrown. Keyless: cache lookup, else SampleModeNoLLM.
   async call<T>(task: string, keyFields: Record<string, unknown>, req: ChatRequest, parse: (raw: unknown) => T): Promise<{ out: T } & Omit<LlmOutcome, "value">> {
@@ -192,7 +231,7 @@ export class LlmGateway {
     const client = this.o.client;
     if (!client) {
       if (!existsSync(file)) throw new SampleModeNoLLM(task);
-      return { out: parse(JSON.parse(readFileSync(file, "utf8")).value), source: "llm-cache", latencyMs: 0, reasoningChars: 0 };
+      return { out: parse(JSON.parse(readFileSync(file, "utf8")).value), source: "llm-cache", latencyMs: 0, reasoningChars: 0, provider: null, requestedModel: null, handledModel: null };
     }
     let user = req.user;
     let reasoning = req.reasoning;
@@ -202,8 +241,8 @@ export class LlmGateway {
       try {
         r = await client.chat({ ...req, user, reasoning, timeoutMs: reasoning === "on" ? (req.timeoutMs ?? 90_000) : Math.min(req.timeoutMs ?? 90_000, 60_000) });
       } catch (e) {
-        if (e instanceof NimError && e.timedOut) dumpCall(task, req, reasoning, user, null);
-        if (!(e instanceof NimError && e.timedOut) || tryN > 0 || reasoning === "off") throw e; // already off: nothing cheaper to try
+        if (e instanceof LlmError && e.timedOut) dumpCall(task, req, reasoning, user, null);
+        if (!(e instanceof LlmError && e.timedOut) || tryN > 0 || reasoning === "off") throw e; // already off: nothing cheaper to try
         lastErr = e.message;
         reasoning = "off"; // the reasoning call ran past its budget; answer directly
         continue;
@@ -216,16 +255,16 @@ export class LlmGateway {
         const out = parse(raw);
         if (this.o.cacheWrite && !hasCandidateOrigin(keyFields)) {
           mkdirSync(this.dir, { recursive: true });
-          writeFileSync(file, JSON.stringify({ task, model: client.model, key_fields: keyFields, value: raw }, null, 2) + "\n");
+          writeFileSync(file, JSON.stringify({ task, provider: r.provider, model: r.handledModel ?? r.requestedModel, key_fields: keyFields, value: raw }, null, 2) + "\n");
         }
-        return { out, source: "nim", latencyMs: r.latencyMs, reasoningChars: r.reasoning.length };
+        return { out, source: "live", latencyMs: r.latencyMs, reasoningChars: r.reasoning.length, provider: r.provider, requestedModel: r.requestedModel, handledModel: r.handledModel };
       } catch (e) {
         lastErr = (e as Error).message.slice(0, 400);
         user = `${req.user}\n\nYour previous reply was rejected: ${lastErr}\nReply again with ONLY the JSON object, exactly in the requested shape. Be brief.`;
         if (r.finishReason === "length") reasoning = "off"; // the retry answers directly so it fits
       }
     }
-    throw new NimError(`${task}: no valid reply after 2 calls (${lastErr})`);
+    throw new LlmError(`${task}: no valid reply after 2 calls (${lastErr})`);
   }
 }
 

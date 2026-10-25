@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LlmGateway, NIM_MODEL, SampleModeNoLLM } from "../adapters/nim.js";
+import { LlmGateway, NIM_MODEL, SampleModeNoLLM, llmSponsorCall } from "../adapters/nim.js";
 import type { Plan } from "../engine/types.js";
 import { schemaFqn } from "../memory/playbook.js";
 import { canonicalSql } from "../sql/text.js";
@@ -40,9 +40,9 @@ export const ReviseReply = z.discriminatedUnion("action", [
   z.object({ action: z.literal("withdraw"), reason: z.string().min(3).max(300) }),
 ]);
 export type ReviseOutcome =
-  | { action: "next"; hypothesis_id: string; source: "nim" | "llm-cache" }
-  | { action: "new"; plan_node_id: string; claim: string; source: "nim" | "llm-cache" }
-  | { action: "withdraw"; reason: string; source: "nim" | "llm-cache" };
+  | { action: "next"; hypothesis_id: string; source: "live" | "llm-cache" }
+  | { action: "new"; plan_node_id: string; claim: string; source: "live" | "llm-cache" }
+  | { action: "withdraw"; reason: string; source: "live" | "llm-cache" };
 
 export const planExcerpt = (plan: Plan | null, max = 5000): string => (plan ? plan.text.slice(0, max) : "(no plan available)");
 
@@ -104,7 +104,7 @@ export class Diagnoser {
         (raw) => Reply.parse(raw),
       );
       diagnosis.bottleneck = r.out.bottleneck;
-      diagnosis.narrative = r.source === "nim" ? "llm" : "llm-cache";
+      diagnosis.narrative = r.source === "live" ? "llm" : "llm-cache";
       let n = diagnosis.hypotheses.length;
       for (const h of r.out.hypotheses) {
         if (!allNodes.has(h.plan_node_id)) {
@@ -116,14 +116,14 @@ export class Diagnoser {
       this.trace.emit({
         agent_name: "Diagnoser", action: "analyse_plan", input_summary: `plan ${plan?.nodes.length ?? 0} nodes + detector ${d.label}`,
         output_summary: `${r.out.hypotheses.length} LLM hypothesis(es), ${diagnosis.raw_refs.length} dropped; ranked: ${diagnosis.hypotheses.map((h) => h.id).join(" > ")}`,
-        target_agent: "Rewriter", sponsor_call: { service: r.source === "nim" ? "nim" : "llm-cache", name: "chat_completions", latency_ms: Math.round(r.latencyMs) },
+        target_agent: "Rewriter", sponsor_call: llmSponsorCall(r, r.latencyMs),
         retry_count: 0, status: "ok",
       });
     } catch (e) {
-      const reason = e instanceof SampleModeNoLLM ? "no key and no cache entry — narrative omitted, detector hypothesis kept" : (e as Error).message.slice(0, 250);
+      const reason = e instanceof SampleModeNoLLM ? "no live model and no cache entry — narrative omitted, detector hypothesis kept" : (e as Error).message.slice(0, 250);
       this.trace.emit({
         agent_name: "Diagnoser", action: "analyse_plan", input_summary: "LLM narrative", output_summary: reason, target_agent: "Rewriter",
-        sponsor_call: { service: "nim", name: "chat_completions", latency_ms: Math.round(performance.now() - t0) }, retry_count: 0,
+        sponsor_call: { service: this.llm.provider ?? "llm-cache", name: "chat_completions", latency_ms: Math.round(performance.now() - t0) }, retry_count: 0,
         status: e instanceof SampleModeNoLLM ? "skipped" : "error",
       });
     }
@@ -131,7 +131,7 @@ export class Diagnoser {
   }
 
   // Called by the chain after NOT_FASTER(no_gain), with the ledger already updated (current → falsified). Throws SampleModeNoLLM
-  // when there is no key and no cache entry; an answer that cites an unknown id or plan node is returned as a withdrawal.
+  // when there is no live model and no cache entry; an answer that cites an unknown id or plan node is returned as a withdrawal.
   async revise(a: { schema?: string; sql: string; plan: Plan | null; diagnosis: Diagnosis; attempt: Attempt; carryoverKey: string; attemptNo: number }): Promise<ReviseOutcome> {
     const untested = a.diagnosis.hypotheses.filter((h) => h.status === "untested" || h.status === "unproven");
     const nodes = new Set([...a.diagnosis.plan_nodes.map((n) => n.id), ...(a.plan?.nodes.map((n) => String(n.id)) ?? [])]);
@@ -163,7 +163,7 @@ export class Diagnoser {
       agent_name: "Diagnoser", action: "revise", input_summary: `ledger after ${a.attempt.hypothesis_id ?? "candidate"} falsified; ${untested.length} untested`,
       output_summary: out.action === "next" ? `try ${out.hypothesis_id}` : out.action === "new" ? `new hypothesis on node ${out.plan_node_id}: ${out.claim.slice(0, 100)}` : `withdraw: ${out.reason}`,
       target_agent: out.action === "withdraw" ? "Orchestrator" : "Rewriter",
-      sponsor_call: { service: r.source === "nim" ? "nim" : "llm-cache", name: "chat_completions", latency_ms: Math.round(performance.now() - t0) }, retry_count: a.attemptNo - 1, status: "ok",
+      sponsor_call: llmSponsorCall(r, performance.now() - t0), retry_count: a.attemptNo - 1, status: "ok",
     });
     return out;
   }

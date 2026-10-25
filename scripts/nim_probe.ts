@@ -5,7 +5,8 @@
 //   npx tsx scripts/nim_probe.ts
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { LlmGateway, nimClientFromEnv } from "../src/adapters/nim.js";
+import { LlmGateway } from "../src/adapters/nim.js";
+import { nimClientFromEnv } from "../src/adapters/nim.js";
 import { Diagnoser } from "../src/agents/diagnoser.js";
 import { detectPatterns } from "../src/agents/patterns.js";
 import { Rewriter } from "../src/agents/rewriter.js";

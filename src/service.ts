@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { LlmGateway, nimClientFromEnv } from "./adapters/nim.js";
+import { llmClientFromEnv } from "./adapters/llm.js";
+import { LlmGateway } from "./adapters/nim.js";
 import { loadConfig, ROOT, type VerifierConfig } from "./config.js";
 import { DuckDbEngine } from "./engine/duckdb.js";
 import type { QueryEngine } from "./engine/types.js";
@@ -59,7 +60,7 @@ export class QueryDocService {
   constructor(private readonly o: ServiceOptions = {}) {
     this.root = o.root ?? ROOT;
     this.env = o.env ?? process.env;
-    this.llm = o.llm ?? new LlmGateway({ client: nimClientFromEnv(this.env), ...(o.cacheWrite ? { cacheWrite: true } : {}), cacheDir: join(this.root, "llm-cache") });
+    this.llm = o.llm ?? new LlmGateway({ client: llmClientFromEnv(this.env), ...(o.cacheWrite ? { cacheWrite: true } : {}), cacheDir: join(this.root, "llm-cache") });
   }
 
   private p = (...parts: string[]) => join(this.root, ...parts);
@@ -157,7 +158,7 @@ export class QueryDocService {
           status, run_id: runId, ...(runId !== requested && typeof b.run_id === "string" ? { requested_run_id: requested } : {}),
           engine: c.engine, llm: c.llm, ...(mode.banner ? { banner: mode.banner } : {}),
           verdict: c.verdict, ...(c.no_rewrite_reason ? { no_rewrite_reason: c.no_rewrite_reason, llm_unavailable: c.no_rewrite_reason === "llm_unavailable" } : {}),
-          ...(partial ? { error: { type: "SampleModeNoLLM", message: "needs NVIDIA_API_KEY for rewrites, or pass candidate_sql" } } : {}),
+          ...(partial ? { error: { type: "SampleModeNoLLM", message: "needs a live model through Meterless Nightshift (METERLESS_RUNTIME_TOKEN) for rewrites, or pass candidate_sql" } } : {}),
           ...(status === "error" ? { error: { type: "UpstreamError", message: c.detail ?? "engine error" } } : {}),
           output: { dossier, case: c }, agents, trace_id: runId, log_file: join("data", "runs", runId, `trace-${runId}.jsonl`),
           execution_time_seconds: Math.round(((performance.now() - t0) / 1000) * 10) / 10,
@@ -295,7 +296,7 @@ export class QueryDocService {
     } catch (e) {
       engine = { name: mode.engine, ok: false, error: (e as Error).message.slice(0, 200) };
     }
-    return { status: 200, json: { status: engine.ok ? "ok" : "degraded", engine, ...(mode.banner ? { banner: mode.banner } : {}), nim: { configured: this.llm.live, model: "nvidia/nemotron-3-ultra-550b-a55b" }, llm_cache: existsSync(this.p("llm-cache")), calibration: this.calibration(), playbook_seed: existsSync(this.p("fixtures", "hmem-seed", "sample", "state.json")) } };
+    return { status: 200, json: { status: engine.ok ? "ok" : "degraded", engine, ...(mode.banner ? { banner: mode.banner } : {}), llm: { provider: this.llm.provider ?? "none", configured: this.llm.live, route: "app → Meterless Nightshift → NVIDIA Nemotron" }, llm_cache: existsSync(this.p("llm-cache")), calibration: this.calibration(), playbook_seed: existsSync(this.p("fixtures", "hmem-seed", "sample", "state.json")) } };
   }
 }
 

@@ -2,6 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { NightshiftClient } from "../src/adapters/nightshift.js";
 import { LlmGateway, NimClient } from "../src/adapters/nim.js";
 import type { VerifierConfig } from "../src/config.js";
 import { runCase } from "../src/orchestrator.js";
@@ -40,7 +41,7 @@ const queries: Record<string, StubQuery> = {
 };
 
 // A scripted "model": the n-th Rewriter call returns the n-th SQL; Diagnoser returns two hypotheses, one citing a node that does not exist.
-function fakeLlm(rewrites: string[], revise?: (user: string) => unknown) {
+function fakeLlm(rewrites: string[], revise?: (user: string) => unknown, provider: "nim" | "nightshift" = "nim") {
   const prompts: { task: string; user: string }[] = [];
   let r = 0;
   const fetchFn = (async (_u: unknown, init: RequestInit) => {
@@ -55,13 +56,23 @@ function fakeLlm(rewrites: string[], revise?: (user: string) => unknown) {
       : isRewrite
       ? JSON.stringify({ hypothesis_id: /TARGET HYPOTHESIS (h\d+)/.exec(user)![1], sql: rewrites[Math.min(r++, rewrites.length - 1)], change_summary: "drop the unused join", risk_notes: "" })
       : JSON.stringify({ bottleneck: "The LEFT JOIN to d is never read.", hypotheses: [{ plan_node_id: "99", claim: "hallucinated node citation that must be dropped" }, { plan_node_id: "2", claim: "The broadcast join at node 2 is the cost." }, { plan_node_id: "1", claim: "The scan at node 1 reads too much." }] });
-    return new Response(JSON.stringify({ choices: [{ message: { content, reasoning_content: "…" }, finish_reason: "stop" }] }), { status: 200 });
+    return new Response(JSON.stringify({ model: "nvidia/nemotron-3-ultra-550b-a55b", choices: [{ message: { content, reasoning_content: "…" }, finish_reason: "stop" }] }), { status: 200 });
   }) as typeof fetch;
-  return { prompts, fetchFn, llm: new LlmGateway({ client: new NimClient("k", { fetchFn }), cacheDir: mkdtempSync(join(tmpdir(), "qd-")) }) };
+  return { prompts, fetchFn, llm: new LlmGateway({ client: provider === "nightshift" ? new NightshiftClient("tok", { fetchFn, model: "meterless/deep" }) : new NimClient("k", { fetchFn }), cacheDir: mkdtempSync(join(tmpdir(), "qd-")) }) };
 }
 const deps = (llm: LlmGateway) => ({ engine: new PlanEngine(queries), cfg, llm, attemptCap: 3, logDir: mkdtempSync(join(tmpdir(), "qd-log-")) });
 
 describe("runCase — Diagnoser → Rewriter → Verifier end to end (stub engine, scripted model)", () => {
+  it("through Nightshift: the case says nightshift and every model call in the trace names the provider, the requested route and the handling model", async () => {
+    const { llm } = fakeLlm([RIGHT], undefined, "nightshift");
+    const { case: c, trace } = await runCase({ sql: ORIG }, deps(llm), { runId: "t-ns" });
+    expect(c.verdict).toBe("ACCEPTED");
+    expect(c.llm).toBe("nightshift");
+    const calls = trace.events.filter((e) => e.sponsor_call && e.sponsor_call.service !== "zetaris" && e.sponsor_call.name === "chat_completions");
+    expect(calls.map((e) => e.agent_name)).toEqual(["Diagnoser", "Rewriter"]);
+    for (const e of calls) expect(e.sponsor_call).toMatchObject({ service: "nightshift", provider: "nightshift", requested_model: "meterless/deep", handled_model: "nvidia/nemotron-3-ultra-550b-a55b" });
+  });
+
   it("retries after a ROW_DIFF with the rejection in the carryover and ends ACCEPTED", async () => {
     const { llm, prompts } = fakeLlm([WRONG, RIGHT]);
     const { case: c, trace, chain } = await runCase({ sql: ORIG }, deps(llm), { runId: "t1" });

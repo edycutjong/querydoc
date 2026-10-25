@@ -173,7 +173,7 @@ describe("decision, playbook, runs, slow queries", () => {
     const h = (await svc.health()).json as any;
     expect(h.status).toBe("ok");
     expect(h.engine.name).toBe("duckdb");
-    expect(h.nim.configured).toBe(false);
+    expect(h.llm).toMatchObject({ provider: "none", configured: false });
   });
 });
 

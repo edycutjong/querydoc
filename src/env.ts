@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 // Credentials live outside the repo (~/.config/querydoc/*.env by default, or QUERYDOC_ENV_DIR). They are loaded into this
 // process's environment at run time and never written anywhere. Variables already set in the shell win.
-export function loadQuerydocEnv(files = ["zetaris.env", "nvidia.env"]): string[] {
+export function loadQuerydocEnv(files = ["zetaris.env", "nightshift.env", "nvidia.env"]): string[] {
   const dir = process.env.QUERYDOC_ENV_DIR ?? join(homedir(), ".config", "querydoc");
   const loaded: string[] = [];
   for (const f of files) {

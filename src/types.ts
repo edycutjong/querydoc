@@ -51,7 +51,7 @@ export interface Case {
   source: string;
   schema_fqn?: string;
   engine: "zetaris" | "duckdb";
-  llm: "nim" | "cache" | "none";
+  llm: "nightshift" | "nim" | "cache" | "none"; // the live provider that served this case, or its cache
   started_at: string;
   finished_at?: string;
   precheck?: { deterministic: boolean; rows: number; fingerprint: string; fingerprint_kind: "rows" | "engine"; vacuous: boolean; columns: Column[] };

@@ -1,5 +1,5 @@
 // npm run record -- [--sample] [--live] [--traps N] [--fresh]
-// Re-records the evidence in one command (architecture §scripts/record.ts). Needs NVIDIA_API_KEY (~/.config/querydoc/nvidia.env).
+// Re-records the evidence in one command (architecture §scripts/record.ts). Needs a live model through Meterless Nightshift (METERLESS_RUNTIME_TOKEN, ~/.config/querydoc/nightshift.env).
 //  --sample : the canonical pass over input_examples/example_2,4,6 (plain SQL: the ONLY runs that write llm-cache/), example_1/3 (a supplied
 //             candidate) with cache writes off (candidate-origin rule, also enforced inside the gateway), the ledger-reuse seed, N repeats of each trap (03/04/05, cache writes off), then a
 //             keyless replay of all six examples written to output_examples/ with the allowed-verdict sets.
@@ -8,7 +8,8 @@
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { LlmGateway, nimClientFromEnv } from "../src/adapters/nim.js";
+import { llmClientFromEnv } from "../src/adapters/llm.js";
+import { LlmGateway } from "../src/adapters/nim.js";
 import { DIAGNOSER_SYSTEM, REVISE_SYSTEM } from "../src/agents/diagnoser.js";
 import { REWRITER_SYSTEM } from "../src/agents/rewriter.js";
 import { ROOT } from "../src/config.js";
@@ -26,9 +27,9 @@ const N = Number(opt("traps", "5"));
 const LIVE_N = Number(opt("live-n", "2"));
 
 loadQuerydocEnv();
-const client = nimClientFromEnv();
+const client = llmClientFromEnv();
 if (!client) {
-  console.error("record: NVIDIA_API_KEY is not set (~/.config/querydoc/nvidia.env) — the canonical pass needs the live model");
+  console.error("record: no live model — set METERLESS_RUNTIME_TOKEN (~/.config/querydoc/nightshift.env) and run Meterless Nightshift; the canonical pass goes through it (LLM_PROVIDER=nim is the declared fallback)");
   process.exit(2);
 }
 const sha = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 16);
@@ -50,7 +51,7 @@ const summary = (c: Case) => ({
 });
 
 const manifest: Record<string, unknown> = {
-  recorded_at: new Date().toISOString(), model: client.model,
+  recorded_at: new Date().toISOString(), provider: client.provider, requested_model: client.model,
   prompt_hashes: { rewriter: sha(REWRITER_SYSTEM), diagnoser: sha(DIAGNOSER_SYSTEM), revise: sha(REVISE_SYSTEM) },
   sample_data_sha: { trips: sha(readFileSync(join(ROOT, "data/sample/trips.parquet")).toString("base64")), zones: sha(readFileSync(join(ROOT, "data/sample/zones.parquet")).toString("base64")) },
 };
@@ -163,7 +164,7 @@ async function livePack() {
       console.log(`${id}: ${c.verdict} — ${summary(c).route}`);
     }
   }
-  writeFileSync(join(dest, "MANIFEST.json"), JSON.stringify({ recorded_at: new Date().toISOString(), model: client!.model, runs: out }, null, 2) + "\n");
+  writeFileSync(join(dest, "MANIFEST.json"), JSON.stringify({ recorded_at: new Date().toISOString(), provider: client!.provider, requested_model: client!.model, runs: out }, null, 2) + "\n");
   await svc.close();
 }
 

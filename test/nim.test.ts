@@ -64,7 +64,7 @@ describe("llm-cache + LlmGateway", () => {
     const client = new NimClient("k", { fetchFn: (async () => reply('{"x":5}')) as typeof fetch });
     const live = new LlmGateway({ client, cacheDir: dir, cacheWrite: true });
     const a = await live.call("task", { sql: "select 1" }, REQ, (r) => Ok.parse(r));
-    expect(a).toMatchObject({ out: { x: 5 }, source: "nim" });
+    expect(a).toMatchObject({ out: { x: 5 }, source: "live", provider: "nim" });
     expect(readdirSync(dir)).toHaveLength(1);
     const keyless = new LlmGateway({ client: null, cacheDir: dir });
     expect(await keyless.call("task", { sql: "select 1" }, REQ, (r) => Ok.parse(r))).toMatchObject({ out: { x: 5 }, source: "llm-cache", latencyMs: 0 });

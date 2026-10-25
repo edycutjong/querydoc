@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LlmGateway, NIM_MODEL } from "../adapters/nim.js";
+import { LlmGateway, NIM_MODEL, llmSponsorCall } from "../adapters/nim.js";
 import type { Plan } from "../engine/types.js";
 import type { Trace } from "../trace.js";
 import type { Diagnosis, Hypothesis } from "../types.js";
@@ -74,7 +74,7 @@ export class Rewriter {
     this.trace.emit({
       agent_name: "Rewriter", action: c.attemptNo > 1 ? "retry" : "rewrite", input_summary: `hypothesis ${c.hypothesis.id}: ${c.hypothesis.claim.slice(0, 90)}`,
       output_summary: `${r.out.change_summary.slice(0, 140)} | sql ${r.out.sql.replace(/\s+/g, " ").slice(0, 100)}`, target_agent: "Verifier",
-      sponsor_call: { service: r.source === "nim" ? "nim" : "llm-cache", name: "chat_completions", latency_ms: Math.round(performance.now() - t0) },
+      sponsor_call: llmSponsorCall(r, performance.now() - t0),
       retry_count: c.attemptNo - 1, status: "ok",
     });
     return r.out;
