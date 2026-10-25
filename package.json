@@ -12,7 +12,8 @@
     "build:sidecar": "javac -d engine/zetaris-jdbc/out engine/zetaris-jdbc/QuerySidecar.java",
     "spike": "tsx scripts/spike_zetaris.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:config": "tsx scripts/check_config_sources.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
