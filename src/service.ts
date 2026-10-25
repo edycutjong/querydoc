@@ -207,7 +207,15 @@ export class QueryDocService {
   }
 
   // --- POST /runs/:id/decision ----------------------------------------------------------------------------------------------
-  decide(id: string, body: unknown): Reply {
+  // Queued with the runs: H-MEM rewrites its whole state.json from memory on every write, so a decision written while a live run
+  // holds the same store open would be overwritten by that run's next write (and both would draw ids from the same counter).
+  decide(id: string, body: unknown): Promise<Reply> {
+    const job = this.queue.then(() => this.decideNow(id, body));
+    this.queue = job.catch(() => undefined);
+    return job;
+  }
+
+  private decideNow(id: string, body: unknown): Reply {
     if (!RUN_ID_RE.test(id)) return fail(new ApiError(400, "InvalidInput", "bad run id"));
     const f = this.p("data", "runs", id, "case.json");
     if (!existsSync(f)) return fail(new ApiError(404, "NotFound", `no run ${id}`));

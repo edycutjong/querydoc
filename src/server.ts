@@ -77,7 +77,7 @@ export function createApp(svc: QueryDocService, serveStatic?: (url: URL, res: Se
       if (m === "GET" && (m2 = path.match(/^\/runs\/([^/]+)\/trace$/))) return send(res, svc.runTrace(m2[1]!));
       if (m === "POST" && (m2 = path.match(/^\/runs\/([^/]+)\/decision$/))) {
         const b = await readBody(req);
-        return send(res, b.ok ? svc.decide(m2[1]!, b.json) : b.reply);
+        return send(res, b.ok ? await svc.decide(m2[1]!, b.json) : b.reply);
       }
       if (m === "GET" && path === "/slow-queries") return send(res, svc.slowQueries(svc.resolveMode(undefined).engine === "duckdb" ? "sample" : "live"));
       if (m === "GET" && path === "/playbook") return send(res, svc.playbook(url.searchParams.get("run_id"), url.searchParams.get("schema")));

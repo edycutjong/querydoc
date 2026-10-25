@@ -48,6 +48,28 @@ describe("GET /health during a run", () => {
     expect(probes).toBe(1);
   });
 
+  it("a decision waits for a running case (one H-MEM writer at a time)", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const gated = new Proxy(engine, {
+      get(t, k, r) {
+        if (k === "run") return async (...a: Parameters<QueryEngine["run"]>) => { await gate; return t.run(...a); };
+        const v = Reflect.get(t, k, r);
+        return typeof v === "function" ? v.bind(t) : v;
+      },
+    }) as unknown as QueryEngine;
+    const svc = new QueryDocService({ root, env: { SAMPLE_MODE: "true" }, llm: llm(), engineFactory: async () => gated });
+    const order: string[] = [];
+    const running = svc.run({ input: { sql: "SELECT COUNT(*) FROM lake.trips", candidate_sql: "SELECT COUNT(1) FROM lake.trips" } }).then(() => order.push("run"));
+    const deciding = svc.decide("no-such-run", { decision: "approve", actor: "edy" }).then((r) => (order.push("decide"), r));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(order).toEqual([]);
+    release();
+    await Promise.all([running, deciding]);
+    expect(order).toEqual(["run", "decide"]);
+    expect(((await deciding) as { status: number }).status).toBe(404);
+  });
+
   it("close() does not throw when an engine open is still pending and then fails", async () => {
     const svc = new QueryDocService({ root, env: { SAMPLE_MODE: "true" }, llm: llm(), engineFactory: () => new Promise((_, no) => setTimeout(() => no(new Error("no engine")), 50)) });
     const h = svc.health(); // starts opening the engine

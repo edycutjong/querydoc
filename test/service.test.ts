@@ -142,22 +142,22 @@ describe("decision, playbook, runs, slow queries", () => {
     const r = await run(body);
     expect(r.json.output.case.attempts.every((a: any) => a.reason !== "ROW_DIFF")).toBe(true); // rows identical; the speed gate depends on the machine
     if (r.json.verdict !== "ACCEPTED") return;
-    const d = svc.decide("svc-hero", { decision: "approve", actor: "edy" }) as { status: number; json: any };
+    const d = (await svc.decide("svc-hero", { decision: "approve", actor: "edy" })) as { status: number; json: any };
     expect(d.status).toBe(200);
     expect(d.json.ledger_entries).toBeGreaterThanOrEqual(2); // create + feedback
     expect(existsSync(join(root, "data", "patches", "svc-hero.sql"))).toBe(true);
     expect(readFileSync(join(root, "data", "patches", "svc-hero.md"), "utf8")).toContain("approved by edy");
     const entries = (svc.playbook("svc-hero", null).json as any).entries;
     expect(entries.some((e: any) => e.tags.includes("outcome:verified") && e.source === "human:edy")).toBe(true);
-    expect((svc.decide("svc-hero", { decision: "reject", actor: "edy" }) as any).status).toBe(409);
+    expect((await svc.decide("svc-hero", { decision: "reject", actor: "edy" }) as any).status).toBe(409);
     expect((svc.getRun("svc-hero").json as any).case.decision.decision).toBe("approve");
   });
 
   it("only an accepted run can be decided on; bad actor/decision and unknown ids are structured errors", async () => {
-    expect((svc.decide("svc-first", { decision: "approve", actor: "edy" }) as any).status).toBe(409);
-    expect((svc.decide("svc-first", { decision: "maybe", actor: "edy" }) as any).status).toBe(400);
-    expect((svc.decide("svc-first", { decision: "approve" }) as any).status).toBe(400);
-    expect((svc.decide("nope", { decision: "approve", actor: "edy" }) as any).status).toBe(404);
+    expect((await svc.decide("svc-first", { decision: "approve", actor: "edy" }) as any).status).toBe(409);
+    expect((await svc.decide("svc-first", { decision: "maybe", actor: "edy" }) as any).status).toBe(400);
+    expect((await svc.decide("svc-first", { decision: "approve" }) as any).status).toBe(400);
+    expect((await svc.decide("nope", { decision: "approve", actor: "edy" }) as any).status).toBe(404);
     expect((svc.getRun("..%2f") as any).status).toBe(400);
   });
 
