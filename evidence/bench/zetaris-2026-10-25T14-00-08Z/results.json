@@ -1,0 +1,50 @@
+{
+  "engine": "zetaris",
+  "recorded_at": "2026-10-25T14:00:08.793Z",
+  "pairs": 10,
+  "identical_rows": {
+    "original_rows": 1,
+    "rewrite_rows": 1
+  },
+  "method": "wall clock in the calling process; alternating order (original first on even pairs); nearest-rank percentiles",
+  "rewrite_source": "recorded/live/hero-r1/case.json (the Rewriter's accepted attempt)",
+  "original_ms": [
+    31493.9,
+    26960.9,
+    40841.1,
+    46950.8,
+    24300,
+    32442.6,
+    34455.7,
+    33705.2,
+    30111.9,
+    35016.1
+  ],
+  "rewrite_ms": [
+    12727.2,
+    12167.7,
+    11614,
+    21100.8,
+    16659.8,
+    16436.8,
+    16534.7,
+    16428,
+    20930,
+    16360.2
+  ],
+  "original": {
+    "p50": 32442.6,
+    "p95": 46950.8,
+    "median": 33073.9
+  },
+  "rewrite": {
+    "p50": 16428,
+    "p95": 21100.8,
+    "median": 16432.4
+  },
+  "speedup": {
+    "median_of_pair_ratios": 2.11,
+    "p50_over_p50": 1.97,
+    "pairs_faster": 10
+  }
+}

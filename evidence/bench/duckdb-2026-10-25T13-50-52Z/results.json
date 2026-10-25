@@ -1,0 +1,70 @@
+{
+  "engine": "duckdb",
+  "recorded_at": "2026-10-25T13:50:52.783Z",
+  "pairs": 20,
+  "identical_rows": {
+    "original_rows": 8,
+    "rewrite_rows": 8
+  },
+  "method": "wall clock in the calling process; alternating order (original first on even pairs); nearest-rank percentiles",
+  "rewrite_source": "evals/queries/sample/01-hero.rewrite.sql (hand-written, committed)",
+  "original_ms": [
+    108.6,
+    100,
+    91.4,
+    118.7,
+    105.9,
+    88.4,
+    100.1,
+    89.7,
+    96.5,
+    109.9,
+    95.4,
+    78.4,
+    74.3,
+    79.6,
+    80,
+    80.2,
+    103.7,
+    78.4,
+    76.8,
+    84
+  ],
+  "rewrite_ms": [
+    5.8,
+    6.4,
+    5.3,
+    5.8,
+    6.2,
+    7.9,
+    6.2,
+    5.2,
+    5.5,
+    5.2,
+    4.7,
+    4.9,
+    5.1,
+    5.2,
+    4.9,
+    5.7,
+    4.8,
+    5,
+    5.4,
+    5.2
+  ],
+  "original": {
+    "p50": 89.7,
+    "p95": 109.9,
+    "median": 90.6
+  },
+  "rewrite": {
+    "p50": 5.2,
+    "p95": 6.4,
+    "median": 5.3
+  },
+  "speedup": {
+    "median_of_pair_ratios": 16.24,
+    "p50_over_p50": 17.25,
+    "pairs_faster": 20
+  }
+}
