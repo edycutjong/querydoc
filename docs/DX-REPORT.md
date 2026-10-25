@@ -100,7 +100,7 @@ for the hero, pair and trap executions; the adapter's default is 120 s, so live 
   that floor is Day 1's, 3 × its 594.3 ms spread, kept because it is the more conservative one). trace.jsonl: 16 Verifier
   events, 4 of them critiques. The two runs differ (1.72× vs 2.12×) and pair 1 here was only 1.17× (33.4 s vs 28.5 s): a ~35 s
   query on this platform moves by several seconds from run to run, which is why ACCEPT needs the median ratio, the saving
-  floor and a majority of faster pairs together, never one pair's ratio. Pair exclusion (cache hits) is not wired on this
+  floor and a majority of an odd number (≥ 3) of valid pairs together, never one pair's ratio. Pair exclusion (cache hits) is not wired on this
   path: the JDBC driver reports no cache-hit flag, so no pair is excluded. The bullets below are the first run.
 
 - **First live verdicts.** Hero, pre-check: two runs of the original, 36.7 s and 25.2 s, same fingerprint, 1 row. Candidate
