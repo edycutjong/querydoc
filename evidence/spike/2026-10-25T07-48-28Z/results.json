@@ -1,0 +1,17 @@
+{
+  "run": "2026-10-25T07-48-28Z",
+  "tables": {
+    "count": 39,
+    "file": "docs/zetaris-tables.json"
+  },
+  "xsource": {
+    "sql": "SELECT COUNT(*) AS n FROM TPCDS_DB.warehouse w CROSS JOIN (SELECT * FROM NY_TAXI.customers LIMIT 5) t",
+    "ok": true,
+    "n": 25,
+    "wallMs": 17574.6,
+    "calls": [
+      66,
+      67
+    ]
+  }
+}

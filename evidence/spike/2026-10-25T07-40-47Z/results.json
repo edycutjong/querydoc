@@ -1,0 +1,152 @@
+{
+  "run": "2026-10-25T07-40-47Z",
+  "explain": {
+    "plainCall": 1,
+    "formattedCall": 2,
+    "formattedWallMs": 10985.2,
+    "nodeCount": 12,
+    "nodes": [
+      "(12) AdaptiveSparkPlan",
+      "(11)   HashAggregate",
+      "(10)     Exchange",
+      "(9)       HashAggregate",
+      "(8)         Project",
+      "(7)           BroadcastHashJoin",
+      "(3)             Project",
+      "(2)               Filter",
+      "(1)                 Scan",
+      "(6)             BroadcastExchange",
+      "(5)               Filter",
+      "(4)                 Scan"
+    ],
+    "joinKept": true,
+    "explainSlowQuery": {
+      "call": 3,
+      "wallMs": 3664.1,
+      "ok": true
+    }
+  },
+  "noise": {
+    "select1Ms": [
+      168.2,
+      651.2,
+      89.4,
+      66.2,
+      57,
+      56.9,
+      61,
+      65.9,
+      69.6,
+      73.2
+    ],
+    "discardedFirstMs": 168.2,
+    "select1MedianMs": 66.2,
+    "select1SpreadMs": 594.3,
+    "noiseFloorMs": 1782.9,
+    "calls": [
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ]
+  },
+  "hero": {
+    "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.store_sales ss\nLEFT JOIN TPCDS_DB.promotion p ON ss.ss_promo_sk = p.p_promo_sk\nWHERE  ss.ss_customer_sk IS NULL",
+    "rewrite": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.store_sales ss\nWHERE  ss.ss_customer_sk IS NULL",
+    "planCall": 14,
+    "planNodes": [
+      "(12) AdaptiveSparkPlan Output [1]: [n#28908L]; Arguments: isFinalPlan=false",
+      "(11)   HashAggregate Input [1]: [count#28959L]; Keys: []; Functions [1]: [count(1)]; Aggregate Attributes [1]: [count(1)#28955L]; Results [1]",
+      "(10)     Exchange Input [1]: [count#28959L]; Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=723]",
+      "(9)       HashAggregate Input: []; Keys: []; Functions [1]: [partial_count(1)]; Aggregate Attributes [1]: [count#28958L]; Results [1]: [count#28",
+      "(8)         Project Output: []; Input [2]: [ss_promo_sk#28921, p_promo_sk#28936]",
+      "(7)           BroadcastHashJoin LeftOuter BuildRight; Left keys [1]: [ss_promo_sk#28921]; Right keys [1]: [p_promo_sk#28936]; Join type: LeftOuter; Join",
+      "(3)             Project Output [1]: [ss_promo_sk#28921]; Input [2]: [ss_customer_sk#28916, ss_promo_sk#28921]",
+      "(2)               Filter Input [2]: [ss_customer_sk#28916, ss_promo_sk#28921]; Condition : isnull(ss_customer_sk#28916)",
+      "(1)                 Scan parquet TPCDS_DB.store_sales; Output [2]: [ss_customer_sk#28916, ss_promo_sk#28921]; Batched: true; Location: InMemoryFi",
+      "(6)             BroadcastExchange Input [1]: [p_promo_sk#28936]; Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false),",
+      "(5)               Filter Input [1]: [p_promo_sk#28936]; Condition : isnotnull(p_promo_sk#28936)",
+      "(4)                 Scan parquet TPCDS_DB.promotion; Output [1]: [p_promo_sk#28936]; Batched: true; Location: InMemoryFileIndex [s3a://zetaris-pu"
+    ],
+    "joinKeptByEngine": true,
+    "runsMs": [
+      33476.3,
+      34153.4,
+      41883,
+      36755.8,
+      35712.2
+    ],
+    "runCalls": [
+      15,
+      16,
+      17,
+      18,
+      19
+    ],
+    "count": 129752,
+    "medianMs": 35712.2,
+    "warmMedianMs": 36234,
+    "coldWarmGap": false,
+    "medianMinusSelect1Ms": 35646,
+    "pairs": [
+      {
+        "orig": 33840.1,
+        "rewrite": 17872.9,
+        "origN": 129752,
+        "rewriteN": 129752,
+        "calls": [
+          20,
+          21
+        ]
+      },
+      {
+        "orig": 38288.5,
+        "rewrite": 22247.1,
+        "origN": 129752,
+        "rewriteN": 129752,
+        "calls": [
+          22,
+          23
+        ]
+      },
+      {
+        "orig": 36014.8,
+        "rewrite": 19027.5,
+        "origN": 129752,
+        "rewriteN": 129752,
+        "calls": [
+          24,
+          25
+        ]
+      }
+    ],
+    "pairsOrigMedianMs": 36014.8,
+    "pairsRewriteMedianMs": 19027.5,
+    "pairsSpeedup": 1.893,
+    "rowsEqualInPairs": true,
+    "trap": {
+      "sql": "SELECT COUNT(1) AS n\nFROM   TPCDS_DB.store_sales ss\nLEFT JOIN TPCDS_DB.promotion p ON ss.ss_item_sk = p.p_item_sk\nWHERE  ss.ss_customer_sk IS NULL",
+      "original": 129776,
+      "rewrite": 129752,
+      "rowsDiffer": true,
+      "calls": [
+        26,
+        27
+      ]
+    },
+    "promotionKeys": {
+      "row": [
+        300,
+        300,
+        291
+      ],
+      "call": 28
+    }
+  }
+}

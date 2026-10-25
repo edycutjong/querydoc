@@ -1,0 +1,127 @@
+{
+  "policy": {
+    "note": "Design thresholds (specs: architecture §Verifier order), not measurements. Measured values below carry a source {run, calls} in evidence/spike/<run>/calls.jsonl.",
+    "speedupMin": 1.2,
+    "savingMinMs": 50,
+    "timedPairs": 3,
+    "attemptCap": 3,
+    "rowCap": 10000,
+    "noiseFloorMinMs": 50
+  },
+  "rowCap": {
+    "engineCapObserved": false,
+    "largestDrainedRows": 200000,
+    "engineTruncationFlag": false,
+    "source": {
+      "run": "2026-10-25T07-39-14Z",
+      "calls": [
+        2
+      ]
+    }
+  },
+  "fingerprint": {
+    "hashFn": "xxhash64",
+    "available": [
+      "xxhash64",
+      "hash",
+      "md5",
+      "sha2",
+      "crc32"
+    ],
+    "sumAs": "DECIMAL(38,0)",
+    "deterministic": true,
+    "discriminates": true,
+    "source": {
+      "run": "2026-10-25T07-39-14Z",
+      "calls": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    }
+  },
+  "numeric": {
+    "tpcdsMoneyType": "double",
+    "aggregateTypes": {
+      "n": "bigint",
+      "s": "double",
+      "a": "double"
+    },
+    "source": {
+      "run": "2026-10-25T07-52-47Z",
+      "calls": [
+        1,
+        2
+      ]
+    }
+  },
+  "sqlParserDialect": {
+    "value": "hive",
+    "parsesAll": [
+      "hive",
+      "bigquery"
+    ],
+    "source": {
+      "run": "2026-10-25T07-39-14Z",
+      "calls": [
+        13
+      ]
+    }
+  },
+  "llm": {
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "listed": true,
+    "chatStatus": 200,
+    "source": {
+      "run": "2026-10-25T07-39-14Z",
+      "calls": [
+        14,
+        15
+      ]
+    }
+  },
+  "noise": {
+    "select1MedianMs": 66.2,
+    "select1SpreadMs": 594.3,
+    "noiseFloorMs": 1782.9,
+    "rule": "max(50 ms, 3 × spread of SELECT 1 runs 2–10)",
+    "source": {
+      "run": "2026-10-25T07-40-47Z",
+      "calls": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ]
+    }
+  },
+  "hero": {
+    "query": "evals/queries/zetaris/01-hero.sql",
+    "medianMs": 35712.2,
+    "warmMedianMs": 36234,
+    "coldWarmGap": false,
+    "warmupPair": false,
+    "medianMinusSelect1Ms": 35646,
+    "source": {
+      "run": "2026-10-25T07-40-47Z",
+      "calls": [
+        15,
+        16,
+        17,
+        18,
+        19
+      ]
+    }
+  }
+}

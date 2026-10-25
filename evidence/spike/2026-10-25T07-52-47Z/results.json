@@ -1,0 +1,42 @@
+{
+  "run": "2026-10-25T07-52-47Z",
+  "types": {
+    "storeSalesMoneyColumns": [
+      "ss_wholesale_cost:double",
+      "ss_list_price:double",
+      "ss_sales_price:double",
+      "ss_ext_discount_amt:double",
+      "ss_ext_sales_price:double",
+      "ss_ext_wholesale_cost:double",
+      "ss_ext_list_price:double",
+      "ss_ext_tax:double",
+      "ss_coupon_amt:double",
+      "ss_net_paid:double",
+      "ss_net_paid_inc_tax:double",
+      "ss_net_profit:double"
+    ],
+    "aggregateColumns": [
+      {
+        "name": "n",
+        "type": "bigint"
+      },
+      {
+        "name": "s",
+        "type": "double"
+      },
+      {
+        "name": "a",
+        "type": "double"
+      }
+    ],
+    "aggregateRow": [
+      129752,
+      112184503.89999956,
+      50.64687625459374
+    ],
+    "calls": [
+      1,
+      2
+    ]
+  }
+}
