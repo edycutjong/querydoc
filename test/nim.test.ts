@@ -89,7 +89,7 @@ describe("llm-cache + LlmGateway", () => {
     expect((await g.call("t", {}, REQ, (r) => Ok.parse(r))).out).toEqual({ x: 2 });
     expect(users[1]).toContain("previous reply was rejected");
     const always = new LlmGateway({ client: new NimClient("k", { fetchFn: (async () => reply('{"x":"nope"}')) as typeof fetch }) });
-    await expect(always.call("t", {}, REQ, (r) => Ok.parse(r))).rejects.toThrow(/failed validation twice/);
+    await expect(always.call("t", {}, REQ, (r) => Ok.parse(r))).rejects.toThrow(/no valid reply after 2 calls/);
   });
 
   it("a reply cut off at max_tokens is retried with reasoning off, and the failure says why", async () => {
@@ -106,6 +106,21 @@ describe("llm-cache + LlmGateway", () => {
     expect(bodies.map((b) => (b.chat_template_kwargs as { enable_thinking: boolean }).enable_thinking)).toEqual([true, false]);
     const cut = new LlmGateway({ client: new NimClient("k", { fetchFn: (async () => new Response(JSON.stringify({ choices: [{ message: { content: "{" }, finish_reason: "length" }] }), { status: 200 })) as typeof fetch }) });
     await expect(cut.call("t", {}, REQ, (r) => Ok.parse(r))).rejects.toThrow(/truncated at max_tokens/);
+  });
+
+  it("a reasoning call that times out is retried once with reasoning off (not re-sent with the same settings)", async () => {
+    const modes: boolean[] = [];
+    const fetchFn = (async (_u: unknown, init: RequestInit) => {
+      const on = (JSON.parse(init.body as string).chat_template_kwargs as { enable_thinking: boolean }).enable_thinking;
+      modes.push(on);
+      if (on) throw new DOMException("The operation timed out.", "TimeoutError");
+      return reply('{"x":4}');
+    }) as typeof fetch;
+    const g = new LlmGateway({ client: new NimClient("k", { fetchFn, backoffMs: 1 }) });
+    expect((await g.call("t", {}, REQ, (r) => Ok.parse(r))).out).toEqual({ x: 4 });
+    expect(modes).toEqual([true, false]);
+    const dead = new LlmGateway({ client: new NimClient("k", { fetchFn: (async () => { throw new DOMException("x", "TimeoutError"); }) as typeof fetch }) });
+    await expect(dead.call("t", {}, REQ, (r) => Ok.parse(r))).rejects.toThrow(/timed out/);
   });
 
   it("a cache file with a stale shape fails validation keyless instead of being trusted", async () => {

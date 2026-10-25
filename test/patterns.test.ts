@@ -27,6 +27,12 @@ describe("pattern detector", () => {
     expect(labels("SELECT COUNT(1), d.x FROM f LEFT JOIN d ON f.k = d.k")).toEqual([]);
   });
 
+  it("does not claim an unused join when an unqualified column could come from the joined table", () => {
+    expect(labels("SELECT c_name FROM t.f f LEFT JOIN t.d d ON f.k = d.k")).toEqual([]);
+    expect(labels("SELECT COUNT(1) AS n FROM t.f f LEFT JOIN t.d d ON f.k = d.k WHERE f.x IS NULL")).toEqual(["unused_outer_join"]);
+    expect(labels("SELECT COUNT(1) AS n FROM t.f f LEFT JOIN t.d d ON f.k = d.k WHERE x IS NULL")).toEqual([]);
+  });
+
   it("T1: a literal filter on the joined side inside the ON clause", () => {
     expect(labels("SELECT s.a, p.n FROM t.s s LEFT JOIN t.p p ON s.k = p.k AND p.flag = 'X'")).toEqual(["outer_join_predicate"]);
   });

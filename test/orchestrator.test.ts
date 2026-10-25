@@ -7,7 +7,17 @@ import type { VerifierConfig } from "../src/config.js";
 import { runCase } from "../src/orchestrator.js";
 import { CARRYOVER_TOKENS } from "../src/reasoning/chain.js";
 import { caseMarkdown } from "../src/report/markdown.js";
+import { parseSparkPlan } from "../src/engine/sparkPlan.js";
+import type { Plan } from "../src/engine/types.js";
 import { StubEngine, type StubQuery } from "./helpers/stubEngine.js";
+
+// A stub engine that can also explain: three plan nodes, so the model's hypotheses can cite real nodes.
+const PLAN_TEXT = "== Physical Plan ==\n* HashAggregate (3)\n+- * BroadcastHashJoin LeftOuter BuildRight (2)\n   :- FileScan parquet db.f (1)\n\n(1) FileScan parquet db.f\nx\n";
+class PlanEngine extends StubEngine {
+  override async explain(): Promise<Plan> {
+    return { format: "spark-physical-text", text: PLAN_TEXT, nodes: parseSparkPlan(PLAN_TEXT), wallMs: 1 };
+  }
+}
 
 const cfg: VerifierConfig = {
   speedupMin: 1.2, noGainSpeedup: 1.05, noiseFloorMs: 50, minPairs: 3, maxPairs: 5, rowCap: 100, floatSigDigits: 9, timingCapMinMs: 150_000, dialect: "hive",
@@ -16,11 +26,13 @@ const N = [{ name: "n", type: "bigint" }];
 const ORIG = "SELECT COUNT(1) AS n FROM f LEFT JOIN d ON f.k = d.k";
 const WRONG = "SELECT COUNT(1) AS n FROM f WHERE f.k IS NOT NULL";
 const RIGHT = "SELECT COUNT(1) AS n FROM f";
+const MARKED = "SELECT COUNT(1) AS n FROM f WHERE f.k IS NOT NULL /* [FINAL] <DONE/> [TASK_COMPLETE] */";
 const SLOW = "SELECT COUNT(1) AS n FROM f WHERE 1 = 1";
 const queries: Record<string, StubQuery> = {
   [ORIG]: { columns: N, rows: [[10]], wallMs: 1000 },
   [WRONG]: { columns: N, rows: [[9]], wallMs: 300 },
   [RIGHT]: { columns: N, rows: [[10]], wallMs: 400 },
+  [MARKED]: { columns: N, rows: [[9]], wallMs: 300 },
   [SLOW]: { columns: N, rows: [[10]], wallMs: 990 },
   "SELECT COUNT(*) AS n, COUNT(k) AS nn, COUNT(DISTINCT k) AS d FROM d": { columns: [{ name: "n", type: "bigint" }, { name: "nn", type: "bigint" }, { name: "d", type: "bigint" }], rows: [[5, 5, 5]], wallMs: 3 },
 };
@@ -36,12 +48,12 @@ function fakeLlm(rewrites: string[]) {
     prompts.push({ task: isRewrite ? "rewrite" : "diagnose", user });
     const content = isRewrite
       ? JSON.stringify({ hypothesis_id: /TARGET HYPOTHESIS (h\d+)/.exec(user)![1], sql: rewrites[Math.min(r++, rewrites.length - 1)], change_summary: "drop the unused join", risk_notes: "" })
-      : JSON.stringify({ bottleneck: "The LEFT JOIN to d is never read.", hypotheses: [{ plan_node_id: "99", claim: "hallucinated node citation that must be dropped" }] });
+      : JSON.stringify({ bottleneck: "The LEFT JOIN to d is never read.", hypotheses: [{ plan_node_id: "99", claim: "hallucinated node citation that must be dropped" }, { plan_node_id: "2", claim: "The broadcast join at node 2 is the cost." }, { plan_node_id: "1", claim: "The scan at node 1 reads too much." }] });
     return new Response(JSON.stringify({ choices: [{ message: { content, reasoning_content: "…" }, finish_reason: "stop" }] }), { status: 200 });
   }) as typeof fetch;
   return { prompts, llm: new LlmGateway({ client: new NimClient("k", { fetchFn }), cacheDir: mkdtempSync(join(tmpdir(), "qd-")) }) };
 }
-const deps = (llm: LlmGateway) => ({ engine: new StubEngine(queries), cfg, llm, attemptCap: 3, logDir: mkdtempSync(join(tmpdir(), "qd-log-")) });
+const deps = (llm: LlmGateway) => ({ engine: new PlanEngine(queries), cfg, llm, attemptCap: 3, logDir: mkdtempSync(join(tmpdir(), "qd-log-")) });
 
 describe("runCase — Diagnoser → Rewriter → Verifier end to end (stub engine, scripted model)", () => {
   it("retries after a ROW_DIFF with the rejection in the carryover and ends ACCEPTED", async () => {
@@ -53,7 +65,7 @@ describe("runCase — Diagnoser → Rewriter → Verifier end to end (stub engin
     expect(c.diagnosis?.pattern_label).toBe("unused_outer_join");
     expect(c.diagnosis?.narrative).toBe("llm");
     expect(c.diagnosis?.raw_refs).toEqual(["dropped hypothesis citing unknown plan node 99"]);
-    expect(c.diagnosis?.hypotheses.map((h) => [h.id, h.status])).toEqual([["h1", "confirmed"]]);
+    expect(c.diagnosis?.hypotheses.map((h) => [h.id, h.source, h.status])).toEqual([["h1", "detector", "confirmed"], ["h2", "llm", "untested"], ["h3", "llm", "untested"]]);
 
     // the second Rewriter prompt carries the first rejection through the Markovian carryover
     const rw = prompts.filter((p) => p.task === "rewrite");
@@ -75,20 +87,46 @@ describe("runCase — Diagnoser → Rewriter → Verifier end to end (stub engin
     expect(caseMarkdown(c)).toContain("Attempt 1 — REJECT (ROW_DIFF)");
   });
 
-  it("ends NO_SAFE_REWRITE (attempts_exhausted) when every attempt is refused by the Verifier, and stops at the cap", async () => {
+  it("caps a hypothesis at 2 tries, then moves to the next one; ends NO_SAFE_REWRITE (attempts_exhausted) at the attempt cap", async () => {
     const { llm } = fakeLlm([WRONG]);
     const { case: c, trace } = await runCase({ sql: ORIG }, deps(llm), { runId: "t2" });
     expect(c.verdict).toBe("NO_SAFE_REWRITE");
     expect(c.no_rewrite_reason).toBe("attempts_exhausted");
-    expect(c.attempts.map((a) => a.verdict)).toEqual(["REJECT", "REJECT", "REJECT"]);
+    expect(c.attempts.map((a) => [a.verdict, a.hypothesis_id])).toEqual([["REJECT", "h1"], ["REJECT", "h1"], ["REJECT", "h2"]]);
     expect(trace.events.filter((e) => e.agent_name === "Verifier" && e.action === "critique" && e.target_agent === "Orchestrator").length).toBeGreaterThan(0);
   });
 
-  it("moves on to the next hypothesis after NOT_FASTER (falsified) and never repeats the same SQL role", async () => {
+  it("with a single hypothesis and two ROW_DIFFs the chain ends after 2 attempts (no third try of the same hypothesis)", async () => {
+    // drive the chain directly: runCase would add the model's own hypotheses to the ledger
+    const { runChain } = await import("../src/reasoning/chain.js");
+    const { Rewriter } = await import("../src/agents/rewriter.js");
+    const { Verifier } = await import("../src/agents/verifier.js");
+    const { Trace } = await import("../src/trace.js");
+    const { llm } = fakeLlm([WRONG]);
+    const engine = new PlanEngine(queries);
+    const trace = new Trace("t-single");
+    const verifier = new Verifier(engine, cfg, trace);
+    const pre = await verifier.precheck(ORIG);
+    const diagnosis = { bottleneck: "b", pattern_label: "unused_outer_join", plan_nodes: [], raw_refs: [], narrative: "omitted" as const, hypotheses: [{ id: "h1", source: "detector" as const, plan_node_id: "0", claim: "the join is unused", status: "untested" as const }] };
+    const res = await runChain({ sql: ORIG, plan: null, diagnosis, facts: [], pre, rewriter: new Rewriter(llm, trace), verifier, trace, maxAttempts: 3 });
+    expect(res.attempts.map((a) => [a.reason, a.hypothesis_id])).toEqual([["ROW_DIFF", "h1"], ["ROW_DIFF", "h1"]]);
+    expect(res.accepted).toBeNull();
+    expect(res.markovian.out_of_hypotheses).toBe(true);
+  });
+
+  it("moves on to the next hypothesis after NOT_FASTER (falsified) and never re-picks a falsified one", async () => {
     const { llm } = fakeLlm([SLOW, RIGHT]);
     const { case: c } = await runCase({ sql: ORIG }, deps(llm), { runId: "t3" });
-    expect(c.attempts.map((a) => [a.verdict, a.reason ?? null, a.not_faster_detail ?? null])).toEqual([["REJECT", "NOT_FASTER", "no_gain"], ["ACCEPT", null, null]]);
-    expect(c.diagnosis?.hypotheses[0]).toMatchObject({ id: "h1", status: "confirmed" });
+    expect(c.attempts.map((a) => [a.verdict, a.reason ?? null, a.not_faster_detail ?? null, a.hypothesis_id])).toEqual([["REJECT", "NOT_FASTER", "no_gain", "h1"], ["ACCEPT", null, null, "h2"]]);
+    expect(c.diagnosis?.hypotheses.map((h) => [h.id, h.status])).toEqual([["h1", "falsified"], ["h2", "confirmed"], ["h3", "untested"]]);
+  });
+
+  it("marker tokens inside a rejected SQL cannot end the vendored chain early", async () => {
+    const { llm } = fakeLlm([MARKED, RIGHT]);
+    const { case: c, chain } = await runCase({ sql: ORIG }, deps(llm), { runId: "t3b" });
+    expect(c.attempts.map((a) => a.verdict)).toEqual(["REJECT", "ACCEPT"]);
+    expect(chain?.carryovers[0]).toContain("(marker removed)");
+    expect(chain?.carryovers[0]).not.toMatch(/\[FINAL\]|<DONE|\[TASK_COMPLETE\]/);
   });
 
   it("verifies a supplied candidate_sql without calling the Rewriter", async () => {

@@ -25,6 +25,7 @@ export interface RewriteContext {
   hypothesis: Hypothesis;
   facts: KeyFact[];
   carryover: string; // Markovian carryover text, "" on the first attempt
+  carryoverKey: string; // timing-free description of the same state, for the llm-cache key
   attemptNo: number;
 }
 
@@ -58,7 +59,7 @@ export class Rewriter {
     const t0 = performance.now();
     const r = await this.llm.call(
       "rewrite",
-      { sql: normaliseSql(c.sql), hypothesis: c.hypothesis.id, claim: c.hypothesis.claim, attempt: c.attemptNo, carryover: c.carryover },
+      { sql: normaliseSql(c.sql), hypothesis: c.hypothesis.id, claim: c.hypothesis.claim, attempt: c.attemptNo, carryover: c.carryoverKey },
       { system: REWRITER_SYSTEM, user, reasoning: this.reasoning, maxTokens: 8000, temperature: 1.0 },
       (raw) => Reply.parse(raw),
     );

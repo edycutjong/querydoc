@@ -42,7 +42,7 @@ for (const mode of ["on", "off"] as const) {
   let rw: unknown = null;
   let rwOk = true;
   try {
-    rw = await new Rewriter(gw, trace, mode).rewrite({ sql: heroSql, plan, diagnosis: dx, hypothesis: h, facts, carryover: "", attemptNo: 1 });
+    rw = await new Rewriter(gw, trace, mode).rewrite({ sql: heroSql, plan, diagnosis: dx, hypothesis: h, facts, carryover: "", carryoverKey: "", attemptNo: 1 });
   } catch (e) {
     rwOk = false;
     rw = (e as Error).message;

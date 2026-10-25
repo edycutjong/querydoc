@@ -80,6 +80,22 @@ export function findJoins(m: string): Join[] {
   return out;
 }
 
+const SQL_WORDS = new Set(("select from where and or not null is in like between case when then else end as on using join left right full inner outer cross semi anti group by order " +
+  "having limit distinct union all intersect except asc desc nulls first last count sum avg min max true false exists any some cast over partition rows range " +
+  "interval date timestamp int bigint double string decimal float with lateral view explode").split(" "));
+
+// True when the statement reads a column WITHOUT a qualifier outside the joins' ON conditions. An unqualified name could belong to
+// the joined table, so the join is not provably unused and `unused_outer_join` is not claimed (the Rewriter is not misled).
+function readsUnqualified(m: string, joins: Join[]): boolean {
+  let t = m;
+  for (const j of [...joins].sort((a, b) => b.start - a.start)) t = t.slice(0, j.start) + " " + t.slice(j.end); // drop whole join clauses
+  t = t.replace(/\b(?:from|join)\s+[\w.`]+(?:\s+(?:as\s+)?[a-z_]\w*)?/g, " "); // table and alias after FROM
+  t = t.replace(/\bas\s+[a-z_]\w*/g, " "); // output aliases
+  t = t.replace(/\b[a-z_]\w*\s*\.\s*[a-z_*]\w*/g, " "); // qualified references
+  t = t.replace(/\b[a-z_]\w*\s*\(/g, " ("); // function names
+  return [...t.matchAll(/\b[a-z_][a-z0-9_]*\b/g)].some((x) => !SQL_WORDS.has(x[0]));
+}
+
 const trim = (s: string, n = 140) => s.replace(/\s+/g, " ").trim().slice(0, n);
 
 export function detectPatterns(sql: string, plan?: Plan | null): Detection {
@@ -106,7 +122,7 @@ export function detectPatterns(sql: string, plan?: Plan | null): Detection {
     const readsAlias = new RegExp(`\\b${j.alias}\\s*\\.`, "i").test(outside) || new RegExp(`\\b${j.alias}\\s*\\.\\s*\\*`).test(outside);
     // `select *` would read every joined column
     const star = /\bselect\s+(?:distinct\s+)?\*/i.test(m.slice(0, j.start));
-    if (!readsAlias && !star) hits.push({ label: "unused_outer_join", evidence: trim(`${j.kind} join ${j.table} ${j.alias} on ${j.on}`) });
+    if (!readsAlias && !star && !readsUnqualified(m, joins)) hits.push({ label: "unused_outer_join", evidence: trim(`${j.kind} join ${j.table} ${j.alias} on ${j.on}`) });
   }
 
   // outer_join_predicate: a LEFT JOIN whose ON also filters the joined side against a literal / list (T1 shape).

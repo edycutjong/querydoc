@@ -39,7 +39,7 @@ export class SampleModeNoLLM extends Error {
 }
 
 export class NimError extends Error {
-  constructor(message: string, readonly status: number | null = null) {
+  constructor(message: string, readonly status: number | null = null, readonly timedOut = false) {
     super(message);
     this.name = "NimError";
   }
@@ -107,7 +107,10 @@ export class NimClient {
         };
       } catch (e) {
         if (e instanceof NimError && e.status !== null && e.status < 500 && e.status !== 429) throw e;
-        lastErr = e as Error; // network error / timeout: retry
+        // A timeout is not retried here with the same settings (a reasoning call that ran past its budget will do it again): the
+        // gateway retries it once with reasoning off.
+        if ((e as Error).name === "TimeoutError" || (e as Error).name === "AbortError") throw new NimError(`NIM timed out after ${req.timeoutMs ?? 120_000} ms (reasoning ${req.reasoning})`, null, true);
+        lastErr = e as Error; // network error: retry
       }
     }
     throw lastErr instanceof NimError ? lastErr : new NimError(`NIM request failed after ${retries + 1} attempts: ${lastErr.message}`);
@@ -139,7 +142,7 @@ export function extractJson(content: string): unknown {
 // memory ids live in prompts and must not break a hit (architecture §Playbook write semantics → llm-cache protocol).
 
 export const normalisedKey = (task: string, fields: Record<string, unknown>): string =>
-  createHash("sha256").update(JSON.stringify({ task, ...sortKeys(fields) })).digest("hex");
+  createHash("sha256").update(JSON.stringify({ ...sortKeys(fields), task })).digest("hex");
 
 function sortKeys(v: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1)));
@@ -182,7 +185,17 @@ export class LlmGateway {
     let reasoning = req.reasoning;
     let lastErr = "";
     for (let tryN = 0; tryN < 2; tryN++) {
-      const r = await client.chat({ ...req, user, reasoning });
+      let r: ChatResult;
+      try {
+        r = await client.chat({ ...req, user, reasoning, timeoutMs: reasoning === "on" ? (req.timeoutMs ?? 90_000) : Math.min(req.timeoutMs ?? 90_000, 60_000) });
+      } catch (e) {
+        if (e instanceof NimError && e.timedOut) dumpCall(task, req, reasoning, user, null);
+        if (!(e instanceof NimError && e.timedOut) || tryN > 0) throw e;
+        lastErr = e.message;
+        reasoning = "off"; // the reasoning call ran past its budget; answer directly
+        continue;
+      }
+      dumpCall(task, req, reasoning, user, r);
       try {
         // Reasoning tokens count against max_tokens: a long think can cut the JSON off. That is a truncation, not a bad answer.
         if (r.finishReason === "length") throw new Error(`reply truncated at max_tokens (finish_reason length, ${r.completionTokens ?? "?"} tokens, reasoning ${r.reasoning.length} chars)`);
@@ -199,8 +212,17 @@ export class LlmGateway {
         if (r.finishReason === "length") reasoning = "off"; // the retry answers directly so it fits
       }
     }
-    throw new NimError(`${task}: reply failed validation twice (${lastErr})`);
+    throw new NimError(`${task}: no valid reply after 2 calls (${lastErr})`);
   }
+}
+
+// QUERYDOC_DUMP_DIR=<dir>: write each model call (prompt, reply head, finish reason, latency) for debugging a stalled prompt. Never the key.
+function dumpCall(task: string, req: ChatRequest, reasoning: ReasoningMode, user: string, r: ChatResult | null): void {
+  const dir = process.env.QUERYDOC_DUMP_DIR;
+  if (!dir) return;
+  mkdirSync(dir, { recursive: true });
+  const name = `${new Date().toISOString().replace(/[:.]/g, "-")}-${task}-${reasoning}.json`;
+  writeFileSync(join(dir, name), JSON.stringify({ task, reasoning, system: req.system, user, timed_out: r === null, latency_ms: r ? Math.round(r.latencyMs) : null, finish: r?.finishReason ?? null, completion_tokens: r?.completionTokens ?? null, reasoning_chars: r?.reasoning.length ?? null, content_head: r?.content.slice(0, 600) ?? null }, null, 2) + "\n");
 }
 
 export function nimClientFromEnv(env: NodeJS.ProcessEnv = process.env): NimClient | null {

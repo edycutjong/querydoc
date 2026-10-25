@@ -17,6 +17,8 @@ export interface KeyFact {
   unique: boolean; // distinct == non_null == rows
 }
 
+const MAX_KEYS = 4; // one sequential aggregate scan per key: cap the work before any LLM call
+
 export async function profileJoinKeys(engine: QueryEngine, sql: string, dialect: string, trace: Trace): Promise<KeyFact[]> {
   const m = maskSql(trimStatement(sql)).toLowerCase();
   const wanted = new Map<string, { table: string; column: string }>();
@@ -25,12 +27,13 @@ export async function profileJoinKeys(engine: QueryEngine, sql: string, dialect:
     for (const c of j.on.matchAll(re)) wanted.set(`${j.table}.${c[1]}`, { table: j.table, column: c[1]! });
   }
   const facts: KeyFact[] = [];
-  for (const { table, column } of wanted.values()) {
+  for (const { table, column } of [...wanted.values()].slice(0, MAX_KEYS)) {
     const q = `SELECT COUNT(*) AS n, COUNT(${column}) AS nn, COUNT(DISTINCT ${column}) AS d FROM ${table}`;
     if (!sqlGuard(q, dialect).ok) continue;
     try {
       const r = await engine.run(q, { rowCap: 1, timeoutSec: 120 });
       const [n, nn, d] = (r.rows[0] ?? []).map(Number) as [number, number, number];
+      if (![n, nn, d].every(Number.isFinite)) throw new Error(`unreadable profile result ${JSON.stringify(r.rows[0] ?? null)}`);
       facts.push({ table, column, rows: n, non_null: nn, distinct: d, unique: d === nn && nn === n });
       trace.emit({
         agent_name: "Orchestrator", action: "profile_keys", input_summary: `${table}.${column}`,

@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { LlmGateway } from "./adapters/nim.js";
@@ -33,13 +34,13 @@ export interface CaseRun {
 }
 
 export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}): Promise<CaseRun> {
-  const runId = opts.runId ?? `run-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}Z`;
+  const runId = opts.runId ?? `run-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}Z-${randomBytes(2).toString("hex")}`; // suffix: two runs in one second never share a trace file
   const logDir = deps.logDir ?? join(ROOT, "logs");
   mkdirSync(logDir, { recursive: true });
   const trace = new Trace(runId, join(logDir, `trace-${runId}.jsonl`));
   const maxAttempts = Math.max(1, Math.min(opts.maxAttempts ?? deps.attemptCap, 3));
   const c: Case = {
-    run_id: runId, sql: input.sql, source: input.source ?? "paste", engine: deps.engine.name, llm: deps.llm.live ? "nim" : "cache",
+    run_id: runId, sql: input.sql, source: input.source ?? "paste", engine: deps.engine.name, llm: "none",
     started_at: new Date().toISOString(), attempts: [], verdict: "ERROR", playbook_hits: [],
   };
   const finish = (verdict: Case["verdict"], extra: Partial<Case> = {}, chain?: ChainResult["markovian"]): CaseRun => {
@@ -55,7 +56,7 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
   const verifier = new Verifier(deps.engine, deps.cfg, trace);
   trace.emit({
     agent_name: "Orchestrator", action: "start_case", input_summary: input.sql.replace(/\s+/g, " ").slice(0, 120),
-    output_summary: `engine ${deps.engine.name}; llm ${c.llm}; attempt cap ${maxAttempts}`, target_agent: "Verifier", retry_count: 0, status: "ok",
+    output_summary: `engine ${deps.engine.name}; llm ${deps.llm.live ? "nim" : "cache-only"}; attempt cap ${maxAttempts}`, target_agent: "Verifier", retry_count: 0, status: "ok",
   });
 
   try {
@@ -90,6 +91,7 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
     const rewriter = new Rewriter(deps.llm, trace, deps.reasoning?.rewriter ?? "on");
     const chain = await runChain({ sql: input.sql, plan, diagnosis: c.diagnosis, facts, pre, rewriter, verifier, trace, maxAttempts });
     c.attempts.push(...chain.attempts);
+    if (c.llm === "none" && chain.attempts.length) c.llm = deps.llm.live ? "nim" : "cache"; // a Rewriter attempt ran, so a model (or its cache) was used
     if (chain.upstreamError) throw new Error(chain.upstreamError);
     return finalise(chain.accepted, chain.attempts, chain, finish);
   } catch (e) {
