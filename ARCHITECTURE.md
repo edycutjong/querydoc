@@ -1,0 +1,79 @@
+# Architecture
+
+Derived from the code at the commit that last touched this file (`git log -1 -- ARCHITECTURE.md`). Paths are relative to the repo root.
+
+## One case, end to end
+
+`POST /run` → `src/server.ts` → `QueryDocService.run` (`src/service.ts`) → `runCase` (`src/orchestrator.ts`):
+
+```
+SQL (paste, or + candidate_sql)
+  │  guard: one read-only statement                          src/guard/sqlGuard.ts
+  ▼
+Verifier.precheck: determinism lint, original run twice,     src/agents/verifier.ts, src/verify/*
+  vacuity, order above the row cap, top-N tie probe
+  │  (not verifiable → NOT_VERIFIABLE, case ends)
+  ▼
+engine.explain → plan nodes                                  src/engine/{zetaris,duckdb}.ts, sparkPlan.ts
+detectPatterns (static, no model)                            src/agents/patterns.ts
+profileJoinKeys (COUNT(*) vs COUNT(DISTINCT key))            src/agents/profile.ts
+  ▼
+Diagnoser → pattern label, hypotheses (model call)           src/agents/diagnoser.ts
+  ▼
+[candidate_sql supplied? Verifier judges it as attempt 1]
+  ▼
+Markovian chain, ≤ 3 attempts                                src/reasoning/chain.ts
+  each attempt: playbook retrieve → Rewriter (model) → Verifier.verify
+     ACCEPT          → case ACCEPTED
+     REJECT/ROW_DIFF → recordRejection → next attempt
+     NOT_FASTER      → no_gain → Diagnoser.revise: next | new | withdraw
+  ▼
+Case verdict: ACCEPTED | NO_SAFE_REWRITE (attempts_exhausted | diagnoser_withdrew |
+  llm_unavailable | upstream) | NOT_VERIFIABLE | ERROR      src/orchestrator.ts finalise()
+```
+
+Nothing is applied anywhere. An ACCEPTED case is a reviewable candidate with a patch file (`POST /runs/:id/decision`).
+
+## Agents (names as they appear in `logs/trace-*.jsonl`)
+
+| Agent | Role | Model? |
+|---|---|---|
+| Orchestrator | sequencing, plan fetch, playbook open/query/write, final verdict mapping | no |
+| Diagnoser | reads plan + detector + key facts, names the pattern, proposes hypotheses; `revise` after a no-gain | yes |
+| Rewriter | writes one candidate for one hypothesis, sees the carryover of refusals | yes |
+| Verifier | the only source of a verdict: deterministic checks, every one a `critique` trace line | **no** |
+
+The Verifier order, cheapest gate first: guard → pre-check → result-schema check → row diff (rows under the cap; engine-side
+`xxhash64` row-hash fingerprint above it) → paired alternating timing. Thresholds are in `querydoc.config.json` (`policy`):
+speedup ≥ 1.2×, saving ≥ the noise floor (≥ 50 ms), 3 timed pairs (up to 5), attempt cap 3, row cap 10,000, floats to 9 significant digits.
+Model output is never parsed for a verdict or a number.
+
+## Engines (`src/engine/types.ts` → `QueryEngine`: run / explain / listTables / tableInfo / health)
+
+- **Zetaris** (`zetaris.ts`): the local platform over JDBC. A small Java sidecar (`engine/zetaris-jdbc/QuerySidecar.java`) holds one warm
+  connection and speaks one JSON request per line on stdin/stdout; the driver's own stdout noise is moved to stderr. `EXPLAIN FORMATTED`
+  gives the Spark physical plan. Needs a JDK 17 (`javac` compiles the sidecar on first use) and the JDBC jar.
+- **DuckDB** (`duckdb.ts`): the keyless sample engine on `data/sample/*.parquet` (see `data/README.md`), external access locked,
+  `EXCEPT ALL` as the row oracle.
+
+## Meterless engines (vendored in `vendor/meterless/`, byte-identical to upstream `0aa7417`; LICENSE and NOTICE kept)
+
+- **H-MEM → playbook** (`src/memory/playbook.ts`, store in `data/hmem/`): the Verifier writes at confidence 0.9; retrieval is by exact
+  pattern + schema tag above `RETRIEVAL_FLOOR`; the ledger reuses **refusals only** (an identical refused candidate is not executed again).
+- **Markovian → rewrite chain** (`src/reasoning/chain.ts`): one attempt is one chunk; the carryover block (hypothesis ledger + rejected
+  attempts, ≤ 400 tokens) is what the next attempt sees.
+- **Nightshift → model provider** (`src/adapters/nightshift.ts`, selected by `src/adapters/llm.ts`): OpenAI-compatible local runtime,
+  default provider. `src/adapters/nim.ts` is the declared fallback (`LLM_PROVIDER=nim`) and the replay path: a normalised `llm-cache/`
+  makes sample mode keyless. Provider, requested model and the model the response reports are recorded in every trace line and case.
+
+## API (`src/server.ts`, port 8000)
+
+`POST /run` · `GET /runs/:id` · `GET /runs/:id/trace` · `POST /runs/:id/decision` · `GET /slow-queries` · `GET /playbook` ·
+`GET /traces/recorded` · `GET /health` (answers within 5 s; reports engine busy during a case). The UI (`web/`) is served from `/`.
+Live mode binds `127.0.0.1` by default and answers only on `localhost`, an IP literal, or names in `QUERYDOC_ALLOWED_HOSTS`.
+
+## Evidence the code writes
+
+`logs/trace-<run>.jsonl` (Hub schema: `timestamp, agent_name, action, input_summary, output_summary, target_agent, sponsor_call,
+retry_count, status`), `recorded/` (live and sample packs, regenerated by `npm run record`), `evidence/` (spike, verify, bench runs),
+`evals/results.md` (`npm run eval`), `DEMO.md` (`npm run bench`).

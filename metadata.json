@@ -1,0 +1,51 @@
+{
+  "name": "Query Doctor",
+  "slug": "querydoc",
+  "tagline": "Diagnose a slow SQL query on Zetaris, rewrite it, and ship the rewrite only when executing both returns the same rows, faster.",
+  "event": "Open Agent Hackathon 2026",
+  "track": "Reasoning Architecture",
+  "repository": "https://github.com/edycutjong/querydoc",
+  "license": "Apache-2.0",
+  "language": "TypeScript (Node 22) + a Java JDBC sidecar",
+  "entrypoints": {
+    "api": "POST http://localhost:8000/run",
+    "cli": "npx tsx run.ts input_examples/example_1.json --sample",
+    "keyless_docker": "docker run --rm -p 8000:8000 -e SAMPLE_MODE=true querydoc"
+  },
+  "agents": ["Orchestrator", "Diagnoser", "Rewriter", "Verifier"],
+  "feedback_events": "Verifier critique (every check), Rewriter retry after REJECT, Diagnoser.revise after NOT_FASTER/no_gain",
+  "sponsors": {
+    "zetaris": {
+      "used": true,
+      "how": "Live path: the local Zetaris platform (TPCDS_DB Parquet) over its Lightning JDBC driver through a Java sidecar (engine/zetaris-jdbc/QuerySidecar.java, src/engine/zetaris.ts). The query is run, EXPLAINed (EXPLAIN FORMATTED), row-fingerprinted on the engine (xxhash64) and timed there. The local platform has no MCP endpoint, so none of the four documented MCP tools (get_slow_queries, get_query_stats, profile_table, explain_query) is used; their roles are filled by pasted SQL, SQL aggregates, EXPLAIN and our own wall-clock timing (docs/DX-REPORT.md).",
+      "evidence": ["recorded/live/", "DEMO.md", "docs/DX-REPORT.md"]
+    },
+    "meterless": {
+      "used": true,
+      "engines": ["H-MEM (playbook of refused and verified rewrites)", "Markovian (rewrite chain, one attempt per chunk)"],
+      "where": ["src/memory/playbook.ts", "src/reasoning/chain.ts", "vendor/meterless/"],
+      "nightshift": "Implemented as the default model provider (src/adapters/nightshift.ts) and covered by mock-runtime tests. NOT demonstrated against a live Nightshift runtime: every recorded run used the declared fallback (direct NVIDIA NIM, LLM_PROVIDER=nim)."
+    },
+    "nvidia": {
+      "used": true,
+      "model": "nvidia/nemotron-3-ultra-550b-a55b",
+      "how": "Diagnoser and Rewriter. Recorded runs reached it directly on NVIDIA's hosted endpoint (provider nim, the declared fallback), not through Nightshift."
+    },
+    "cursor": {
+      "used": true,
+      "how": "cursor-agent wrote the scaffold commit only (d3e823c, trailers Tool: cursor and Co-authored-by: Cursor). Cursor was optional for this event (organiser, 2026-10-22); every other commit was written with Claude Code (Tool: claude-code)."
+    }
+  },
+  "ai_usage": {
+    "development": "Claude Code (Claude Opus 5.5 and Sonnet 5.5) wrote 100 of 101 commits; Cursor's agent wrote 1 (the scaffold). Commit trailers record the tool.",
+    "review": "Code and architecture were reviewed by an outside panel of four models (Qwen, Grok, Codex, Claude Opus); each finding was checked against the code before any change.",
+    "runtime": "Nemotron 3 Ultra for diagnosis and rewrite proposals. The verdict never comes from a model."
+  },
+  "tests": { "runner": "vitest", "files": 26, "tests": 286, "command": "npm test" },
+  "pre_existing": [
+    "vendor/meterless/ (H-MEM and Markovian engines, byte-identical to upstream 0aa7417, with LICENSE and NOTICE)",
+    "data/sample/ (NYC TLC Jan 2024 yellow-cab subset and taxi zones, public data; data/README.md)",
+    "Pre-window specs and visual assets (declared in the submission form)"
+  ],
+  "limitations": "See FAILURE_MODES.md."
+}
