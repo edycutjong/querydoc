@@ -6,7 +6,13 @@
     "timedPairs": 3,
     "attemptCap": 3,
     "rowCap": 10000,
-    "noiseFloorMinMs": 50
+    "noiseFloorMinMs": 50,
+    "noGainSpeedup": 1.05,
+    "maxTimedPairs": 5,
+    "timingCapMinMs": 150000,
+    "timingCapRule": "max(timingCapMinMs, timedPairs × 2 × the pre-check median of the original) — a rewrite as slow as the original still fits its 3 pairs",
+    "floatSigDigits": 9,
+    "floatSigDigitsNote": "relative tolerance ≈1e-9 (architecture §Verifier order); calibrated live in the floatTolerance section"
   },
   "rowCap": {
     "engineCapObserved": false,
