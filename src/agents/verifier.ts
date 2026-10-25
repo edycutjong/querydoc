@@ -51,6 +51,7 @@ export interface Attempt extends AttemptInput {
   not_faster_detail?: "no_gain" | "under_gate";
   detail?: string;
   first_diff?: { side: "orig" | "rewrite"; row: unknown[]; order?: true };
+  original_changed?: true; // the original's result changed during timing: the case is NOT_VERIFIABLE, not a retryable ERROR
   rows: { orig: number; rewrite: number };
   fingerprint: { orig: string; rewrite: string | null };
   fingerprint_kind?: "rows" | "engine";
@@ -220,7 +221,7 @@ export class Verifier {
     const att: Attempt = { ...input, sql, verdict: "REJECT", rows: { orig: pre.rows, rewrite: 0 }, fingerprint: { orig: pre.fingerprint, rewrite: null } };
     const label = `attempt ${input.n}`;
     const finish = (a: Attempt): Attempt => {
-      const target: AgentName = opts.lastAttempt ? "Orchestrator" : a.not_faster_detail === "no_gain" && a.origin === "rewriter" ? "Diagnoser" : "Rewriter";
+      const target: AgentName = opts.lastAttempt || a.original_changed ? "Orchestrator" : a.not_faster_detail === "no_gain" && a.origin === "rewriter" ? "Diagnoser" : "Rewriter";
       const summary =
         a.verdict === "ACCEPT"
           ? `ACCEPT: same ${a.rows.orig} row(s), ${a.timing_ms!.median_speedup}× median over ${a.timing_ms!.orig.length} pairs`
@@ -344,7 +345,8 @@ export class Verifier {
       ...(dec.note ? { note: dec.note } : {}),
     };
     if (changed === "candidate") return finish({ ...att, reason: "ROW_DIFF", detail: `non-deterministic candidate: ${dec.note}` });
-    if (dec.verdict === "ERROR") return finish({ ...att, reason: "ERROR", detail: `${changed ? "" : "engine error "}during timing: ${dec.note}` });
+    if (changed === "original") return finish({ ...att, reason: "ERROR", original_changed: true, detail: `not verifiable: during timing ${dec.note}` });
+    if (dec.verdict === "ERROR") return finish({ ...att, reason: "ERROR", detail: `engine error during timing: ${dec.note}` });
     if (dec.verdict === "ACCEPT") return finish({ ...att, verdict: "ACCEPT" });
     const gates = dec.missed.join(", ");
     return finish({ ...att, reason: "NOT_FASTER", not_faster_detail: dec.notFasterDetail!,

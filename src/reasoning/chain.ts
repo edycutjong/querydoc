@@ -168,6 +168,10 @@ export async function runChain(a: ChainArgs): Promise<ChainResult> {
         return { content: `Attempt ${n} accepted for ${current.id}.\n[TASK_COMPLETE]` };
       }
       rejected.push(att);
+      if (att.original_changed) {
+        finished = true; // the original is not deterministic after all: no later attempt can be verified against it
+        return { content: `Attempt ${n}: the original's result changed between runs.\n[TASK_COMPLETE]` };
+      }
       if (att.reason === "NOT_FASTER") current.status = att.not_faster_detail === "no_gain" ? "falsified" : "unproven";
       else current.status = "unproven";
       // NOT_FASTER(no_gain), attempts left: the ledger is updated (falsified), then the Diagnoser revises — pick, new hypothesis or withdraw.

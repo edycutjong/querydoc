@@ -122,6 +122,7 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
       c.attempts.push(att);
       onAttempt(att);
       syncHits();
+      if (att.original_changed) return finish("NOT_VERIFIABLE", { detail: att.detail });
       if (att.verdict === "ACCEPT" || maxAttempts <= 1) return finalise(att.verdict === "ACCEPT" ? att : null, c.attempts, null, finish);
       prior.push(att);
     }
@@ -130,6 +131,8 @@ export async function runCase(input: RunInput, deps: Deps, opts: RunOptions = {}
     const chain = await runChain({ sql: input.sql, plan, diagnosis: c.diagnosis, facts, pre, rewriter, diagnoser, verifier, trace, maxAttempts, prior, engine: deps.engine.name, schema: c.schema_fqn ?? "", retrieve, ...(reuse ? { reuse } : {}), onAttempt });
     c.attempts.push(...chain.attempts);
     syncHits();
+    const changed = chain.attempts.find((x) => x.original_changed);
+    if (changed) return finish("NOT_VERIFIABLE", { detail: changed.detail }, chain.markovian);
     if (chain.upstreamError) throw new Error(chain.upstreamError);
     return finalise(chain.accepted, chain.attempts, chain, finish);
   } catch (e) {
