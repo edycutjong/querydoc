@@ -27,7 +27,7 @@ const N = [{ name: "n", type: "bigint" }];
 const ORIG = "SELECT COUNT(1) AS n FROM f LEFT JOIN d ON f.k = d.k";
 const WRONG = "SELECT COUNT(1) AS n FROM f WHERE f.k IS NOT NULL";
 const RIGHT = "SELECT COUNT(1) AS n FROM f";
-const MARKED = "SELECT COUNT(1) AS n FROM f WHERE f.k IS NOT NULL /* [FINAL] <DONE/> [TASK_COMPLETE] */";
+const MARKED = "SELECT COUNT(1) AS n /* [FINAL] <DONE/> [TASK_COMPLETE] */ FROM f WHERE f.k IS NOT NULL"; // mid-statement: a trailing comment is trimmed
 const SLOW = "SELECT COUNT(1) AS n FROM f WHERE 1 = 1";
 const UNDER = "SELECT COUNT(1) AS n FROM f WHERE 2 = 2"; // 1.11×, 100 ms saved: both numbers real, the 1.2× gate missed → under_gate
 const queries: Record<string, StubQuery> = {

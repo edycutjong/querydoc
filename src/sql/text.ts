@@ -53,7 +53,12 @@ export function maskSql(sql: string, keepIdents = false): string {
   return out;
 }
 
-export const trimStatement = (sql: string): string => sql.trim().replace(/;\s*$/, "").trim();
+// One statement as pasted: trailing comments after the closing ";" (`…; -- nightly report`, `…; /* end */`) are not a second
+// statement — cut at the last character outside a comment (maskSql keeps quote characters, so a closing literal is never cut).
+export const trimStatement = (sql: string): string => {
+  const s = sql.trim();
+  return s.slice(0, maskSql(s).trimEnd().length).replace(/;\s*$/, "").trim();
+};
 
 // Canonical text for hashing and cache keys: comments dropped, whitespace collapsed and everything lower-cased OUTSIDE quotes only, so
 // 'x--y' and 'Cash' vs 'cash' remain different statements. A trailing semicolon is dropped.

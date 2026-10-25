@@ -66,3 +66,14 @@ describe("sqlGuard (Zetaris side, hive dialect)", () => {
     expect(m.includes(";")).toBe(false);
   });
 });
+
+describe("trailing comments after the closing semicolon", () => {
+  it("are not a second statement; a real second statement still is", async () => {
+    const { trimStatement } = await import("../src/sql/text.js");
+    expect(trimStatement("SELECT 1 AS a; -- nightly report")).toBe("SELECT 1 AS a");
+    expect(trimStatement("SELECT 1 AS a; /* end */")).toBe("SELECT 1 AS a");
+    expect(trimStatement("SELECT 'x; -- not a comment' AS a")).toBe("SELECT 'x; -- not a comment' AS a");
+    expect(sqlGuard("SELECT 1 AS a; -- nightly report", "hive").ok).toBe(true);
+    expect(sqlGuard("SELECT 1; SELECT 2 -- two", "hive").reason).toBe("more than one statement");
+  });
+});
