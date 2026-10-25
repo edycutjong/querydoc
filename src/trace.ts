@@ -20,6 +20,7 @@ export interface TraceEvent {
     provider?: "nightshift" | "nim";
     requested_model?: string;
     handled_model?: string | null;
+    recorded_model?: string; // llm-cache hits: the model the replayed response came from when it was recorded
   };
   retry_count: number;
   status: string;

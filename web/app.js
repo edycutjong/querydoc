@@ -354,7 +354,7 @@ function paintRail(events, recorded) {
       : e.agent_name === "Rewriter" && e.action === "retry" ? `<span class="edge fix">↳ retry after the critique</span>`
       : e.agent_name === "Diagnoser" && e.action === "revise" ? `<span class="edge revise">↳ revised diagnosis</span>` : "";
     return `<div class="ev ${cls}">${sc ? `<span class="lat">${fmtMs(sc.latency_ms)}</span>` : ""}<span class="who">${esc(e.agent_name)}</span> · ${esc(e.action)}
-      ${sc ? `<br><span class="chip">${esc(sc.service)}:${esc(sc.name)}</span><span class="src">${esc(SRC[sc.service] ?? sc.service)}</span>${sc.handled_model ? `<span class="src" title="requested route ${esc(sc.requested_model ?? "")}">handled by ${esc(sc.handled_model)}</span>` : ""}` : ""}
+      ${sc ? `<br><span class="chip">${esc(sc.service)}:${esc(sc.name)}</span><span class="src">${esc(SRC[sc.service] ?? sc.service)}</span>${sc.handled_model ? `<span class="src" title="requested route ${esc(sc.requested_model ?? "")}">handled by ${esc(sc.handled_model)}</span>` : ""}${sc.recorded_model ? `<span class="src" title="replayed from llm-cache/, recorded earlier">recorded from ${esc(sc.recorded_model)}</span>` : ""}` : ""}
       <div class="muted">${esc((e.output_summary || e.input_summary || "").slice(0, 160))}</div>${edge}</div>`;
   });
   rail.innerHTML = `<h2>Agent trace</h2>${recorded ? `<p class="muted data">recorded live run — ${events.length} events</p>` : ""}${rows.length ? rows.join("") : `<p class="empty">Waiting for the first agent<span class="status"><span class="dots"></span></span></p>`}`;

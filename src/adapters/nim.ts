@@ -198,11 +198,19 @@ export interface LlmOutcome {
   provider: LlmProvider | null; // live calls only
   requestedModel: string | null;
   handledModel: string | null; // the model the response reports (null = cache hit or not reported)
+  recordedModel?: string | null; // cache hits only: the model the replayed response came from when it was recorded
 }
 
-// The trace's sponsor_call for one gateway outcome: live calls name the provider and the model that handled the request; cache hits say llm-cache.
+// A keyless replay: the parsed value plus the model the entry says produced it (never reported as a live handling model).
+function cacheHit<T>(file: string, parse: (raw: unknown) => T): { out: T } & Omit<LlmOutcome, "value"> {
+  const entry = JSON.parse(readFileSync(file, "utf8")) as { value: unknown; model?: unknown };
+  return { out: parse(entry.value), source: "llm-cache", latencyMs: 0, reasoningChars: 0, provider: null, requestedModel: null, handledModel: null, recordedModel: typeof entry.model === "string" ? entry.model : null };
+}
+
+// The trace's sponsor_call for one gateway outcome: live calls name the provider and the model that handled the request; cache hits say
+// llm-cache, with the model the replayed response was recorded from.
 export function llmSponsorCall(r: Omit<LlmOutcome, "value">, latencyMs: number) {
-  if (r.source === "llm-cache" || !r.provider) return { service: "llm-cache" as const, name: "chat_completions", latency_ms: Math.round(latencyMs) };
+  if (r.source === "llm-cache" || !r.provider) return { service: "llm-cache" as const, name: "chat_completions", latency_ms: Math.round(latencyMs), ...(r.recordedModel ? { recorded_model: r.recordedModel } : {}) };
   return { service: r.provider, name: "chat_completions", latency_ms: Math.round(latencyMs), provider: r.provider, requested_model: r.requestedModel ?? "", handled_model: r.handledModel };
 }
 
@@ -262,7 +270,7 @@ export class LlmGateway {
     const client = this.o.client;
     if (!client) {
       if (!existsSync(file)) throw new SampleModeNoLLM(task);
-      return { out: parse(JSON.parse(readFileSync(file, "utf8")).value), source: "llm-cache", latencyMs: 0, reasoningChars: 0, provider: null, requestedModel: null, handledModel: null };
+      return cacheHit(file, parse);
     }
     let user = req.user;
     let reasoning = req.reasoning;
@@ -270,7 +278,7 @@ export class LlmGateway {
     // degrades to the recorded cache; the outcome says llm-cache, never live. No cache entry = SampleModeNoLLM, as keyless.
     const unreachable = (): { out: T } & Omit<LlmOutcome, "value"> => {
       if (!existsSync(file)) throw new SampleModeNoLLM(task);
-      return { out: parse(JSON.parse(readFileSync(file, "utf8")).value), source: "llm-cache", latencyMs: 0, reasoningChars: 0, provider: null, requestedModel: null, handledModel: null };
+      return cacheHit(file, parse);
     };
     let lastErr = "";
     for (let tryN = 0; tryN < 2; tryN++) {

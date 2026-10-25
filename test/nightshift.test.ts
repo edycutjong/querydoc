@@ -165,7 +165,8 @@ describe("gateway through Nightshift", () => {
     // keyless replay of the same key: llm-cache, no provider
     const hit = await new LlmGateway({ client: null, cacheDir: dir }).call("t", { k: 1 }, REQ, (raw) => raw as { a: number });
     expect(hit).toMatchObject({ source: "llm-cache", provider: null, handledModel: null });
-    expect(llmSponsorCall(hit, 0).service).toBe("llm-cache");
+    expect(hit.recordedModel).toBe("nvidia/nemotron-3-ultra-550b-a55b");
+    expect(llmSponsorCall(hit, 0)).toEqual({ service: "llm-cache", name: "chat_completions", latency_ms: 0, recorded_model: "nvidia/nemotron-3-ultra-550b-a55b" });
   });
 });
 
