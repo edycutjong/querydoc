@@ -12,6 +12,6 @@
     "allowImportingTsExtensions": true,
     "types": ["node"]
   },
-  "include": ["src", "scripts", "test"],
+  "include": ["src", "scripts", "test", "run.ts"],
   "exclude": ["test/vendor"]
 }

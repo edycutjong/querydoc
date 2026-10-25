@@ -11,7 +11,7 @@
   "scripts": {
     "build:sidecar": "javac -d engine/zetaris-jdbc/out engine/zetaris-jdbc/QuerySidecar.java",
     "spike": "tsx scripts/spike_zetaris.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node scripts/typecheck.mjs",
     "test": "vitest run",
     "check:config": "tsx scripts/check_config_sources.ts"
   },
@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@duckdb/node-api": "^1.4.5-r.1",
-    "node-sql-parser": "5.4.0"
+    "node-sql-parser": "5.4.0",
+    "zod": "^4.6.7"
   }
 }
