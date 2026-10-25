@@ -25,3 +25,17 @@ describe("determinism lint", () => {
     expect(tieAtCut([["1"], ["2"]], [0], 2)).toBe(false);
   });
 });
+
+describe("orderSpec when the parser cannot read the statement", () => {
+  const sql = "SELECT a FROM t LATERAL VIEW explode(x) e AS y LIMIT 5";
+  it("the hive parser really fails on this statement", async () => {
+    const { default: pkg } = await import("node-sql-parser");
+    expect(() => new pkg.Parser().astify(sql, { database: "hive" })).toThrow();
+  });
+  it("LIMIT is still read (so the determinism lint sees it) and no ORDER BY means multiset", () => {
+    expect(orderSpec(sql, ["a"])).toEqual({ kind: "multiset", limit: 5 });
+  });
+  it("an ORDER BY it cannot parse is raw, with the LIMIT kept", () => {
+    expect(orderSpec("SELECT a FROM t LATERAL VIEW explode(x) e AS y ORDER BY a LIMIT 5", ["a"])).toMatchObject({ kind: "raw", limit: 5 });
+  });
+});

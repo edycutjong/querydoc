@@ -186,7 +186,21 @@ describe("Verifier — hardening", () => {
     expect((await v.precheck("SELECT v FROM a ORDER BY created_at LIMIT 2")).reason).toMatch(/top-N cut not checkable/);
   });
   it("minPairs below 3 in the config is clamped to 3", async () => {
-    const { loadConfig } = await import("../src/config.js");
-    expect(loadConfig().minPairs).toBeGreaterThanOrEqual(3);
+    const { loadConfig, ROOT } = await import("../src/config.js");
+    const { mkdtempSync, readFileSync, writeFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+    const c = JSON.parse(readFileSync(join(ROOT, "querydoc.config.json"), "utf8"));
+    c.policy.timedPairs = 1;
+    const p = join(mkdtempSync(join(tmpdir(), "qd-cfg-")), "querydoc.config.json");
+    writeFileSync(p, JSON.stringify(c));
+    expect(loadConfig(p).minPairs).toBe(3);
+  });
+  it("explain() runs the guard first: a refused statement never reaches the engine", async () => {
+    const { ZetarisEngine } = await import("../src/engine/zetaris.js");
+    // A bogus jar path: had the guard let the statement through, the sidecar spawn would fail with a different error.
+    const e = new ZetarisEngine({ jdbcUrl: "jdbc:x", jdbcJar: "/nonexistent.jar", user: "u", password: "p" });
+    await expect(e.explain("DROP TABLE t")).rejects.toThrow(/guard refused/);
+    await expect(e.explain("SELECT TRANSFORM(a) USING 'id' FROM t")).rejects.toThrow(/guard refused/);
   });
 });
