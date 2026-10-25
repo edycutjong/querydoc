@@ -73,12 +73,16 @@ export function orderSpec(sql: string, outputColumns: string[], dialect = "hive"
 // window's OVER (ORDER BY …) does not count. Text-level, so it also holds for a statement the parser cannot read.
 export function hasTopLevelOrderBy(sql: string): boolean {
   const m = maskSql(sql);
+  const orderBy = /order\s+by\b/iy; // sticky: matches exactly at lastIndex, however much whitespace sits between the words
   let depth = 0;
   for (let i = 0; i < m.length; i++) {
     const c = m[i];
     if (c === "(") depth++;
     else if (c === ")") depth = Math.max(0, depth - 1);
-    else if (depth === 0 && (c === "o" || c === "O") && /^order\s+by\b/i.test(m.slice(i, i + 12)) && !/\w/.test(m[i - 1] ?? "")) return true;
+    else if (depth === 0 && (c === "o" || c === "O") && !/\w/.test(m[i - 1] ?? "")) {
+      orderBy.lastIndex = i;
+      if (orderBy.test(m)) return true;
+    }
   }
   return false;
 }

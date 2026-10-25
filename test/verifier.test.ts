@@ -193,6 +193,8 @@ describe("Verifier — hardening", () => {
     expect(hasTopLevelOrderBy("SELECT k, ROW_NUMBER() OVER (ORDER BY k) AS r FROM t")).toBe(false);
     expect(hasTopLevelOrderBy("SELECT k FROM a UNION ALL SELECT k FROM b ORDER BY k")).toBe(true);
     expect(hasTopLevelOrderBy("SELECT 'order by' AS x FROM t")).toBe(false);
+    expect(hasTopLevelOrderBy("SELECT k FROM t ORDER\n          BY k")).toBe(true);
+    expect(hasTopLevelOrderBy("SELECT k AS reorder FROM t")).toBe(false);
     const { v } = setup({ "SELECT k FROM t ORDER BY k": { columns: K, rows: range(5), wallMs: 1000 } });
     const pre = await v.precheck("SELECT k FROM t ORDER BY k");
     const a = await v.verify(attempt("SELECT k, ROW_NUMBER() OVER (ORDER BY k) AS r FROM t QUALIFY r > 0"), pre);

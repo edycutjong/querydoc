@@ -306,8 +306,9 @@ export class QueryDocService {
     // (minutes), and the UI renders nothing until /health answers.
     if (this.inflight > 0) engine = { name: mode.engine, ok: true, busy: true };
     else {
-      // A cold or unreachable live instance can take a minute to answer (connect + SELECT 1): /health waits a bounded time, the probe
-      // keeps running, and concurrent /health calls share it — the UI renders nothing until /health answers.
+      // A cold or unreachable live instance can take a minute or two to answer (sidecar start + connect + SELECT 1, each bounded):
+      // /health waits a bounded time, the probe keeps running, and concurrent /health calls share it — the UI renders nothing
+      // until /health answers.
       this.probe ??= (async () => {
         try {
           const h = await (await this.engine(mode.engine)).health();
