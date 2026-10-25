@@ -5,7 +5,7 @@ import { QueryDocService, type Reply } from "./service.js";
 
 const MAX_BODY = 256 * 1024;
 
-function readBody(req: IncomingMessage): Promise<{ ok: true; json: unknown } | { ok: false; reply: Reply }> {
+export function readBody(req: IncomingMessage): Promise<{ ok: true; json: unknown } | { ok: false; reply: Reply }> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -20,6 +20,7 @@ function readBody(req: IncomingMessage): Promise<{ ok: true; json: unknown } | {
     });
     req.on("end", () => {
       if (dead) return;
+      dead = true;
       const text = Buffer.concat(chunks).toString("utf8");
       try {
         resolve({ ok: true, json: text.trim() ? JSON.parse(text) : {} });
@@ -27,7 +28,14 @@ function readBody(req: IncomingMessage): Promise<{ ok: true; json: unknown } | {
         resolve({ ok: false, reply: { status: 400, json: { status: "error", error: { type: "InvalidJson", message: "request body is not valid JSON", recoverable: true } } } });
       }
     });
-    req.on("error", () => undefined);
+    // A body that never ends (client reset mid-upload) must still settle, or the handler awaits for ever.
+    const aborted = () => {
+      if (dead) return;
+      dead = true;
+      resolve({ ok: false, reply: { status: 400, json: { status: "error", error: { type: "InvalidInput", message: "request body aborted", recoverable: true } } } });
+    };
+    req.on("error", aborted);
+    req.on("close", aborted);
   });
 }
 
