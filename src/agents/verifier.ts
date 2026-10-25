@@ -233,7 +233,11 @@ export class Verifier {
     if (!g.ok) return finish({ ...att, verdict: "REFUSED", reason: "GUARD", detail: `read-only guard: ${g.reason}` });
     // The original passed this lint in the pre-check; a candidate must too. One diff run cannot show a rewrite equal when its own
     // answer can change between runs (rand(), current_date, sampling, an unordered LIMIT): equal today is not equivalent.
-    const lint = lintDeterminism(sql, orderSpec(sql, [], this.cfg.dialect));
+    const candSpec = orderSpec(sql, [], this.cfg.dialect);
+    const lint = lintDeterminism(sql, candSpec);
+    // An ordered original's order is part of its answer. A candidate without a top-level ORDER BY may return the same sequence on
+    // one run (a sorted subquery, a single-threaded scan) and another on the next: one positional match proves nothing.
+    if (pre.spec.kind !== "multiset" && candSpec.kind === "multiset") lint.push("no top-level ORDER BY, but the original's order is part of its result");
     if (lint.length) return finish({ ...att, verdict: "REFUSED", reason: "GUARD", detail: `determinism lint: ${lint.join("; ")} — not executed` });
 
     // Ledger reuse (architecture §Verifier order step 1): a refusal recorded on this original, this candidate and this original-result

@@ -186,6 +186,15 @@ describe("Verifier — timing table end to end (stub engine)", () => {
 });
 
 describe("Verifier — hardening", () => {
+  it("an ordered original refuses a candidate that has no top-level ORDER BY, even if it returned the same sequence once", async () => {
+    const { v, engine } = setup({ "SELECT k FROM t ORDER BY k": { columns: K, rows: range(5), wallMs: 1000 } });
+    const pre = await v.precheck("SELECT k FROM t ORDER BY k");
+    const before = engine.calls.length;
+    const a = await v.verify(attempt("SELECT k FROM (SELECT k FROM t ORDER BY k) s"), pre);
+    expect(a).toMatchObject({ verdict: "REFUSED", reason: "GUARD" });
+    expect(a.detail).toMatch(/no top-level ORDER BY/);
+    expect(engine.calls.length).toBe(before);
+  });
   it("a candidate whose result changes during timing is refused (ROW_DIFF), not timed into an ACCEPT", async () => {
     const { v } = setup({
       "SELECT k FROM t": { columns: K, rows: range(5), wallMs: 1000 },
