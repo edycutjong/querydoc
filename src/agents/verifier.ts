@@ -282,6 +282,8 @@ export class Verifier {
       this.policy,
       capMs,
     );
+    // Pair exclusion (a pair dropped as a cache hit) is not wired: the local JDBC path reports no cache-hit flag, so no pair is
+    // ever marked excluded and excluded_pairs stays 0. decideTiming handles it (tested in test/timing.test.ts) for engines that do.
     const dec = decideTiming(pairs, this.policy);
     att.timing_ms = {
       orig: pairs.flatMap((p) => (p.orig === null ? [] : [r1(p.orig)])),

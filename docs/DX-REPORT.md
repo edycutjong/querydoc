@@ -96,9 +96,12 @@ for the hero, pair and trap executions; the adapter's default is 120 s, so live 
   **28.5 / 16.0 / 16.6 s** → **ACCEPT**, median speedup **2.12×**, median saving **18.0 s**, 3 of 3 pairs faster, timing cap
   232.2 s. Trap: candidate returned 129,752 where the original returns **129,776** → **REJECT (ROW_DIFF)**, not timed.
   `SELECT 1` median 49.4 ms, spread 8.2 ms over runs 2–10. Kill rule: **YES** (6 comparable queries; engine time
-  34,808 ms ≥ 10,697.4 ms). trace.jsonl: 16 Verifier events, 4 of them critiques. The two runs differ (1.72× vs 2.12×) because
-  a ~35 s query on this platform moves by several seconds from run to run, which is why the gate needs a majority of pairs
-  and not a single ratio. The bullets below are the first run.
+  34,808 ms = hero median 34,857.4 − `SELECT 1` median 49.4, against 6 × the config's noise floor of 1,782.9 ms = 10,697.4 ms;
+  that floor is Day 1's, 3 × its 594.3 ms spread, kept because it is the more conservative one). trace.jsonl: 16 Verifier
+  events, 4 of them critiques. The two runs differ (1.72× vs 2.12×) and pair 1 here was only 1.17× (33.4 s vs 28.5 s): a ~35 s
+  query on this platform moves by several seconds from run to run, which is why ACCEPT needs the median ratio, the saving
+  floor and a majority of faster pairs together, never one pair's ratio. Pair exclusion (cache hits) is not wired on this
+  path: the JDBC driver reports no cache-hit flag, so no pair is excluded. The bullets below are the first run.
 
 - **First live verdicts.** Hero, pre-check: two runs of the original, 36.7 s and 25.2 s, same fingerprint, 1 row. Candidate
   (the hand-written join elimination, `evals/queries/zetaris/01-hero-rewrite.sql`): same row, then three alternating pairs,
