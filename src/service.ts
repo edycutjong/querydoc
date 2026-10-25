@@ -32,6 +32,7 @@ export class ApiError extends Error {
 const fail = (e: ApiError): Reply => ({ status: e.http, json: { status: "error", error: { type: e.type, message: e.message, recoverable: e.recoverable } } });
 
 export interface ServiceOptions {
+  healthWaitMs?: number; // how long GET /health waits for an engine probe (default 5000)
   root?: string; // repository root (data/, fixtures/, recorded/ live under it)
   env?: NodeJS.ProcessEnv;
   cacheWrite?: boolean; // record.ts turns the llm-cache write on for the canonical pass only
@@ -56,6 +57,7 @@ export class QueryDocService {
   private readonly engines = new Map<string, Promise<QueryEngine>>();
   private queue: Promise<unknown> = Promise.resolve();
   private inflight = 0; // POST /run requests queued or running
+  private probe: Promise<{ ok: boolean; error?: string }> | null = null; // the engine probe in flight, shared by concurrent /health
   private readonly llm: LlmGateway;
 
   constructor(private readonly o: ServiceOptions = {}) {
@@ -304,12 +306,21 @@ export class QueryDocService {
     // (minutes), and the UI renders nothing until /health answers.
     if (this.inflight > 0) engine = { name: mode.engine, ok: true, busy: true };
     else {
-      try {
-        const h = await (await this.engine(mode.engine)).health();
-        engine = { name: mode.engine, ok: h.ok, ...(h.error ? { error: h.error } : {}) };
-      } catch (e) {
-        engine = { name: mode.engine, ok: false, error: (e as Error).message.slice(0, 200) };
-      }
+      // A cold or unreachable live instance can take a minute to answer (connect + SELECT 1): /health waits a bounded time, the probe
+      // keeps running, and concurrent /health calls share it — the UI renders nothing until /health answers.
+      this.probe ??= (async () => {
+        try {
+          const h = await (await this.engine(mode.engine)).health();
+          return { ok: h.ok, ...(h.error ? { error: h.error } : {}) };
+        } catch (e) {
+          return { ok: false, error: (e as Error).message.slice(0, 200) };
+        }
+      })().finally(() => (this.probe = null));
+      const wait = this.o.healthWaitMs ?? 5_000;
+      let timer: NodeJS.Timeout | undefined;
+      const r = await Promise.race([this.probe, new Promise<null>((res) => (timer = setTimeout(() => res(null), wait)))]);
+      clearTimeout(timer);
+      engine = r ? { name: mode.engine, ...r } : { name: mode.engine, ok: false, error: `no answer within ${wait / 1000} s (the probe continues)` };
     }
     return { status: 200, json: { status: engine.ok ? "ok" : "degraded", engine, ...(mode.banner ? { banner: mode.banner } : {}), llm: { provider: this.llm.provider ?? "none", configured: this.llm.live }, llm_cache: existsSync(this.p("llm-cache")), calibration: this.calibration(), playbook_seed: existsSync(this.p("fixtures", "hmem-seed", "sample", "state.json")) } };
   }

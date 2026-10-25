@@ -70,6 +70,27 @@ describe("GET /health during a run", () => {
     expect(((await deciding) as { status: number }).status).toBe(404);
   });
 
+  it("a slow engine probe answers within the bounded wait, and concurrent /health calls share one probe", async () => {
+    let probes = 0;
+    const slow = new Proxy(engine, {
+      get(t, k, r) {
+        if (k === "health") return async () => { probes++; await new Promise((res) => setTimeout(res, 400)); return t.health(); };
+        const v = Reflect.get(t, k, r);
+        return typeof v === "function" ? v.bind(t) : v;
+      },
+    }) as unknown as QueryEngine;
+    const svc = new QueryDocService({ root, env: { SAMPLE_MODE: "true" }, llm: llm(), engineFactory: async () => slow, healthWaitMs: 50 });
+    const t0 = performance.now();
+    const [a, b] = (await Promise.all([svc.health(), svc.health()])) as { json: { engine: { ok: boolean; error?: string } } }[];
+    expect(performance.now() - t0).toBeLessThan(300);
+    expect(a!.json.engine).toMatchObject({ ok: false, error: expect.stringMatching(/no answer within 0.05 s/) });
+    expect(b!.json.engine.ok).toBe(false);
+    expect(probes).toBe(1);
+    await new Promise((res) => setTimeout(res, 450)); // the probe finishes in the background
+    expect(((await svc.health()) as { json: { engine: { ok: boolean } } }).json.engine.ok).toBe(false); // a new probe, again slower than the wait
+    expect(probes).toBe(2);
+  });
+
   it("close() does not throw when an engine open is still pending and then fails", async () => {
     const svc = new QueryDocService({ root, env: { SAMPLE_MODE: "true" }, llm: llm(), engineFactory: () => new Promise((_, no) => setTimeout(() => no(new Error("no engine")), 50)) });
     const h = svc.health(); // starts opening the engine
