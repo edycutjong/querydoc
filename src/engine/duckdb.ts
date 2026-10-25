@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
 import { ROOT } from "../config.js";
 import { duckdbFingerprintSql } from "../verify/fingerprint.js";
@@ -129,4 +129,4 @@ export class DuckDbEngine implements QueryEngine {
   }
 }
 
-export const sampleDirExists = (dir = SAMPLE_DIR): boolean => existsSync(join(dir, "trips.parquet")) && existsSync(join(dirname(dir), "sample", "zones.parquet"));
+export const sampleDirExists = (dir = SAMPLE_DIR): boolean => existsSync(join(dir, "trips.parquet")) && existsSync(join(dir, "zones.parquet"));
